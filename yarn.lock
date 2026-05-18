@@ -451,22 +451,6 @@
   resolved "https://registry.yarnpkg.com/@discoveryjs/json-ext/-/json-ext-0.5.7.tgz#1d572bfbbe14b7704e0ba0f39b74815b84870d70"
   integrity sha512-dBVuXR082gk3jsFp7Rd/JI4kytwGHecnCoTtXFb7DB6CNHp4rg5k1bhg0nWdLGLnOV71lmDzGQaLMy8iPLY0pw==
 
-"@duckdb/duckdb-wasm-shell@file:packages/duckdb-wasm-shell":
-  version "1.11.0"
-  dependencies:
-    "@duckdb/duckdb-wasm" "file:packages/duckdb-wasm"
-    qs "^6.14.1"
-    xterm "^5.3.0"
-    xterm-addon-fit "^0.8.0"
-    xterm-addon-web-links "^0.9.0"
-    xterm-addon-webgl "^0.16.0"
-
-"@duckdb/duckdb-wasm@file:packages/duckdb-wasm":
-  version "1.11.0"
-  dependencies:
-    apache-arrow "^17.0.0"
-    qs "^6.14.1"
-
 "@emotion/is-prop-valid@^0.8.2":
   version "0.8.8"
   resolved "https://registry.yarnpkg.com/@emotion/is-prop-valid/-/is-prop-valid-0.8.8.tgz#db28b1c4368a259b60a97311d6a952d4fd01ac1a"
@@ -636,6 +620,22 @@
     "@shikijs/themes" "^3.20.0"
     "@shikijs/types" "^3.20.0"
     "@shikijs/vscode-textmate" "^10.0.2"
+
+"@haybarn/haybarn-wasm-shell@file:packages/duckdb-wasm-shell":
+  version "1.5.2-rc1"
+  dependencies:
+    "@haybarn/haybarn-wasm" "file:packages/duckdb-wasm"
+    qs "^6.14.1"
+    xterm "^5.3.0"
+    xterm-addon-fit "^0.8.0"
+    xterm-addon-web-links "^0.9.0"
+    xterm-addon-webgl "^0.16.0"
+
+"@haybarn/haybarn-wasm@file:packages/duckdb-wasm":
+  version "1.5.2-rc1"
+  dependencies:
+    apache-arrow "^17.0.0"
+    qs "^6.14.1"
 
 "@humanwhocodes/config-array@^0.11.14":
   version "0.11.14"
@@ -1251,10 +1251,10 @@
   dependencies:
     "@types/react" "*"
 
-"@types/react-virtualized@^9.21.29":
-  version "9.21.29"
-  resolved "https://registry.yarnpkg.com/@types/react-virtualized/-/react-virtualized-9.21.29.tgz#480b647f43a42f8e414d1af49a0ccd9b16537655"
-  integrity sha512-+ODVQ+AyKngenj4OPpg43Hz4B9Rdjuz1Naxu9ypNc3Cjo0WVZTYhqXfF/Nm38i8PV/YXECRIl4mTAZK5hq2B+g==
+"@types/react-virtualized@^9.22.3":
+  version "9.22.3"
+  resolved "https://registry.yarnpkg.com/@types/react-virtualized/-/react-virtualized-9.22.3.tgz#5fd9b28229c5fcead489ed5f3de1cc81abcbc478"
+  integrity sha512-UKRWeBIrECaKhE4O//TSFhlgwntMwyiEIOA7WZoVkr52Jahv0dH6YIOorqc358N2V3oKFclsq5XxPmx2PiYB5A==
   dependencies:
     "@types/prop-types" "*"
     "@types/react" "*"
@@ -7017,10 +7017,10 @@ react-transition-group@^4.4.5:
     loose-envify "^1.4.0"
     prop-types "^15.6.2"
 
-react-virtualized@9.22.5:
-  version "9.22.5"
-  resolved "https://registry.yarnpkg.com/react-virtualized/-/react-virtualized-9.22.5.tgz#bfb96fed519de378b50d8c0064b92994b3b91620"
-  integrity sha512-YqQMRzlVANBv1L/7r63OHa2b0ZsAaDp1UhVNEdUaXI8A5u6hTpA5NYtUueLH2rFuY/27mTGIBl7ZhqFKzw18YQ==
+react-virtualized@9.22.6:
+  version "9.22.6"
+  resolved "https://registry.yarnpkg.com/react-virtualized/-/react-virtualized-9.22.6.tgz#3ae2aa69eca61cf3af332e2f9d6b4aa5638786d5"
+  integrity sha512-U5j7KuUQt3AaMatlMJ0UJddqSiX+Km0YJxSqbAzIiGw5EmNz0khMyqP2hzgu4+QUtm+QPIrxzUX4raJxmVJnHg==
   dependencies:
     "@babel/runtime" "^7.7.2"
     clsx "^1.0.4"
