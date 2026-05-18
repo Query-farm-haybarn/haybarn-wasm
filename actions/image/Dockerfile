@@ -1,5 +1,12 @@
-FROM ubuntu:23.10
+FROM ubuntu:24.04
 
+# Build toolchain only — no Chromium / Chrome in the image.
+# Karma+browser tests need a real Chrome which Ubuntu 24.04 only ships
+# via snap (won't run inside a container). For local smoke builds we
+# only need the wasm artifact to compile. Browser tests run in CI on a
+# runner that has Chrome pre-installed by actions/setup-node or are
+# served by a separate test-runner image — they don't belong in the
+# build toolchain image.
 RUN apt-get update -qq \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y \
         tini build-essential git \
@@ -7,22 +14,13 @@ RUN apt-get update -qq \
         bison flex \
         brotli rsync \
         libpthread-stubs0-dev \
-        chromium-browser \
         wget gnupg ca-certificates procps libxss1 \
         zip sqlite3 \
         software-properties-common \
-    && add-apt-repository ppa:mozillateam/ppa \
-    && mkdir -p /etc/apt/preferences.d/ \
-    && apt-get update -qq \
-    && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list' \
-    && apt-get update \
-    && apt-get install -y google-chrome-stable \
     && apt-get clean \
-    && export CHROME_BIN=/usr/bin/google-chrome \
-    && rm -rf /var/lib/apt/lists/* /etc/apt/sources.list.d/google.list
+    && rm -rf /var/lib/apt/lists/*
 
-ARG EMSDK_VERSION="3.1.56"
+ARG EMSDK_VERSION="3.1.71"
 RUN mkdir -p /opt/emsdk \
     && cd /opt/emsdk \
     && curl -SL https://github.com/emscripten-core/emsdk/archive/${EMSDK_VERSION}.tar.gz | tar -xz --strip-components=1 \
