@@ -175,22 +175,20 @@ jobs:
                       ./target/release/dataprep
                   retention-days: 1
 
-    # Engine wasm compile — all 6 variants in one matrix so a single
-    # `fail-fast` short-circuits the rest on first failure.
+    # Engine wasm compile — all 6 variants in one matrix with fail-fast.
     #
-    # Runs inside the shared Haybarn build image
-    # (ghcr.io/query-farm-haybarn/haybarn-wasm-base) via the
-    # `./.github/actions/haybarn-wasm-ci-env` composite. The image has
-    # emsdk baked at the fixed path /emsdk; this is intentional, since
-    # `mymindstorm/setup-emsdk` installs to a runner-temp dir whose
-    # name contains a per-run UUID — that UUID gets hashed into every
-    # ccache entry, defeating cross-run cache reuse. With the docker
-    # image's stable path, ccache hashes match across runs and across
-    # the haybarn-wasm <-> haybarn-extension-ci-tools repo boundary.
+    # Runs DIRECTLY on the ubuntu-latest runner (not in a container).
+    # Earlier attempts at running this in ghcr.io/.../haybarn-wasm-base
+    # via a composite action introduced too many failure modes
+    # (env-var propagation, eval-shell quoting, signal handling) for
+    # the ratio of benefit. The on-runner approach keeps it boring.
     #
-    # ccache binary inside the image is 4.13.6 (musl-static). The
-    # runner's apt ccache is 4.9.1, which has a known HTTP bearer-auth
-    # bug that silently drops remote writes — we deliberately avoid it.
+    # The one runner-vs-container drawback we have to mitigate ourselves:
+    # `mymindstorm/setup-emsdk` installs emsdk into a per-run temp dir
+    # whose path contains a UUID, which gets hashed into every ccache
+    # entry — defeats cache reuse. Fix: install emsdk manually at the
+    # fixed path /opt/emsdk and cache that dir with actions/cache so
+    # ccache hashes are stable across runs.
     wasm:
         name: 'Wasm / ${{ matrix.variant.name }}'
         runs-on: ubuntu-latest
@@ -216,51 +214,94 @@ jobs:
                   submodules: 'recursive'
                   fetch-depth: 0
 
-            # Hot local cache. The composite action sets
-            # CCACHE_DIR=/github/workspace/.ccache, so backing that path with
-            # actions/cache gives us per-repo persistence between runs even
-            # when the R2 remote is cold or unreachable. Cache key is
-            # per-variant + submodule SHA so an engine bump invalidates
-            # cleanly; restore-keys are looser so a small unrelated change
-            # still hits.
-            - name: Restore ccache (local layer)
+            # Pin emsdk install location so ccache hashes are stable across
+            # runs. mymindstorm/setup-emsdk@v14 installs to a UUID-named
+            # temp dir; we install manually to /opt/emsdk instead.
+            - name: Cache /opt/emsdk
+              id: cache-emsdk
               uses: actions/cache@v5
               with:
-                  path: .ccache
+                  path: /opt/emsdk
+                  key: emsdk-${{ env.EMSCRIPTEN_VERSION }}-x86_64-linux
+
+            - name: Install emsdk at /opt/emsdk
+              if: steps.cache-emsdk.outputs.cache-hit != 'true'
+              shell: bash
+              run: |
+                  set -euxo pipefail
+                  sudo mkdir -p /opt
+                  sudo chown -R "$(id -u):$(id -g)" /opt
+                  git clone --depth=1 https://github.com/emscripten-core/emsdk.git /opt/emsdk
+                  cd /opt/emsdk
+                  ./emsdk install "$EMSCRIPTEN_VERSION"
+                  ./emsdk activate "$EMSCRIPTEN_VERSION"
+
+            - name: Activate emsdk + put on PATH
+              shell: bash
+              run: |
+                  set -euxo pipefail
+                  source /opt/emsdk/emsdk_env.sh
+                  echo "EMSDK=$EMSDK"               >> "$GITHUB_ENV"
+                  echo "EMSDK_NODE=$EMSDK_NODE"     >> "$GITHUB_ENV"
+                  echo "EM_CONFIG=$EM_CONFIG"       >> "$GITHUB_ENV"
+                  echo "/opt/emsdk"                          >> "$GITHUB_PATH"
+                  echo "/opt/emsdk/upstream/emscripten"      >> "$GITHUB_PATH"
+                  echo "$(dirname "$EMSDK_NODE")"            >> "$GITHUB_PATH"
+
+            # Apt ccache on ubuntu-24.04 is 4.9.1 which has a known HTTP
+            # bearer-auth bug that silently drops remote writes. Pull the
+            # musl-static 4.13.6 release instead — same binary
+            # haybarn-extension-ci-tools standardizes on.
+            - name: Install ccache 4.13.6 (musl-static)
+              shell: bash
+              run: |
+                  set -euxo pipefail
+                  curl -fsSL "https://github.com/ccache/ccache/releases/download/v4.13.6/ccache-4.13.6-linux-x86_64-musl-static.tar.xz" \
+                    | sudo tar -xJ -C /opt
+                  sudo install -m 0755 /opt/ccache-4.13.6-linux-x86_64-musl-static/ccache /usr/local/bin/ccache
+                  ccache --version
+
+            # Hot local cache for the duckdb engine compile. Keyed by
+            # variant + submodule CMake hashes so an engine bump
+            # invalidates cleanly; loose restore-keys keep small changes
+            # warm. R2 remote (CCACHE_REMOTE_STORAGE env) is the
+            # cross-run/cross-repo durable layer underneath.
+            - name: Cache ccache (local layer)
+              uses: actions/cache@v5
+              with:
+                  path: ~/.cache/ccache
                   key: ccache-${{ matrix.variant.feature }}-${{ matrix.variant.loadable && 'loadable' || 'plain' }}-${{ hashFiles('submodules/duckdb/**/CMakeLists.txt', '.gitmodules') }}
                   restore-keys: |
                       ccache-${{ matrix.variant.feature }}-${{ matrix.variant.loadable && 'loadable' || 'plain' }}-
                       ccache-${{ matrix.variant.feature }}-
 
+            - name: Install wabt (loadable variants only)
+              if: ${{ matrix.variant.loadable != '' }}
+              shell: bash
+              run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends wabt
+
             - name: Build wasm artifacts
-              uses: ./.github/actions/haybarn-wasm-ci-env
-              with:
-                  script: |
-                    set -euxo pipefail
-                    apt-get update -qq && apt-get install -y --no-install-recommends wabt || true
-                    # Zero ccache stats before the build so the post-build
-                    # readout reflects this run only (cumulative would
-                    # silently roll forward stats from restored cache).
-                    ccache --version
-                    ccache -z
-                    make apply_patches
-                    cd submodules/duckdb && (git tag "${{ inputs.override_git_describe }}" 2>/dev/null || true) && cd ../..
-                    git submodule status > git_submodule_status.txt
-                    USE_GENERATED_EXPORTED_LIST="${{ env.DEFAULT_USE_GENERATED_EXPORTED_LIST }}" \
-                      DUCKDB_PLATFORM="${{ matrix.variant.platform }}" \
-                      DUCKDB_WASM_LOADABLE_EXTENSIONS="${{ matrix.variant.loadable }}" \
-                      GEN=ninja \
-                      ./scripts/wasm_build_lib.sh ${{ matrix.variant.mode }} ${{ matrix.variant.feature }}
+              shell: bash
+              env:
+                  USE_GENERATED_EXPORTED_LIST: ${{ env.DEFAULT_USE_GENERATED_EXPORTED_LIST }}
+                  DUCKDB_PLATFORM: ${{ matrix.variant.platform }}
+                  DUCKDB_WASM_LOADABLE_EXTENSIONS: ${{ matrix.variant.loadable }}
+                  GEN: ninja
+              run: |
+                  set -euxo pipefail
+                  ccache -z
+                  make apply_patches
+                  cd submodules/duckdb && (git tag "${{ inputs.override_git_describe }}" 2>/dev/null || true) && cd ../..
+                  git submodule status > git_submodule_status.txt
+                  ./scripts/wasm_build_lib.sh ${{ matrix.variant.mode }} ${{ matrix.variant.feature }}
 
             - name: Show ccache stats (post-build)
               if: always()
-              uses: ./.github/actions/haybarn-wasm-ci-env
-              with:
-                  script: |
-                    ccache --version
-                    echo '::group::ccache -sv (verbose)'
-                    ccache -sv || ccache -s
-                    echo '::endgroup::'
+              shell: bash
+              run: |
+                  echo '::group::ccache -sv'
+                  ccache -sv || ccache -s
+                  echo '::endgroup::'
 
             - name: Upload artifact
               uses: actions/upload-artifact@v7
