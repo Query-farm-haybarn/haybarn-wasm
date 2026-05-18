@@ -208,6 +208,22 @@ jobs:
                   submodules: 'recursive'
                   fetch-depth: 0
 
+            # Hot local cache. The composite action sets
+            # CCACHE_DIR=/github/workspace/.ccache, so backing that path with
+            # actions/cache gives us per-repo persistence between runs even
+            # when the R2 remote is cold or unreachable. Cache key is
+            # per-variant + submodule SHA so an engine bump invalidates
+            # cleanly; restore-keys are looser so a small unrelated change
+            # still hits.
+            - name: Restore ccache (local layer)
+              uses: actions/cache@v5
+              with:
+                  path: .ccache
+                  key: ccache-${{ matrix.variant.feature }}-${{ matrix.variant.loadable && 'loadable' || 'plain' }}-${{ hashFiles('submodules/duckdb/**/CMakeLists.txt', '.gitmodules') }}
+                  restore-keys: |
+                      ccache-${{ matrix.variant.feature }}-${{ matrix.variant.loadable && 'loadable' || 'plain' }}-
+                      ccache-${{ matrix.variant.feature }}-
+
             - name: Build wasm artifacts
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
