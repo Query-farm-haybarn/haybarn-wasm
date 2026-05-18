@@ -48,7 +48,7 @@ ExternalProject_Add(
              -DDUCKDB_EXPLICIT_PLATFORM=${DUCKDB_EXPLICIT_PLATFORM}
              -DSMALLER_BINARY=1
   BUILD_BYPRODUCTS
-    <INSTALL_DIR>/lib/libduckdb_static.a
+    <INSTALL_DIR>/lib/libhaybarn_static.a
     <INSTALL_DIR>/lib/libduckdb_fmt.a
     <INSTALL_DIR>/lib/libduckdb_utf8proc.a
     <INSTALL_DIR>/lib/libduckdb_fastpforlib.a
@@ -67,7 +67,7 @@ set(DUCKDB_UTF8PROC_INCLUDE_DIR
 set(DUCKDB_RE2_INCLUDE_DIR
     "${DUCKDB_SOURCE_DIR}/third_party/re2")
 set(DUCKDB_FMT_INCLUDE_DIR "${DUCKDB_SOURCE_DIR}/third_party/fmt/include")
-set(DUCKDB_LIBRARY_PATH "${install_dir}/lib/libduckdb_static.a")
+set(DUCKDB_LIBRARY_PATH "${install_dir}/lib/libhaybarn_static.a")
 file(MAKE_DIRECTORY ${DUCKDB_INCLUDE_DIR})
 
 add_library(duckdb STATIC IMPORTED)

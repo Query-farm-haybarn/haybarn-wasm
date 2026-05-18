@@ -1,7 +1,6 @@
 [submodule "submodules/duckdb"]
 	path = submodules/duckdb
 	url = https://github.com/Query-farm-haybarn/haybarn
-	branch = haybarn
 [submodule "submodules/arrow"]
 	path = submodules/arrow
 	url = https://github.com/apache/arrow

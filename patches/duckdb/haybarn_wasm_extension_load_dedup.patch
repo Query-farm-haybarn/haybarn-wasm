@@ -1,0 +1,22 @@
+Drop a dead `ParsedExtensionMetaData parsed_metadata;` declaration in
+the haybarn engine's `extension_load.cpp` that conflicts with the
+`auto parsed_metadata = ParseExtensionMetaData(*handle);` later in
+the same function. Only manifests as a compile error when the engine
+is built with `WASM_LOADABLE_EXTENSIONS` (i.e. from this repo) — the
+unused declaration is harmless in native builds, so the engine repo
+doesn't carry this fix.
+
+If/when the engine fork removes the dead declaration upstream, this
+patch becomes a "previously applied" no-op and can be deleted.
+
+diff --git a/src/main/extension/extension_load.cpp b/src/main/extension/extension_load.cpp
+--- a/src/main/extension/extension_load.cpp
++++ b/src/main/extension/extension_load.cpp
+@@ -374,7 +374,6 @@
+ 	auto filename = fs.ConvertSeparators(extension);
+
+ 	bool direct_load;
+-	ParsedExtensionMetaData parsed_metadata;
+ 	ExtensionInstallMode install_mode = ExtensionInstallMode::UNKNOWN;
+
+ 	// shorthand case
