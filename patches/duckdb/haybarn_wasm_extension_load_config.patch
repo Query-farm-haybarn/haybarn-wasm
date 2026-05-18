@@ -1,0 +1,26 @@
+Fix an undefined `config` reference in the haybarn engine's
+`extension_load.cpp` inside the `#ifdef WASM_LOADABLE_EXTENSIONS`
+branch. Only manifests when the engine is compiled with
+`WASM_LOADABLE_EXTENSIONS=1` (i.e. from this repo's `*_loadable`
+build matrix entries) — native builds and non-loadable wasm builds
+don't trip it because the dead branch is excluded by the preprocessor.
+
+Function signature is `TryInitialLoad(DatabaseInstance &db, ...)`, so
+the in-scope reference is `db.config`. Changing `&config` → `&db.config`
+matches the rest of the function's existing pattern.
+
+If/when the engine fork merges this fix upstream, the patch becomes a
+"previously applied" no-op and can be deleted.
+
+diff --git a/src/main/extension/extension_load.cpp b/src/main/extension/extension_load.cpp
+--- a/src/main/extension/extension_load.cpp
++++ b/src/main/extension/extension_load.cpp
+@@ -377,7 +377,7 @@
+ 		direct_load = false;
+ 		string extension_name = ApplyExtensionAlias(extension);
+ #ifdef WASM_LOADABLE_EXTENSIONS
+-		string url_template = ExtensionUrlTemplate(&config, "");
++		string url_template = ExtensionUrlTemplate(&db.config, "");
+ 		string url = ExtensionFinalizeUrlTemplate(url_template, extension_name);
+
+ 		char *str = (char *)EM_ASM_PTR(
