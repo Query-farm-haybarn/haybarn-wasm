@@ -230,6 +230,11 @@ jobs:
                   script: |
                     set -euxo pipefail
                     apt-get update -qq && apt-get install -y --no-install-recommends wabt || true
+                    # Zero ccache stats before the build so the post-build
+                    # readout reflects this run only (cumulative would
+                    # silently roll forward stats from restored cache).
+                    ccache --version
+                    ccache -z
                     make apply_patches
                     cd submodules/duckdb && (git tag "${{ inputs.override_git_describe }}" 2>/dev/null || true) && cd ../..
                     git submodule status > git_submodule_status.txt
@@ -238,6 +243,16 @@ jobs:
                       DUCKDB_WASM_LOADABLE_EXTENSIONS="${{ matrix.variant.loadable }}" \
                       GEN=ninja \
                       ./scripts/wasm_build_lib.sh ${{ matrix.variant.mode }} ${{ matrix.variant.feature }}
+
+            - name: Show ccache stats (post-build)
+              if: always()
+              uses: ./.github/actions/haybarn-wasm-ci-env
+              with:
+                  script: |
+                    ccache --version
+                    echo '::group::ccache -sv (verbose)'
+                    ccache -sv || ccache -s
+                    echo '::endgroup::'
 
             - name: Upload artifact
               uses: actions/upload-artifact@v7
