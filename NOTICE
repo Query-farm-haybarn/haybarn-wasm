@@ -1,0 +1,28 @@
+Haybarn-Wasm
+============
+
+Haybarn-Wasm is a derived distribution of DuckDB-Wasm, published by
+Query Farm LLC under the same MIT License.
+
+The original work is:
+
+    DuckDB-Wasm
+    Copyright 2018–2025 Stichting DuckDB Foundation
+    Licensed under the MIT License
+    https://github.com/duckdb/duckdb-wasm
+
+This fork (Query-farm-haybarn/haybarn-wasm) adds Haybarn-specific changes
+on top of that work, including:
+
+  * npm package renames (@duckdb/* → @haybarn/*)
+  * an engine submodule re-pointed at the Haybarn engine fork
+    (Query-farm-haybarn/haybarn), which carries the Haybarn patch
+    stack (extension repository URLs, trust root, branding strings)
+  * documentation, NOTICE, and CI changes appropriate to the Haybarn
+    distribution
+
+DuckDB is a trademark of the DuckDB Foundation. Haybarn is an independent
+derived distribution and is not affiliated with, endorsed by, or
+sponsored by the DuckDB Foundation. The Haybarn name is used as the
+distribution identifier; "Haybarn, powered by DuckDB" is the canonical
+tagline for the project.
