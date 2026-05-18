@@ -30,6 +30,17 @@ env:
   EMSCRIPTEN_VERSION: '3.1.71'
   EMSCRIPTEN_VERSION_COI: '3.1.57'
   DEFAULT_USE_GENERATED_EXPORTED_LIST: 'no'
+  # R2-backed ccache shared with haybarn-extension-ci-tools — same
+  # Cloudflare Worker, same bucket, same bearer-token-auth scheme.
+  # Survives across runs, branches, and the duckdb-wasm <-> extensions
+  # repo boundary. Hot reuse: extension wasm builds populate the same
+  # hashes that the engine build needs.
+  CCACHE_REMOTE_STORAGE: "http://haybarn-vcpkg-cache.rusty-bb6.workers.dev/ccache|bearer-token=${{ secrets.HAYBARN_VCPKG_TOKEN }}|connect-timeout=10000|operation-timeout=30000"
+  # sccache for Rust shell crate (packages/duckdb-wasm-shell/crate).
+  SCCACHE_WEBDAV_ENDPOINT: "https://haybarn-vcpkg-cache.rusty-bb6.workers.dev/sccache/"
+  SCCACHE_WEBDAV_TOKEN: ${{ secrets.HAYBARN_VCPKG_TOKEN }}
+  RUSTC_WRAPPER: sccache
+  CARGO_INCREMENTAL: 0
 
 jobs:
     clang_format:
@@ -41,7 +52,7 @@ jobs:
                   submodules: 'recursive'
 
             - name: Lint ./lib
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       python3 ./scripts/run_clang_format.py \
@@ -70,25 +81,25 @@ jobs:
                       ${{ runner.os }}-yarn-
 
             - name: Prepare repository
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       yarn install --frozen-lockfile --prefer-offline
 
             - name: Lint @haybarn/haybarn-wasm
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       yarn workspace @haybarn/haybarn-wasm run lint
 
             - name: Lint @haybarn/haybarn-wasm-shell
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       yarn workspace @haybarn/haybarn-wasm-shell run lint
 
             - name: Lint @haybarn/benchmarks
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       yarn workspace @haybarn/benchmarks run lint
@@ -110,7 +121,7 @@ jobs:
 
             - name: Build generator
               if: steps.cache-generator.outputs.cache-hit != 'true'
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       make -C ./submodules/tpch-dbgen/dbgen/ dbgen
@@ -509,7 +520,7 @@ jobs:
                   (cd ./submodules/duckdb && git fetch --all --tags)
 
             - name: Prepare environment
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       git config --global --add safe.directory '*'
@@ -548,7 +559,7 @@ jobs:
                       CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome
             
             #            - name: Test @haybarn/haybarn-wasm on Firefox
-            #              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+            #              uses: ./.github/actions/haybarn-wasm-ci-env
             #              with:
             #                  script: |-
             #                      yarn workspace @haybarn/haybarn-wasm test:firefox
@@ -609,7 +620,7 @@ jobs:
 
             - name: Preparation TPCH 0.01
               if: github.ref == 'refs/heads/haybarn'
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       git config --global --add safe.directory '*'
@@ -643,7 +654,7 @@ jobs:
 
             - name: Preparation TPCH 0.1
               if: github.ref == 'refs/heads/haybarn'
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       git config --global --add safe.directory '*'
@@ -677,7 +688,7 @@ jobs:
 
             - name: Preparation TPCH 0.25
               if: github.ref == 'refs/heads/haybarn'
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       git config --global --add safe.directory '*'
@@ -711,7 +722,7 @@ jobs:
 
             - name: Preparation TPCH 0.5
               if: github.ref == 'refs/heads/haybarn'
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       git config --global --add safe.directory '*'
@@ -823,7 +834,7 @@ jobs:
                   (cd ./submodules/duckdb && git fetch --all --tags)
 
             - name: Prepare environment
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       git config --global --add safe.directory '*'
@@ -880,7 +891,7 @@ jobs:
                       CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome
             
             #            - name: Test @haybarn/haybarn-wasm on Firefox
-            #              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+            #              uses: ./.github/actions/haybarn-wasm-ci-env
             #              with:
             #                  script: |-
             #                      yarn workspace @haybarn/haybarn-wasm test:firefox
@@ -980,7 +991,7 @@ jobs:
                   (cd ./submodules/duckdb && git fetch --all --tags)
 
             - name: Prepare environment
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       git config --global --add safe.directory '*'
@@ -1032,7 +1043,7 @@ jobs:
                       CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome
             
             #            - name: Test @haybarn/haybarn-wasm on Firefox
-            #              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+            #              uses: ./.github/actions/haybarn-wasm-ci-env
             #              with:
             #                  script: |-
             #                      yarn workspace @haybarn/haybarn-wasm test:firefox
@@ -1125,7 +1136,7 @@ jobs:
                   retention-days: 1
 
             - name: Merge benchmark reports
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       chmod +x ./target/release/dataprep

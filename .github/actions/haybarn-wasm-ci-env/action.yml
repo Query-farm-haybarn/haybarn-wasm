@@ -1,0 +1,67 @@
+# Haybarn replacement for `duckdb/duckdb-wasm-ci-env@<sha>`.
+#
+# Runs the caller's `script:` inside the shared Haybarn wasm build
+# environment image at:
+#
+#   ghcr.io/query-farm-haybarn/haybarn-wasm-base:v1.5.2
+#
+# Same image haybarn-extension-ci-tools / haybarn-community-extensions
+# use to compile community .duckdb_extension.wasm artifacts — Ubuntu
+# 24.04 + emsdk + ccache 4.13.6 (musl-static, supports HTTP bearer-auth
+# remote storage) + sccache + vcpkg.
+#
+# Differences from the upstream action:
+#   * Newer base image (upstream: Ubuntu 22.10 + emsdk 3.1.55).
+#   * Forwards CCACHE_REMOTE_STORAGE so ccache writes to the shared
+#     Haybarn R2 worker (haybarn-vcpkg-cache.rusty-bb6.workers.dev/ccache)
+#     for cross-run, cross-repo cache reuse.
+#   * Forwards SCCACHE_WEBDAV_* for Rust crate caching when present.
+#   * yarn isn't preinstalled — engine-build scripts that need it call
+#     `npm install -g yarn` themselves, leveraging the node bundled in
+#     emsdk.
+
+name: 'Haybarn wasm CI env'
+description: 'Run a script inside the shared Haybarn wasm build image, with R2-backed ccache/sccache.'
+
+inputs:
+  script:
+    description: 'Script to execute inside the container'
+    required: true
+  image:
+    description: 'Container image reference'
+    required: false
+    default: 'ghcr.io/query-farm-haybarn/haybarn-wasm-base:v1.5.2'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Pull container image
+      shell: bash
+      run: docker pull "${{ inputs.image }}"
+
+    - name: Fix workspace permissions (pre)
+      shell: bash
+      run: sudo chown -R $(id -u):$(id -g) ${{ github.workspace }}
+
+    - name: Run script in container
+      shell: bash
+      run: |
+        docker run --rm \
+          -v "${{ github.workspace }}:/github/workspace/:delegated" \
+          -w /github/workspace \
+          -e EM_CACHE=/github/workspace/.emscripten_cache \
+          -e YARN_CACHE_FOLDER=/github/workspace/.yarn_cache \
+          -e CARGO_HOME=/github/workspace/.cargo \
+          -e CCACHE_DIR=/github/workspace/.ccache \
+          -e CCACHE_BASEDIR=/github/workspace \
+          -e CCACHE_REMOTE_STORAGE \
+          -e SCCACHE_WEBDAV_ENDPOINT \
+          -e SCCACHE_WEBDAV_TOKEN \
+          -e RUSTC_WRAPPER \
+          -e CARGO_INCREMENTAL \
+          "${{ inputs.image }}" \
+          bash -c "${{ inputs.script }}"
+
+    - name: Fix workspace permissions (post)
+      shell: bash
+      run: sudo chown -R $(id -u):$(id -g) ${{ github.workspace }}
