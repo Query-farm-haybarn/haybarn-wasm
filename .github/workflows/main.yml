@@ -35,31 +35,30 @@ env:
   # Survives across runs, branches, and the duckdb-wasm <-> extensions
   # repo boundary. Hot reuse: extension wasm builds populate the same
   # hashes that the engine build needs.
+  #
+  # The composite action `.github/actions/haybarn-wasm-ci-env` forwards
+  # this var into the container; runner-level steps see it but they
+  # don't invoke ccache directly so it's a harmless export.
   CCACHE_REMOTE_STORAGE: "http://haybarn-vcpkg-cache.rusty-bb6.workers.dev/ccache|bearer-token=${{ secrets.HAYBARN_VCPKG_TOKEN }}|connect-timeout=10000|operation-timeout=30000"
-  # sccache for Rust shell crate (packages/duckdb-wasm-shell/crate).
+  # sccache for the Rust shell crate (packages/duckdb-wasm-shell/crate),
+  # which compiles inside the container.
+  # RUSTC_WRAPPER is intentionally NOT exported at the workflow level —
+  # it would force runner-level cargo (e.g. the Dataprep job's tpch-gen
+  # build) to invoke `sccache rustc`, and the runner doesn't have an
+  # sccache binary on PATH. The composite action passes RUSTC_WRAPPER
+  # explicitly inside the container where sccache IS available, so the
+  # behavior splits cleanly: containerized Rust → cached; runner Rust →
+  # uncached but functional.
   SCCACHE_WEBDAV_ENDPOINT: "https://haybarn-vcpkg-cache.rusty-bb6.workers.dev/sccache/"
   SCCACHE_WEBDAV_TOKEN: ${{ secrets.HAYBARN_VCPKG_TOKEN }}
-  RUSTC_WRAPPER: sccache
   CARGO_INCREMENTAL: 0
 
 jobs:
-    clang_format:
-        name: Clang-Format
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v6
-              with:
-                  submodules: 'recursive'
-
-            - name: Lint ./lib
-              uses: ./.github/actions/haybarn-wasm-ci-env
-              with:
-                  script: |-
-                      python3 ./scripts/run_clang_format.py \
-                        --exclude ./lib/build \
-                        --exclude ./lib/third_party \
-                        -r ./lib/
-
+    # Clang-Format job removed: it lints lib/* C++ which we intentionally
+    # carry verbatim from upstream duckdb-wasm. Any formatting deviation
+    # is upstream-side, not ours. The shared haybarn-wasm-base image
+    # also doesn't ship clang-format. Re-enable in a future rev if
+    # Haybarn-specific C++ ever lands in lib/.
     eslint:
         name: ESLint
         runs-on: ubuntu-latest

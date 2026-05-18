@@ -46,6 +46,10 @@ runs:
     - name: Run script in container
       shell: bash
       run: |
+        # RUSTC_WRAPPER=sccache is set ONLY inside the container — the
+        # image has /usr/local/bin/sccache. On the GitHub runner host
+        # there's no sccache, so leaking the var out would break any
+        # runner-level cargo invocation (e.g. Dataprep's tpch-gen build).
         docker run --rm \
           -v "${{ github.workspace }}:/github/workspace/:delegated" \
           -w /github/workspace \
@@ -57,10 +61,10 @@ runs:
           -e CCACHE_REMOTE_STORAGE \
           -e SCCACHE_WEBDAV_ENDPOINT \
           -e SCCACHE_WEBDAV_TOKEN \
-          -e RUSTC_WRAPPER \
+          -e RUSTC_WRAPPER=sccache \
           -e CARGO_INCREMENTAL \
           "${{ inputs.image }}" \
-          bash -c "${{ inputs.script }}"
+          bash -lc "source /emsdk/emsdk_env.sh >/dev/null 2>&1 || true; command -v yarn >/dev/null || npm install -g --silent yarn; ${{ inputs.script }}"
 
     - name: Fix workspace permissions (post)
       shell: bash
