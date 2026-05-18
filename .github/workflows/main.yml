@@ -83,24 +83,28 @@ jobs:
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
+                      command -v yarn >/dev/null 2>&1 || npm install -g --silent yarn
                       yarn install --frozen-lockfile --prefer-offline
 
             - name: Lint @haybarn/haybarn-wasm
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
+                      command -v yarn >/dev/null 2>&1 || npm install -g --silent yarn
                       yarn workspace @haybarn/haybarn-wasm run lint
 
             - name: Lint @haybarn/haybarn-wasm-shell
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
+                      command -v yarn >/dev/null 2>&1 || npm install -g --silent yarn
                       yarn workspace @haybarn/haybarn-wasm-shell run lint
 
             - name: Lint @haybarn/benchmarks
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
+                      command -v yarn >/dev/null 2>&1 || npm install -g --silent yarn
                       yarn workspace @haybarn/benchmarks run lint
 
     tpchgen:
@@ -346,6 +350,7 @@ jobs:
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
+                      command -v yarn >/dev/null 2>&1 || npm install -g --silent yarn
                       git config --global --add safe.directory '*'
                       mkdir -p ./lib/build/wasm/release ./reports
                       yarn install --frozen-lockfile
@@ -446,6 +451,7 @@ jobs:
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
+                      command -v yarn >/dev/null 2>&1 || npm install -g --silent yarn
                       git config --global --add safe.directory '*'
                       mkdir -p ./lib/build/wasm/release ./reports
                       yarn install --frozen-lockfile
@@ -480,6 +486,7 @@ jobs:
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
+                      command -v yarn >/dev/null 2>&1 || npm install -g --silent yarn
                       git config --global --add safe.directory '*'
                       mkdir -p ./lib/build/wasm/release ./reports
                       yarn install --frozen-lockfile
@@ -514,6 +521,7 @@ jobs:
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
+                      command -v yarn >/dev/null 2>&1 || npm install -g --silent yarn
                       git config --global --add safe.directory '*'
                       mkdir -p ./lib/build/wasm/release ./reports
                       yarn install --frozen-lockfile
@@ -548,6 +556,7 @@ jobs:
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
+                      command -v yarn >/dev/null 2>&1 || npm install -g --silent yarn
                       git config --global --add safe.directory '*'
                       mkdir -p ./lib/build/wasm/release ./reports
                       yarn install --frozen-lockfile
@@ -657,6 +666,7 @@ jobs:
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
+                      command -v yarn >/dev/null 2>&1 || npm install -g --silent yarn
                       git config --global --add safe.directory '*'
                       mkdir -p ./lib/build/wasm/release ./reports
                       yarn install --frozen-lockfile
@@ -814,6 +824,7 @@ jobs:
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
+                      command -v yarn >/dev/null 2>&1 || npm install -g --silent yarn
                       git config --global --add safe.directory '*'
                       mkdir -p ./lib/build/wasm/release ./reports
                       yarn install --frozen-lockfile

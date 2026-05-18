@@ -1,27 +1,32 @@
-# Haybarn replacement for `duckdb/duckdb-wasm-ci-env@<sha>`.
+# Haybarn shared wasm build environment.
 #
-# Runs the caller's `script:` inside the shared Haybarn wasm build
-# environment image at:
+# Runs the caller's `script:` inside the same image that
+# haybarn-extension-ci-tools / haybarn-community-extensions use to
+# compile community .duckdb_extension.wasm artifacts:
 #
 #   ghcr.io/query-farm-haybarn/haybarn-wasm-base:v1.5.2
 #
-# Same image haybarn-extension-ci-tools / haybarn-community-extensions
-# use to compile community .duckdb_extension.wasm artifacts — Ubuntu
-# 24.04 + emsdk + ccache 4.13.6 (musl-static, supports HTTP bearer-auth
-# remote storage) + sccache + vcpkg.
+# The image bakes Ubuntu 24.04 + emsdk at /emsdk + ccache 4.13.6
+# (musl-static, HTTP bearer-auth works) + sccache + vcpkg. PATH
+# already includes /emsdk and /emsdk/upstream/emscripten, so emcc /
+# em++ / node / npm are available without sourcing emsdk_env.sh.
 #
-# Differences from the upstream action:
-#   * Newer base image (upstream: Ubuntu 22.10 + emsdk 3.1.55).
-#   * Forwards CCACHE_REMOTE_STORAGE so ccache writes to the shared
-#     Haybarn R2 worker (haybarn-vcpkg-cache.rusty-bb6.workers.dev/ccache)
-#     for cross-run, cross-repo cache reuse.
-#   * Forwards SCCACHE_WEBDAV_* for Rust crate caching when present.
-#   * yarn isn't preinstalled — engine-build scripts that need it call
-#     `npm install -g yarn` themselves, leveraging the node bundled in
-#     emsdk.
+# Design rules:
+#   * One `docker run`. No shell wrapping around the user's script.
+#   * No bootstrap commands prepended — the caller's script is the
+#     only thing inside `bash -c "..."`. If the caller wants
+#     `set -euxo pipefail` or yarn or wabt, they declare it in
+#     their own script.
+#   * Forwarded env vars are just the ones the build actually reads:
+#     CCACHE_REMOTE_STORAGE, SCCACHE_*, CARGO_INCREMENTAL.
+#     RUSTC_WRAPPER=sccache is set inside the container only (not
+#     leaked to the runner host, where sccache isn't installed).
+#   * `--init` so signals (SIGTERM from a job cancel) propagate to
+#     ninja child processes instead of leaving in-flight compile jobs
+#     orphaned.
 
 name: 'Haybarn wasm CI env'
-description: 'Run a script inside the shared Haybarn wasm build image, with R2-backed ccache/sccache.'
+description: 'Run a script inside the Haybarn shared wasm build image.'
 
 inputs:
   script:
@@ -41,16 +46,14 @@ runs:
 
     - name: Fix workspace permissions (pre)
       shell: bash
-      run: sudo chown -R $(id -u):$(id -g) ${{ github.workspace }}
+      run: sudo chown -R $(id -u):$(id -g) "${{ github.workspace }}"
 
     - name: Run script in container
       shell: bash
+      env:
+        SCRIPT: ${{ inputs.script }}
       run: |
-        # RUSTC_WRAPPER=sccache is set ONLY inside the container — the
-        # image has /usr/local/bin/sccache. On the GitHub runner host
-        # there's no sccache, so leaking the var out would break any
-        # runner-level cargo invocation (e.g. Dataprep's tpch-gen build).
-        docker run --rm \
+        docker run --rm --init \
           -v "${{ github.workspace }}:/github/workspace/:delegated" \
           -w /github/workspace \
           -e EM_CACHE=/github/workspace/.emscripten_cache \
@@ -63,9 +66,11 @@ runs:
           -e SCCACHE_WEBDAV_TOKEN \
           -e RUSTC_WRAPPER=sccache \
           -e CARGO_INCREMENTAL \
+          -e SCRIPT \
           "${{ inputs.image }}" \
-          bash -lc "source /emsdk/emsdk_env.sh >/dev/null 2>&1 || true; command -v yarn >/dev/null || npm install -g --silent yarn; ${{ inputs.script }}"
+          bash -c 'eval "$SCRIPT"'
 
     - name: Fix workspace permissions (post)
       shell: bash
-      run: sudo chown -R $(id -u):$(id -g) ${{ github.workspace }}
+      if: always()
+      run: sudo chown -R $(id -u):$(id -g) "${{ github.workspace }}"
