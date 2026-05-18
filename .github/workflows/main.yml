@@ -1044,14 +1044,20 @@ jobs:
 
             # Publish @haybarn/haybarn-wasm to npm. Only on `haybarn-v*` tag
             # creation — we don't continuously publish from the `haybarn`
-            # branch (too noisy for a derived distribution). Auth is via
-            # OIDC Trusted Publisher; no NPM_TOKEN needed.
+            # branch (too noisy for a derived distribution).
+            #
+            # Auth: NODE_AUTH_TOKEN from the org-level HAYBARN_NPM_TOKEN
+            # secret (same pattern haybarn-extension-ci-tools uses). The
+            # publish still attaches OIDC provenance via the workflow's
+            # `id-token: write` permission, even though the auth itself is
+            # token-based — they're independent.
             #
             # The other workspace packages (-shell, -app, react-haybarn,
             # benchmarks) are private:true and never published.
             - name: Publish @haybarn/haybarn-wasm to npm
               env:
                   TAG: 'latest'
+                  NODE_AUTH_TOKEN: ${{ secrets.HAYBARN_NPM_TOKEN }}
               if: github.event_name == 'create' && startsWith(github.ref, 'refs/tags/haybarn-v')
               run: |
                   echo "TAG=${TAG} ref=${GITHUB_REF}"
