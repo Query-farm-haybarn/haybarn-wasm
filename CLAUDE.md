@@ -57,6 +57,37 @@ Workspace versions match the embedded engine version:
 dropping the `-rc<N>` suffix when the engine cuts a stable tag.
 Currently `1.5.2-rc1`.
 
+## Local smoke-build setup
+
+```bash
+# 1. Install pinned emsdk (CI uses 3.1.71; homebrew emscripten = HEAD,
+#    which drops APIs our build needs):
+git clone --depth=1 https://github.com/emscripten-core/emsdk.git /tmp/emsdk
+cd /tmp/emsdk && ./emsdk install 3.1.71 && ./emsdk activate 3.1.71
+
+# 2. From haybarn-wasm root, smoke build (one variant is enough):
+cd /path/to/haybarn-wasm
+git submodule update --init --recursive    # fetches duckdb + arrow + rapidjson + …
+cd submodules/duckdb && git fetch --depth 1 origin tag haybarn-v1.5.2-rc13 && cd ../..
+make apply_patches                          # applies patches/duckdb/* to the engine
+bash -c 'source /tmp/emsdk/emsdk_env.sh && \
+  export PATH="/tmp/emsdk/upstream/emscripten:$PATH" && \
+  CMAKE_POLICY_VERSION_MINIMUM=3.5 ./scripts/wasm_build_lib.sh relperf eh'
+
+# Output: build/relperf/eh/duckdb_wasm.{wasm,js} copied to
+#         packages/duckdb-wasm/src/bindings/duckdb-eh.{wasm,js}
+```
+
+Gotchas to know:
+- The submodule needs the haybarn engine tag fetched explicitly — its
+  recorded gitlink is a SHA, and `git describe` later in the build fails
+  without a reachable tag.
+- `CMAKE_POLICY_VERSION_MINIMUM=3.5` is needed because rapidjson's
+  CMakeLists declares a pre-3.5 minimum, which modern CMake 4.x rejects.
+- Homebrew's emscripten is HEAD (5.0.1+). It drops `createDyncallWrapper`
+  from `EXPORTED_RUNTIME_METHODS`, breaking the JS shim phase. Stay on
+  emsdk 3.1.71 to match CI.
+
 ## Out-of-tree references
 
 | What                          | Where                                                |
