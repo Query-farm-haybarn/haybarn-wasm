@@ -150,70 +150,70 @@ lib_debug: lib
 	lldb --args ${LIB_DEBUG_DIR}/tester ${LIB_SOURCE_DIR}
 
 bench_build: yarn_install
-	yarn workspace @duckdb/benchmarks build
+	yarn workspace @haybarn/benchmarks build
 	touch build/bench_build
 
 
 .PHONY: bench_tpch_aq
 bench_tpch_aq: build/data bench_build yarn_install
-	yarn workspace @duckdb/benchmarks bench:system:tpch:arquero 0.01
-	yarn workspace @duckdb/benchmarks bench:system:tpch:arquero 0.1
-	yarn workspace @duckdb/benchmarks bench:system:tpch:arquero 0.5
+	yarn workspace @haybarn/benchmarks bench:system:tpch:arquero 0.01
+	yarn workspace @haybarn/benchmarks bench:system:tpch:arquero 0.1
+	yarn workspace @haybarn/benchmarks bench:system:tpch:arquero 0.5
 
 # Run all benchmarks for the paper
 .PHONY: bench_tpch
 bench_tpch_paper: build/data bench_build yarn_install
-	yarn workspace @duckdb/benchmarks build
-	yarn workspace @duckdb/benchmarks bench:system:tpch:lovefield 0.01
-	yarn workspace @duckdb/benchmarks bench:system:tpch:lovefield 0.1
-	yarn workspace @duckdb/benchmarks bench:system:tpch:lovefield 0.5
-	yarn workspace @duckdb/benchmarks bench:system:tpch:arquero 0.01
-	yarn workspace @duckdb/benchmarks bench:system:tpch:arquero 0.1
-	yarn workspace @duckdb/benchmarks bench:system:tpch:arquero 0.5
-	yarn workspace @duckdb/benchmarks bench:system:tpch:sqljs 0.01
-	yarn workspace @duckdb/benchmarks bench:system:tpch:sqljs 0.1
-	yarn workspace @duckdb/benchmarks bench:system:tpch:sqljs 0.5
-	yarn workspace @duckdb/benchmarks bench:system:tpch:duckdb 0.01
-	yarn workspace @duckdb/benchmarks bench:system:tpch:duckdb 0.1
-	yarn workspace @duckdb/benchmarks bench:system:tpch:duckdb 0.5
+	yarn workspace @haybarn/benchmarks build
+	yarn workspace @haybarn/benchmarks bench:system:tpch:lovefield 0.01
+	yarn workspace @haybarn/benchmarks bench:system:tpch:lovefield 0.1
+	yarn workspace @haybarn/benchmarks bench:system:tpch:lovefield 0.5
+	yarn workspace @haybarn/benchmarks bench:system:tpch:arquero 0.01
+	yarn workspace @haybarn/benchmarks bench:system:tpch:arquero 0.1
+	yarn workspace @haybarn/benchmarks bench:system:tpch:arquero 0.5
+	yarn workspace @haybarn/benchmarks bench:system:tpch:sqljs 0.01
+	yarn workspace @haybarn/benchmarks bench:system:tpch:sqljs 0.1
+	yarn workspace @haybarn/benchmarks bench:system:tpch:sqljs 0.5
+	yarn workspace @haybarn/benchmarks bench:system:tpch:duckdb 0.01
+	yarn workspace @haybarn/benchmarks bench:system:tpch:duckdb 0.1
+	yarn workspace @haybarn/benchmarks bench:system:tpch:duckdb 0.5
 
 .PHONY: bench_all
 bench_all: bench_build bench_internal bench_system_sort_int bench_system_sum_csv bench_system_sort_int bench_system_regex bench_system_join_2 bench_system_join_3 build/data
-	yarn workspace @duckdb/benchmarks bench:system:tpch:duckdb 0.1
-	yarn workspace @duckdb/benchmarks bench:system:tpch:duckdb 0.25
-	yarn workspace @duckdb/benchmarks bench:system:tpch:duckdb 0.5
+	yarn workspace @haybarn/benchmarks bench:system:tpch:duckdb 0.1
+	yarn workspace @haybarn/benchmarks bench:system:tpch:duckdb 0.25
+	yarn workspace @haybarn/benchmarks bench:system:tpch:duckdb 0.5
 
 .PHONY: bench_internal
 bench_internal: bench_build
-	yarn workspace @duckdb/benchmarks bench:internal
+	yarn workspace @haybarn/benchmarks bench:internal
 
 .PHONY: bench_system_sort_int
 bench_system_sort_int: bench_build
-	yarn workspace @duckdb/benchmarks bench:system:sort:int
+	yarn workspace @haybarn/benchmarks bench:system:sort:int
 
 .PHONY: bench_system_sum_csv
 bench_system_sum_csv: bench_build
-	yarn workspace @duckdb/benchmarks bench:system:sum:csv
+	yarn workspace @haybarn/benchmarks bench:system:sum:csv
 
 .PHONY: bench_system_sum_int
 bench_system_sum_int: bench_build
-	yarn workspace @duckdb/benchmarks bench:system:sum:int
+	yarn workspace @haybarn/benchmarks bench:system:sum:int
 
 .PHONY: bench_system_regex
 bench_system_regex: bench_build
-	yarn workspace @duckdb/benchmarks bench:system:regex
+	yarn workspace @haybarn/benchmarks bench:system:regex
 
 .PHONY: bench_system_join_2
 bench_system_join_2: bench_build
-	yarn workspace @duckdb/benchmarks bench:system:join:2
+	yarn workspace @haybarn/benchmarks bench:system:join:2
 
 .PHONY: bench_system_join_3
 bench_system_join_3: bench_build
-	yarn workspace @duckdb/benchmarks bench:system:join:3
+	yarn workspace @haybarn/benchmarks bench:system:join:3
 
 .PHONY: bench_system_tpch
 bench_system_tpch_duckdb: bench_build build/data
-	yarn workspace @duckdb/benchmarks bench:system:tpch:duckdb 0.1
+	yarn workspace @haybarn/benchmarks bench:system:tpch:duckdb 0.1
 
 
 .PHONY: wasm_caches
@@ -283,78 +283,78 @@ wasm_star: wasm_relsize wasm_relperf wasm_dev wasm_debug
 # Build the duckdb library in debug mode
 .PHONY: js_debug
 js_debug: build/bootstrap yarn_install
-	yarn workspace @duckdb/duckdb-wasm build:debug
+	yarn workspace @haybarn/haybarn-wasm build:debug
 
 # Build the duckdb library in release mode
 .PHONY: js_release
 js_release: yarn_install
-	yarn workspace @duckdb/duckdb-wasm build:release
+	yarn workspace @haybarn/haybarn-wasm build:release
 
 # Build the duckdb docs
 .PHONY: docs
 docs: yarn_install
-	yarn workspace @duckdb/duckdb-wasm docs
+	yarn workspace @haybarn/haybarn-wasm docs
 
 # Run the duckdb javascript tests
 .PHONY: js_tests
 js_tests: js_debug build/data
 ifeq (${DUCKDB_WASM_LOADABLE_EXTENSIONS}, 1)
 	# FIXME: build also for node and restore those tests
-	yarn workspace @duckdb/duckdb-wasm test:chrome || echo "--- Parquet tests expected to fail!"
+	yarn workspace @haybarn/haybarn-wasm test:chrome || echo "--- Parquet tests expected to fail!"
 else
-	yarn workspace @duckdb/duckdb-wasm test
+	yarn workspace @haybarn/haybarn-wasm test
 endif
 
 .PHONY: js_tests_release
 js_tests_release: js_release
 ifeq (${DUCKDB_WASM_LOADABLE_EXTENSIONS}, 1)
 	# FIXME: build also for node and restore those tests
-	yarn workspace @duckdb/duckdb-wasm test:chrome || echo "--- Parquet tests expected to fail!"
+	yarn workspace @haybarn/haybarn-wasm test:chrome || echo "--- Parquet tests expected to fail!"
 else
-	yarn workspace @duckdb/duckdb-wasm test
+	yarn workspace @haybarn/haybarn-wasm test
 endif
 
 # Run the duckdb javascript tests in browser
 .PHONY: js_tests_browser
 js_tests_browser: js_debug build/data
-	yarn workspace @duckdb/duckdb-wasm test:chrome
+	yarn workspace @haybarn/haybarn-wasm test:chrome
 
 # Run the duckdb javascript tests in browser
 .PHONY: js_tests_browser_debug
 js_tests_browser_debug: js_debug build/data
-	yarn workspace @duckdb/duckdb-wasm test:browser:debug
+	yarn workspace @haybarn/haybarn-wasm test:browser:debug
 
 # Run the duckdb javascript tests on nodejs
 .PHONY: js_tests_node
 js_tests_node: js_debug build/data
-	yarn workspace @duckdb/duckdb-wasm test:node --filter=${JS_FILTER}
+	yarn workspace @haybarn/haybarn-wasm test:node --filter=${JS_FILTER}
 
 .PHONY: js_tests_node_debug
 js_tests_node_debug: js_debug build/data
-	yarn workspace @duckdb/duckdb-wasm test:node:debug --filter=${JS_FILTER}
+	yarn workspace @haybarn/haybarn-wasm test:node:debug --filter=${JS_FILTER}
 
 wasmpack: yarn_install
-	yarn workspace @duckdb/duckdb-wasm-shell install:wasmpack
+	yarn workspace @haybarn/haybarn-wasm-shell install:wasmpack
 
 .PHONY: shell
 shell: build/bootstrap js_debug
-	yarn workspace @duckdb/duckdb-wasm-shell build:debug
+	yarn workspace @haybarn/haybarn-wasm-shell build:debug
 
 .PHONY: shell_release
 shell_release: js_release
-	yarn workspace @duckdb/duckdb-wasm-shell build:release
+	yarn workspace @haybarn/haybarn-wasm-shell build:release
 
 .PHONY: app_start
 app_start: yarn_install
-	yarn workspace @duckdb/duckdb-wasm-app start
+	yarn workspace @haybarn/haybarn-wasm-app start
 
 .PHONY: app_start_corp
 app_start_corp:
-	yarn workspace @duckdb/duckdb-wasm-app start:corp
+	yarn workspace @haybarn/haybarn-wasm-app start:corp
 
 .PHONY: app
 app: wasm wasmpack shell docs js_tests_release
-	yarn workspace @duckdb/duckdb-wasm-app build:release
+	yarn workspace @haybarn/haybarn-wasm-app build:release
 
 build_loadable:
 	USE_GENERATED_EXPORTED_LIST=no DUCKDB_PLATFORM=wasm_${TARGET} DUCKDB_WASM_LOADABLE_EXTENSIONS=1 ./scripts/wasm_build_lib.sh relsize ${TARGET}
@@ -363,7 +363,7 @@ build_loadable_unsigned: build_loadable
         # need to propagate the unsigned flag
 
 serve_loadable_base: wasmpack shell docs
-	yarn workspace @duckdb/duckdb-wasm-app build:release
+	yarn workspace @haybarn/haybarn-wasm-app build:release
 	cp -r build/extension_repository packages/duckdb-wasm-app/build/release/.
 
 .PHONY: serve_local
@@ -389,9 +389,9 @@ clang_format:
 # JS formatting
 .PHONY: eslint
 eslint:
-	yarn workspace @duckdb/duckdb-wasm run lint
-	yarn workspace @duckdb/duckdb-wasm-shell run lint
-	yarn workspace @duckdb/benchmarks run lint
+	yarn workspace @haybarn/haybarn-wasm run lint
+	yarn workspace @haybarn/haybarn-wasm-shell run lint
+	yarn workspace @haybarn/benchmarks run lint
 
 # Install all yarn packages
 .PHONY: yarn_install
@@ -401,11 +401,11 @@ yarn_install:
 
 .PHONY: examples
 examples: yarn_install
-	yarn workspace @duckdb/duckdb-wasm-examples-bare-node test
-	yarn workspace @duckdb/duckdb-wasm-examples-bare-browser build
-	yarn workspace @duckdb/duckdb-wasm-examples-esbuild-node build
-	yarn workspace @duckdb/duckdb-wasm-examples-esbuild-node test
-	yarn workspace @duckdb/duckdb-wasm-examples-esbuild-browser build
+	yarn workspace @haybarn/haybarn-wasm-examples-bare-node test
+	yarn workspace @haybarn/haybarn-wasm-examples-bare-browser build
+	yarn workspace @haybarn/haybarn-wasm-examples-esbuild-node build
+	yarn workspace @haybarn/haybarn-wasm-examples-esbuild-node test
+	yarn workspace @haybarn/haybarn-wasm-examples-esbuild-browser build
 
 # ---------------------------------------------------------------------------
 # Environment

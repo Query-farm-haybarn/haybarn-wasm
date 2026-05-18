@@ -1,14 +1,16 @@
 {
-    "name": "@duckdb/react-duckdb",
-    "version": "1.11.0",
-    "description": "React components for DuckDB-Wasm",
+    "name": "@haybarn/react-haybarn",
+    "version": "1.5.2-rc1",
+    "description": "React components for Haybarn-Wasm.",
     "license": "MIT",
+    "private": true,
     "repository": {
         "type": "git",
-        "url": "https://github.com/duckdb/duckdb-wasm.git"
+        "url": "https://github.com/Query-farm-haybarn/haybarn-wasm.git"
     },
     "keywords": [
         "sql",
+        "haybarn",
         "duckdb",
         "relational",
         "database",

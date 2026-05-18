@@ -1,4 +1,4 @@
-import * as duckdb from '@duckdb/duckdb-wasm';
+import * as duckdb from '@haybarn/haybarn-wasm';
 import * as arrow from 'apache-arrow';
 
 (async () => {

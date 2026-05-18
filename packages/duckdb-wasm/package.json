@@ -1,14 +1,19 @@
 {
-    "name": "@duckdb/duckdb-wasm",
-    "version": "1.11.0",
-    "description": "DuckDB powered by WebAssembly",
+    "name": "@haybarn/haybarn-wasm",
+    "version": "1.5.2-rc1",
+    "description": "Haybarn for WebAssembly — Query Farm's derived distribution of DuckDB-Wasm. Haybarn, powered by DuckDB.",
     "license": "MIT",
+    "homepage": "https://haybarn.query.farm",
+    "bugs": {
+        "url": "https://github.com/Query-farm-haybarn/haybarn-wasm/issues"
+    },
     "repository": {
         "type": "git",
-        "url": "https://github.com/duckdb/duckdb-wasm.git"
+        "url": "https://github.com/Query-farm-haybarn/haybarn-wasm.git"
     },
     "keywords": [
         "sql",
+        "haybarn",
         "duckdb",
         "relational",
         "database",

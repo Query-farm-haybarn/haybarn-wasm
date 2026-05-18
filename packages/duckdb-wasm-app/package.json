@@ -1,7 +1,7 @@
 {
-    "name": "@duckdb/duckdb-wasm-app",
-    "version": "1.11.0",
-    "description": "",
+    "name": "@haybarn/haybarn-wasm-app",
+    "version": "1.5.2-rc1",
+    "description": "Haybarn-Wasm demo application.",
     "author": "Andre Kohn <kohn.a@outlook.com>",
     "license": "MIT",
     "private": true,
@@ -18,8 +18,8 @@
         "node": ">=14.13"
     },
     "dependencies": {
-        "@duckdb/duckdb-wasm": "file:../duckdb-wasm",
-        "@duckdb/duckdb-wasm-shell": "file:../duckdb-wasm-shell",
+        "@haybarn/haybarn-wasm": "file:../duckdb-wasm",
+        "@haybarn/haybarn-wasm-shell": "file:../duckdb-wasm-shell",
         "apache-arrow": "^17.0.0",
         "bootstrap": "^5.3.3",
         "classnames": "^2.5.1",
