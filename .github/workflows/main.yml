@@ -446,7 +446,6 @@ jobs:
             - wasm_mvp
             - wasm_eh
             - wasm_coi
-            - clang_format
             - eslint
         steps:
             - uses: actions/checkout@v6
@@ -760,7 +759,6 @@ jobs:
             - wasm_mvp_loadable
             - wasm_eh_loadable
             - wasm_coi_loadable
-            - clang_format
             - eslint
         steps:
             - uses: actions/checkout@v6
