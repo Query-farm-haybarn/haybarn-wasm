@@ -18,11 +18,21 @@ export class DuckDB extends DuckDBBrowserBindings {
 
     /** Instantiate the bindings */
     protected instantiateImpl(moduleOverrides: Partial<DuckDBModule>): Promise<DuckDBModule> {
-        return DuckDBWasm({
+        // emsdk 5.x spawns pthread workers via `new Worker(pthreadMainJs, …)`,
+        // where `pthreadMainJs = Module["mainScriptUrlOrBlob"] || _scriptName`
+        // — `locateFile("*.worker.js")` is no longer consulted. Point it at
+        // our wrapper bundle so the worker gets `DUCKDB_RUNTIME` injected
+        // and our custom message handlers wired in before pthread protocol
+        // handling begins.
+        const overrides: Partial<DuckDBModule> = {
             ...moduleOverrides,
             instantiateWasm: this.instantiateWasm.bind(this),
             locateFile: this.locateFile.bind(this),
-        });
+        };
+        if (this.pthreadWorkerURL) {
+            (overrides as Record<string, unknown>).mainScriptUrlOrBlob = this.pthreadWorkerURL;
+        }
+        return DuckDBWasm(overrides);
     }
 }
 

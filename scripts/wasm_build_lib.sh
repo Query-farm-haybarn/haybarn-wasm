@@ -103,15 +103,8 @@ sed \
   -e "s/duckdb_wasm\.wasm/.\/duckdb${SUFFIX}.wasm/g" \
   ${BUILD_DIR}/duckdb_wasm.js > ${DUCKDB_LIB_DIR}/duckdb${SUFFIX}.js
 
-if [ -f ${BUILD_DIR}/duckdb_wasm.worker.js ]; then
-  sed \
-    -e "s/duckdb_wasm\.wasm/.\/duckdb${SUFFIX}.wasm/g" \
-    -e "s/duckdb_wasm\.js/.\/duckdb${SUFFIX}.js/g" \
-    ${BUILD_DIR}/duckdb_wasm.worker.js > ${DUCKDB_LIB_DIR}/duckdb${SUFFIX}.pthread.js
-
-  # Expose the module.
-  # This will allow us to reuse the generated pthread handler and only overwrite the loading.
-  # More info: duckdb-browser-async-coi.pthread.worker.ts
-  printf "\nexport const onmessage = self.onmessage;\nexport function getModule() { return Module; }\nexport function setModule(m) { Module = m; }\n" \
-    >> ${DUCKDB_LIB_DIR}/duckdb${SUFFIX}.pthread.js
-fi
+# Note: emsdk 5.x stopped emitting a separate `duckdb_wasm.worker.js` for the
+# COI variant — the main duckdb_wasm.js now doubles as the pthread worker
+# (spawned with `name: "em-pthread"` so the factory's worker-mode branch
+# fires). The previous `.pthread.js` indirection was removed along with the
+# wrapper rewrite in `packages/duckdb-wasm/src/targets/duckdb-browser-coi.pthread.worker.ts`.

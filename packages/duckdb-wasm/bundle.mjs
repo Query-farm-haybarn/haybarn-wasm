@@ -114,7 +114,9 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
     patchFile('./src/bindings/duckdb-mvp.js', 'child_process');
     patchFile('./src/bindings/duckdb-eh.js', 'child_process');
     patchFile('./src/bindings/duckdb-coi.js', 'child_process');
-    patchFile('./src/bindings/duckdb-coi.pthread.js', 'vm');
+    // emsdk 5.x no longer produces a separate duckdb-coi.pthread.js — the
+    // pthread worker reuses the main module JS. See
+    // src/targets/duckdb-browser-coi.pthread.worker.ts for the new wiring.
 
     // -------------------------------
     // Browser bundles
