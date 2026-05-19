@@ -1,29 +1,36 @@
-Pre-adapter that runs before upstream's `all_of_them.patch` so the
-upstream patch can apply verbatim against the haybarn engine fork.
+Pre-adapter — runs BEFORE upstream's all_of_them.patch. Reshapes the
+haybarn engine source to match the line-by-line context that upstream's
+patch expects, so every upstream hunk applies cleanly with zero rejects.
 
-The only point where the haybarn engine's source diverges from
-upstream DuckDB v1.5.2 inside the region upstream's patch touches is
-the rebranded error message in `extension_load.cpp`. Upstream's patch
-has the original "DuckDB extensions are files..." as a removal-context
-line; the haybarn engine says "Haybarn extensions are files...".
-Without this pre-adapter, `patch` can't find that line and the hunk
-(which removes the entire EndsWith check from the wasm-loadable path)
-fails to apply.
+Two engine-vs-upstream divergences need adapting before upstream's
+patch can touch them:
 
-We just temporarily rebrand back to "DuckDB" for that one line.
-Upstream's patch then deletes the line entirely (the wasm-loadable
-path doesn't need a filename-suffix gatekeeper since the whole flow
-is replaced by in-memory fetch + signature validation), so the
-"DuckDB" wording never actually reaches a runtime binary or user.
+1. extension_load.cpp: rebranded error-message string
+   "Haybarn extensions are files ending..." → "DuckDB extensions are
+   files ending...". Upstream's patch removes this whole line (the
+   EndsWith check goes away in wasm builds), so the brand never
+   reaches a runtime binary.
 
-If/when upstream's patch is reworked or the haybarn engine reroutes
-that error string through a different code path, this adapter
-becomes a no-op and can be deleted.
+2. extension_install_info.hpp: URL constants. The haybarn engine has
+   - a long doc-comment explaining the Haybarn R2 layout + http:// reasoning
+   - two URL constants pointing at haybarn-extensions.query.farm
+   - the upstream nightly repository concept intentionally dropped
+
+   Upstream's patch expects the short upstream-style comment + three
+   URL constants (CORE, CORE_NIGHTLY, COMMUNITY) at duckdb.org.
+   The pre-adapter rewrites this block to upstream's form so the
+   patch's removal context matches. The post-adapter
+   (zz-haybarn-engine-restore.patch) restores it after upstream's
+   https-flip hunk is done.
+
+When upstream's patch rebases onto a new engine version that
+either drops the nightly URL upstream-side, or rewords the error
+message context, this adapter can be simplified or deleted.
 
 diff --git a/src/main/extension/extension_load.cpp b/src/main/extension/extension_load.cpp
 --- a/src/main/extension/extension_load.cpp
 +++ b/src/main/extension/extension_load.cpp
-@@ -454,7 +454,7 @@
+@@ -454,6 +454,6 @@
  	if (!StringUtil::EndsWith(filename, ".duckdb_extension")) {
  		throw PermissionException(
 -		    "Haybarn extensions are files ending with '.duckdb_extension', loading different "
@@ -31,4 +38,39 @@ diff --git a/src/main/extension/extension_load.cpp b/src/main/extension/extensio
  		    "files is not possible, error while loading from '%s', consider 'INSTALL <path>; LOAD <name>;'",
  		    filename);
  	}
+diff --git a/src/include/duckdb/main/extension_install_info.hpp b/src/include/duckdb/main/extension_install_info.hpp
+--- a/src/include/duckdb/main/extension_install_info.hpp
++++ b/src/include/duckdb/main/extension_install_info.hpp
+@@ -54,28 +54,10 @@
+ };
 
+ struct ExtensionRepository {
+-	//! All currently available repositories. Haybarn hosts its own signed
+-	//! extension repositories on Cloudflare R2, fronted by the single
+-	//! `haybarn-extensions.query.farm` custom domain. Core and community share
+-	//! one bucket, segregated by top-level path prefix (/core, /community).
+-	//! The upstream nightly repository concept is intentionally dropped.
+-	//!
+-	//! URLs are http:// intentionally — matches upstream's design. The
+-	//! engine's built-in HTTPUtil (httplib without OpenSSL) can only
+-	//! speak HTTP, so the bootstrap install of httpfs itself happens
+-	//! over HTTP. The binary is RSA-signature-verified against the
+-	//! embedded HAYBARN_TRUST_ROOT key on dlopen, so a MitM can't
+-	//! substitute a malicious extension even over plain HTTP. Once
+-	//! httpfs is loaded, HTTPUtil::BumpToSecureProtocol upgrades
+-	//! subsequent install URLs to https://.
+-	//!
+-	//! NOTE: a Cloudflare Configuration Rule on the query.farm zone
+-	//! disables "Always Use HTTPS" for hostname == haybarn-extensions
+-	//! .query.farm so R2 serves http directly (otherwise R2 would 301
+-	//! to https and the engine's install path doesn't follow redirects
+-	//! because params.follow_location = false).
+-	static constexpr const char *CORE_REPOSITORY_URL = "http://haybarn-extensions.query.farm/core";
+-	static constexpr const char *COMMUNITY_REPOSITORY_URL = "http://haybarn-extensions.query.farm/community";
++	//! All currently available repositories
++	static constexpr const char *CORE_REPOSITORY_URL = "http://extensions.duckdb.org";
++	static constexpr const char *CORE_NIGHTLY_REPOSITORY_URL = "http://nightly-extensions.duckdb.org";
++	static constexpr const char *COMMUNITY_REPOSITORY_URL = "http://community-extensions.duckdb.org";
+
+ 	//! Debugging repositories (target local, relative paths that are produced by DuckDB's build system)
+ 	static constexpr const char *BUILD_DEBUG_REPOSITORY_PATH = "./build/debug/repository";
