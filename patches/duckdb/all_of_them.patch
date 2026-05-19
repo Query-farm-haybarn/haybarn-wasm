@@ -449,7 +449,7 @@ index 4f7f7d2b28..0c28ad3a4e 100644
 -		string url_template = ExtensionUrlTemplate(&config, "");
 +		ExtensionRepository repository;
 +
-+		string custom_endpoint = db.config.options.custom_extension_repo;
++		string custom_endpoint = Settings::Get<CustomExtensionRepositorySetting>(db);
 +		if (!custom_endpoint.empty()) {
 +			repository = ExtensionRepository("custom", custom_endpoint);
 +		}
@@ -664,7 +664,7 @@ index 4f7f7d2b28..0c28ad3a4e 100644
 +	}
 +
 +	auto dopen_from = basename;
-+	if (!db.config.options.allow_unsigned_extensions) {
++	if (!Settings::Get<AllowUnsignedExtensionsSetting>(db)) {
 +		// signature is the last 256 bytes of the file
 +
 +		string signature;
@@ -715,7 +715,7 @@ index 4f7f7d2b28..0c28ad3a4e 100644
 +			signature[j] = ((uint8_t *)exe)[4 + signature_offset + j];
 +		}
 +		bool any_valid = false;
-+		for (auto &key : ExtensionHelper::GetPublicKeys(db.config.options.allow_community_extensions)) {
++		for (auto &key : ExtensionHelper::GetPublicKeys(Settings::Get<AllowCommunityExtensionsSetting>(db))) {
 +			if (duckdb_mbedtls::MbedTlsWrapper::IsValidSha256Signature(key, signature, two_level_hash)) {
 +				any_valid = true;
 +				break;
