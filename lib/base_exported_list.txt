@@ -50,3 +50,4 @@ _duckdb_web_tokenize_buffer
 _duckdb_web_udf_scalar_create
 _duckdb_wasm_crypto_random
 _duckdb_wasm_sha256
+_duckdb_wasm_get_page_origin
