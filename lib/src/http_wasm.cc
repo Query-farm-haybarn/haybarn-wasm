@@ -4,6 +4,41 @@
 
 #include "duckdb/common/http_util.hpp"
 #include "duckdb/web/config.h"
+// DuckDB's bundled MbedTLS wrapper — full include path because it's in third_party
+// and we don't want a public re-export.
+#include "../../submodules/duckdb/third_party/mbedtls/include/mbedtls_wrapper.hpp"
+
+// Platform stubs available to WASM side modules (extensions) via dynamic linking.
+// The main module must reference these in code that survives DCE so the linker
+// keeps them in the wasm exports table.
+
+// SHA-256 implemented in C++ (not JS) so it's a real wasm function reachable
+// from side modules. Uses DuckDB's bundled MbedTLS.
+extern "C" void duckdb_wasm_sha256(const void *data, int len, void *out_hash) {
+    duckdb_mbedtls::MbedTlsWrapper::SHA256State state;
+    state.AddString(std::string(static_cast<const char *>(data), len));
+    char hex[duckdb_mbedtls::MbedTlsWrapper::SHA256_HASH_LENGTH_TEXT];
+    state.FinishHex(hex);
+    auto *out = static_cast<unsigned char *>(out_hash);
+    for (int i = 0; i < 32; i++) {
+        auto hi = hex[i * 2], lo = hex[i * 2 + 1];
+        out[i] = static_cast<unsigned char>(((hi >= 'a' ? hi - 'a' + 10 : hi - '0') << 4) |
+                                             (lo >= 'a' ? lo - 'a' + 10 : lo - '0'));
+    }
+}
+
+extern "C" {
+void duckdb_wasm_crypto_random(void *buf, int len);
+}
+
+// Force the linker to keep the stubs above by referencing them from a constructor
+// the optimizer can't elide.
+__attribute__((constructor)) static void _register_wasm_platform_stubs() {
+    volatile auto p1 = &duckdb_wasm_crypto_random;
+    volatile auto p2 = &duckdb_wasm_sha256;
+    (void)p1;
+    (void)p2;
+}
 
 namespace duckdb {
 class HTTPLogger;
