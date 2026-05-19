@@ -296,7 +296,7 @@ if(EMSCRIPTEN)
       -s MAXIMUM_MEMORY=4GB \
       -s MODULARIZE=1 \
       -s EXPORT_NAME='DuckDB' \
-      -s EXPORTED_RUNTIME_METHODS='[\"ccall\", \"stackSave\", \"stackAlloc\", \"stackRestore\", \"createDyncallWrapper\", \"getTempRet0\", \"setTempRet0\"]' \
+      -s EXPORTED_RUNTIME_METHODS='[\"ccall\", \"stackSave\", \"stackAlloc\", \"stackRestore\", \"HEAP8\", \"HEAPU8\", \"HEAP16\", \"HEAPU16\", \"HEAP32\", \"HEAPU32\", \"HEAPF32\", \"HEAPF64\"]' \
       --js-library=${CMAKE_SOURCE_DIR}/js-stubs.js")
 
 endif()

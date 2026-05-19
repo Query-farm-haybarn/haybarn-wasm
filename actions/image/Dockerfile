@@ -20,7 +20,7 @@ RUN apt-get update -qq \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-ARG EMSDK_VERSION="3.1.71"
+ARG EMSDK_VERSION="5.0.7"
 RUN mkdir -p /opt/emsdk \
     && cd /opt/emsdk \
     && curl -SL https://github.com/emscripten-core/emsdk/archive/${EMSDK_VERSION}.tar.gz | tar -xz --strip-components=1 \

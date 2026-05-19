@@ -60,10 +60,9 @@ Currently `1.5.2-rc1`.
 ## Local smoke-build setup
 
 ```bash
-# 1. Install pinned emsdk (CI uses 3.1.71; homebrew emscripten = HEAD,
-#    which drops APIs our build needs):
+# 1. Install pinned emsdk (CI uses 5.0.7):
 git clone --depth=1 https://github.com/emscripten-core/emsdk.git /tmp/emsdk
-cd /tmp/emsdk && ./emsdk install 3.1.71 && ./emsdk activate 3.1.71
+cd /tmp/emsdk && ./emsdk install 5.0.7 && ./emsdk activate 5.0.7
 
 # 2. From haybarn-wasm root, smoke build (one variant is enough):
 cd /path/to/haybarn-wasm
@@ -84,9 +83,10 @@ Gotchas to know:
   without a reachable tag.
 - `CMAKE_POLICY_VERSION_MINIMUM=3.5` is needed because rapidjson's
   CMakeLists declares a pre-3.5 minimum, which modern CMake 4.x rejects.
-- Homebrew's emscripten is HEAD (5.0.1+). It drops `createDyncallWrapper`
-  from `EXPORTED_RUNTIME_METHODS`, breaking the JS shim phase. Stay on
-  emsdk 3.1.71 to match CI.
+- Homebrew's emscripten works on 5.x but is HEAD — pin to emsdk 5.0.7
+  to match what CI uses. Older emsdk (≤ 3.1.x) won't work: the wasm-side
+  preprocessor checks were updated to use `__EMSCRIPTEN__` (the standard
+  reserved-namespace form), which is what 4.x+ defines.
 
 ## Out-of-tree references
 

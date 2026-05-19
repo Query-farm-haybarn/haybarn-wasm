@@ -6,7 +6,7 @@ index 2de9f41532..1a7803d2d8 100644
  #include <utility>
  #include <vector>
  
-+#ifdef EMSCRIPTEN
++#ifdef __EMSCRIPTEN__
 +#include <emscripten.h>
 +#endif
 +

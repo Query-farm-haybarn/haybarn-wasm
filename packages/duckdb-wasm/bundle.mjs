@@ -36,13 +36,23 @@ import { execSync } from 'child_process';
 // The lack of alternatives for Karma won't allow us to bundle workers and tests as ESM.
 // We should upgrade all CommonJS bundles to ESM as soon as the dynamic requires are resolved.
 
-const TARGET_BROWSER = ['chrome64', 'edge79', 'firefox62', 'safari11.1'];
+// Browser targets bumped from chrome64/firefox62/safari11.1 to support
+// BigInt literal syntax (Chrome 67, Firefox 68, Safari 14) — emsdk 5.0.7
+// emits BigInt literals in its runtime under WASM_BIGINT=1.
+const TARGET_BROWSER = ['chrome67', 'edge79', 'firefox68', 'safari14'];
 const TARGET_BROWSER_TEST = ['es2020'];
 const TARGET_NODE = ['node14.6'];
-const EXTERNALS_NODE = ['apache-arrow'];
-const EXTERNALS_BROWSER = ['apache-arrow', 'module'];
-const EXTERNALS_WEBWORKER = ['module'];
-const EXTERNALS_TEST_BROWSER = ['module'];
+// emsdk 5.0.7's runtime imports node builtins via the `node:` URL scheme
+// (e.g. `node:fs`, `node:crypto`, `node:worker_threads`, `node:util`,
+// `node:os`) inside an `ENVIRONMENT_IS_NODE`-gated branch. esbuild can't
+// statically resolve these for browser bundles; mark them external (via the
+// glob pattern, which esbuild supports for `external`) so the never-reached
+// node branch survives bundling.
+const NODE_BUILTIN_EXTERNALS = ['node:*'];
+const EXTERNALS_NODE = ['apache-arrow', ...NODE_BUILTIN_EXTERNALS];
+const EXTERNALS_BROWSER = ['apache-arrow', 'module', ...NODE_BUILTIN_EXTERNALS];
+const EXTERNALS_WEBWORKER = ['module', ...NODE_BUILTIN_EXTERNALS];
+const EXTERNALS_TEST_BROWSER = ['module', ...NODE_BUILTIN_EXTERNALS];
 
 // Read CLI flags
 let is_debug = false;

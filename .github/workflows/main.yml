@@ -27,8 +27,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  EMSCRIPTEN_VERSION: '3.1.71'
-  EMSCRIPTEN_VERSION_COI: '3.1.57'
+  EMSCRIPTEN_VERSION: '5.0.7'
+  EMSCRIPTEN_VERSION_COI: '5.0.7'
   DEFAULT_USE_GENERATED_EXPORTED_LIST: 'no'
   # R2-backed ccache shared with haybarn-extension-ci-tools — same
   # Cloudflare Worker, same bucket, same bearer-token-auth scheme.
