@@ -83,32 +83,24 @@ jobs:
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
-                      source /emsdk/emsdk_env.sh >/dev/null 2>&1 || true
-                      command -v yarn >/dev/null 2>&1 || npm install -g --silent yarn
                       yarn install --frozen-lockfile --prefer-offline
 
             - name: Lint @haybarn/haybarn-wasm
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
-                      source /emsdk/emsdk_env.sh >/dev/null 2>&1 || true
-                      command -v yarn >/dev/null 2>&1 || npm install -g --silent yarn
                       yarn workspace @haybarn/haybarn-wasm run lint
 
             - name: Lint @haybarn/haybarn-wasm-shell
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
-                      source /emsdk/emsdk_env.sh >/dev/null 2>&1 || true
-                      command -v yarn >/dev/null 2>&1 || npm install -g --silent yarn
                       yarn workspace @haybarn/haybarn-wasm-shell run lint
 
             - name: Lint @haybarn/benchmarks
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
-                      source /emsdk/emsdk_env.sh >/dev/null 2>&1 || true
-                      command -v yarn >/dev/null 2>&1 || npm install -g --silent yarn
                       yarn workspace @haybarn/benchmarks run lint
 
     tpchgen:
@@ -175,153 +167,453 @@ jobs:
                       ./target/release/dataprep
                   retention-days: 1
 
-    # Engine wasm compile — all 6 variants in one matrix with fail-fast.
-    #
-    # Runs DIRECTLY on the ubuntu-latest runner (not in a container).
-    # Earlier attempts at running this in ghcr.io/.../haybarn-wasm-base
-    # via a composite action introduced too many failure modes
-    # (env-var propagation, eval-shell quoting, signal handling) for
-    # the ratio of benefit. The on-runner approach keeps it boring.
-    #
-    # The one runner-vs-container drawback we have to mitigate ourselves:
-    # `mymindstorm/setup-emsdk` installs emsdk into a per-run temp dir
-    # whose path contains a UUID, which gets hashed into every ccache
-    # entry — defeats cache reuse. Fix: install emsdk manually at the
-    # fixed path /opt/emsdk and cache that dir with actions/cache so
-    # ccache hashes are stable across runs.
-    wasm:
-        name: 'Wasm / ${{ matrix.variant.name }}'
+    wasm_mvp:
+        name: Wasm / mvp
         runs-on: ubuntu-latest
         needs:
             - dataprep
             - tpchgen
-        strategy:
-            fail-fast: true
-            matrix:
-                variant:
-                    # Non-loadable: builtin extensions only, smaller surface.
-                    - { name: 'mvp',          mode: 'relperf', feature: 'mvp', platform: 'wasm_mvp',     loadable: '',       artifact: 'wasm-mvp' }
-                    - { name: 'eh',           mode: 'relperf', feature: 'eh',  platform: 'wasm_eh',      loadable: '',       artifact: 'wasm-eh' }
-                    - { name: 'coi',          mode: 'relperf', feature: 'coi', platform: 'wasm_threads', loadable: '',       artifact: 'wasm-coi' }
-                    # Loadable: supports `INSTALL extension; LOAD extension;`
-                    # for the Haybarn extension repository.
-                    - { name: 'mvp (loadable version)', mode: 'relsize', feature: 'mvp', platform: 'wasm_mvp',     loadable: '1',      artifact: 'wasm-mvp-loadable' }
-                    - { name: 'eh (loadable version)',  mode: 'relsize', feature: 'eh',  platform: 'wasm_eh',      loadable: '1',      artifact: 'wasm-eh-loadable' }
-                    - { name: 'coi (loadable version)', mode: 'relsize', feature: 'coi', platform: 'wasm_threads', loadable: 'signed', artifact: 'wasm-coi-loadable' }
         steps:
             - uses: actions/checkout@v6
               with:
                   submodules: 'recursive'
                   fetch-depth: 0
 
-            # Pin emsdk install location so ccache hashes are stable across
-            # runs. mymindstorm/setup-emsdk@v14 installs to a UUID-named
-            # temp dir; we install manually to /opt/emsdk instead.
+            - name: Prepare repository
+              run: |
+                  make apply_patches
+                  cd submodules/duckdb && git tag ${{ inputs.override_git_describe }}
+
+            # Install emsdk at the fixed path /opt/emsdk. mymindstorm/setup-emsdk
+            # installs to a per-run UUID-named temp dir, which gets hashed into
+            # every ccache compile entry and defeats cross-run cache reuse.
+            # A fixed install path keeps ccache keys stable across runs.
             - name: Cache /opt/emsdk
               id: cache-emsdk
               uses: actions/cache@v5
               with:
                   path: /opt/emsdk
                   key: emsdk-${{ env.EMSCRIPTEN_VERSION }}-x86_64-linux
-
             - name: Install emsdk at /opt/emsdk
               if: steps.cache-emsdk.outputs.cache-hit != 'true'
               shell: bash
               run: |
                   set -euxo pipefail
-                  sudo mkdir -p /opt
-                  sudo chown -R "$(id -u):$(id -g)" /opt
+                  sudo mkdir -p /opt && sudo chown -R "$(id -u):$(id -g)" /opt
                   git clone --depth=1 https://github.com/emscripten-core/emsdk.git /opt/emsdk
                   cd /opt/emsdk
-                  ./emsdk install "$EMSCRIPTEN_VERSION"
-                  ./emsdk activate "$EMSCRIPTEN_VERSION"
-
-            - name: Activate emsdk + put on PATH
+                  ./emsdk install ${{ env.EMSCRIPTEN_VERSION }}
+                  ./emsdk activate ${{ env.EMSCRIPTEN_VERSION }}
+            - name: Activate emsdk on PATH
               shell: bash
               run: |
                   set -exo pipefail   # NOT -u: emsdk_env.sh doesn't always set every var
                   source /opt/emsdk/emsdk_env.sh
-                  echo "EMSDK=${EMSDK:-/opt/emsdk}"                               >> "$GITHUB_ENV"
-                  echo "EMSDK_NODE=${EMSDK_NODE:-}"                               >> "$GITHUB_ENV"
-                  echo "EM_CONFIG=${EM_CONFIG:-/opt/emsdk/.emscripten}"           >> "$GITHUB_ENV"
-                  echo "/opt/emsdk"                                                >> "$GITHUB_PATH"
-                  echo "/opt/emsdk/upstream/emscripten"                            >> "$GITHUB_PATH"
-                  if [ -n "${EMSDK_NODE:-}" ]; then
-                      echo "$(dirname "$EMSDK_NODE")"                              >> "$GITHUB_PATH"
-                  fi
+                  echo "EMSDK=${EMSDK:-/opt/emsdk}" >> "$GITHUB_ENV"
+                  echo "EMSDK_NODE=${EMSDK_NODE:-}" >> "$GITHUB_ENV"
+                  echo "EM_CONFIG=${EM_CONFIG:-/opt/emsdk/.emscripten}" >> "$GITHUB_ENV"
+                  echo "/opt/emsdk"                       >> "$GITHUB_PATH"
+                  echo "/opt/emsdk/upstream/emscripten"   >> "$GITHUB_PATH"
+                  if [ -n "${EMSDK_NODE:-}" ]; then echo "$(dirname "$EMSDK_NODE")" >> "$GITHUB_PATH"; fi
 
-            # Apt ccache on ubuntu-24.04 is 4.9.1 which has a known HTTP
-            # bearer-auth bug that silently drops remote writes. Pull the
-            # musl-static 4.13.6 release instead — same binary
-            # haybarn-extension-ci-tools standardizes on.
-            - name: Install ccache 4.13.6 (musl-static)
-              shell: bash
-              run: |
-                  set -euxo pipefail
-                  curl -fsSL "https://github.com/ccache/ccache/releases/download/v4.13.6/ccache-4.13.6-linux-x86_64-musl-static.tar.xz" \
-                    | sudo tar -xJ -C /opt
-                  sudo install -m 0755 /opt/ccache-4.13.6-linux-x86_64-musl-static/ccache /usr/local/bin/ccache
-                  ccache --version
-
-            # Hot local cache for the duckdb engine compile. Keyed by
-            # variant + submodule CMake hashes so an engine bump
-            # invalidates cleanly; loose restore-keys keep small changes
-            # warm. R2 remote (CCACHE_REMOTE_STORAGE env) is the
-            # cross-run/cross-repo durable layer underneath.
-            - name: Cache ccache (local layer)
-              uses: actions/cache@v5
+            - name: Setup Ccache
+              uses: hendrikmuhs/ccache-action@main
               with:
-                  path: ~/.cache/ccache
-                  key: ccache-${{ matrix.variant.feature }}-${{ matrix.variant.loadable && 'loadable' || 'plain' }}-${{ hashFiles('submodules/duckdb/**/CMakeLists.txt', '.gitmodules') }}
-                  restore-keys: |
-                      ccache-${{ matrix.variant.feature }}-${{ matrix.variant.loadable && 'loadable' || 'plain' }}-
-                      ccache-${{ matrix.variant.feature }}-
+                  key: ${{ github.job }}
 
-            - name: Install wabt (loadable variants only)
-              if: ${{ matrix.variant.loadable != '' }}
-              shell: bash
-              run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends wabt
-
-            - name: Build wasm artifacts
-              shell: bash
-              env:
-                  USE_GENERATED_EXPORTED_LIST: ${{ env.DEFAULT_USE_GENERATED_EXPORTED_LIST }}
-                  DUCKDB_PLATFORM: ${{ matrix.variant.platform }}
-                  DUCKDB_WASM_LOADABLE_EXTENSIONS: ${{ matrix.variant.loadable }}
-                  GEN: ninja
+            - name: Git submodule status
               run: |
-                  set -euxo pipefail
-                  ccache -z
-                  make apply_patches
-                  cd submodules/duckdb && (git tag "${{ inputs.override_git_describe }}" 2>/dev/null || true) && cd ../..
                   git submodule status > git_submodule_status.txt
-                  ./scripts/wasm_build_lib.sh ${{ matrix.variant.mode }} ${{ matrix.variant.feature }}
 
-            - name: Show ccache stats (post-build)
-              if: always()
-              shell: bash
+            - name: Build Wasm module
               run: |
-                  echo '::group::ccache -sv'
-                  ccache -sv || ccache -s
-                  echo '::endgroup::'
+                  DUCKDB_PLATFORM="wasm_mvp" ./scripts/wasm_build_lib.sh relperf mvp
 
             - name: Upload artifact
               uses: actions/upload-artifact@v7
               with:
-                  name: ${{ matrix.variant.artifact }}
+                  name: wasm-mvp
                   path: |
-                      ./packages/duckdb-wasm/src/bindings/duckdb-${{ matrix.variant.feature }}.js
-                      ./packages/duckdb-wasm/src/bindings/duckdb-${{ matrix.variant.feature }}.wasm
-                      ./packages/duckdb-wasm/src/bindings/duckdb-${{ matrix.variant.feature }}.pthread.js
-                  if-no-files-found: ignore
+                      ./packages/duckdb-wasm/src/bindings/duckdb-mvp.js
+                      ./packages/duckdb-wasm/src/bindings/duckdb-mvp.wasm
                   retention-days: 1
 
+    wasm_eh:
+        name: Wasm / eh
+        runs-on: ubuntu-latest
+        needs:
+            - dataprep
+            - tpchgen
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  submodules: 'recursive'
+                  fetch-depth: 0
+
+            - name: Prepare repository
+              run: |
+                  make apply_patches
+                  cd submodules/duckdb && git tag ${{ inputs.override_git_describe }}
+
+            # Install emsdk at the fixed path /opt/emsdk. mymindstorm/setup-emsdk
+            # installs to a per-run UUID-named temp dir, which gets hashed into
+            # every ccache compile entry and defeats cross-run cache reuse.
+            # A fixed install path keeps ccache keys stable across runs.
+            - name: Cache /opt/emsdk
+              id: cache-emsdk
+              uses: actions/cache@v5
+              with:
+                  path: /opt/emsdk
+                  key: emsdk-${{ env.EMSCRIPTEN_VERSION }}-x86_64-linux
+            - name: Install emsdk at /opt/emsdk
+              if: steps.cache-emsdk.outputs.cache-hit != 'true'
+              shell: bash
+              run: |
+                  set -euxo pipefail
+                  sudo mkdir -p /opt && sudo chown -R "$(id -u):$(id -g)" /opt
+                  git clone --depth=1 https://github.com/emscripten-core/emsdk.git /opt/emsdk
+                  cd /opt/emsdk
+                  ./emsdk install ${{ env.EMSCRIPTEN_VERSION }}
+                  ./emsdk activate ${{ env.EMSCRIPTEN_VERSION }}
+            - name: Activate emsdk on PATH
+              shell: bash
+              run: |
+                  set -exo pipefail   # NOT -u: emsdk_env.sh doesn't always set every var
+                  source /opt/emsdk/emsdk_env.sh
+                  echo "EMSDK=${EMSDK:-/opt/emsdk}" >> "$GITHUB_ENV"
+                  echo "EMSDK_NODE=${EMSDK_NODE:-}" >> "$GITHUB_ENV"
+                  echo "EM_CONFIG=${EM_CONFIG:-/opt/emsdk/.emscripten}" >> "$GITHUB_ENV"
+                  echo "/opt/emsdk"                       >> "$GITHUB_PATH"
+                  echo "/opt/emsdk/upstream/emscripten"   >> "$GITHUB_PATH"
+                  if [ -n "${EMSDK_NODE:-}" ]; then echo "$(dirname "$EMSDK_NODE")" >> "$GITHUB_PATH"; fi
+
+            - name: Setup Ccache
+              uses: hendrikmuhs/ccache-action@main
+              with:
+                  key: ${{ github.job }}
+
+            - name: Git submodule status
+              run: |
+                  git submodule status > git_submodule_status.txt
+
+            - name: Build Wasm module
+              run: |
+                  DUCKDB_PLATFORM="wasm_eh" ./scripts/wasm_build_lib.sh relperf eh
+
+            - name: Upload artifact
+              uses: actions/upload-artifact@v7
+              with:
+                  name: wasm-eh
+                  path: |
+                      ./packages/duckdb-wasm/src/bindings/duckdb-eh.js
+                      ./packages/duckdb-wasm/src/bindings/duckdb-eh.wasm
+                  retention-days: 1
+
+    wasm_coi:
+        name: Wasm / coi
+        runs-on: ubuntu-latest
+        needs:
+            - dataprep
+            - tpchgen
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  submodules: 'recursive'
+                  fetch-depth: 0
+
+            - name: Prepare repository
+              run: |
+                  make apply_patches
+                  cd submodules/duckdb && git tag ${{ inputs.override_git_describe }}
+
+            # Install emsdk at the fixed path /opt/emsdk. mymindstorm/setup-emsdk
+            # installs to a per-run UUID-named temp dir, which gets hashed into
+            # every ccache compile entry and defeats cross-run cache reuse.
+            # A fixed install path keeps ccache keys stable across runs.
+            - name: Cache /opt/emsdk
+              id: cache-emsdk
+              uses: actions/cache@v5
+              with:
+                  path: /opt/emsdk
+                  key: emsdk-${{ env.EMSCRIPTEN_VERSION_COI }}-x86_64-linux
+            - name: Install emsdk at /opt/emsdk
+              if: steps.cache-emsdk.outputs.cache-hit != 'true'
+              shell: bash
+              run: |
+                  set -euxo pipefail
+                  sudo mkdir -p /opt && sudo chown -R "$(id -u):$(id -g)" /opt
+                  git clone --depth=1 https://github.com/emscripten-core/emsdk.git /opt/emsdk
+                  cd /opt/emsdk
+                  ./emsdk install ${{ env.EMSCRIPTEN_VERSION_COI }}
+                  ./emsdk activate ${{ env.EMSCRIPTEN_VERSION_COI }}
+            - name: Activate emsdk on PATH
+              shell: bash
+              run: |
+                  set -exo pipefail   # NOT -u: emsdk_env.sh doesn't always set every var
+                  source /opt/emsdk/emsdk_env.sh
+                  echo "EMSDK=${EMSDK:-/opt/emsdk}" >> "$GITHUB_ENV"
+                  echo "EMSDK_NODE=${EMSDK_NODE:-}" >> "$GITHUB_ENV"
+                  echo "EM_CONFIG=${EM_CONFIG:-/opt/emsdk/.emscripten}" >> "$GITHUB_ENV"
+                  echo "/opt/emsdk"                       >> "$GITHUB_PATH"
+                  echo "/opt/emsdk/upstream/emscripten"   >> "$GITHUB_PATH"
+                  if [ -n "${EMSDK_NODE:-}" ]; then echo "$(dirname "$EMSDK_NODE")" >> "$GITHUB_PATH"; fi
+
+            - name: Setup Ccache
+              uses: hendrikmuhs/ccache-action@main
+              with:
+                  key: ${{ github.job }}
+
+            - name: Git submodule status
+              run: |
+                  git submodule status > git_submodule_status.txt
+
+            - name: Build Wasm module
+              run: |
+                  DUCKDB_PLATFORM="wasm_coi" ./scripts/wasm_build_lib.sh relperf coi
+
+            - name: Upload artifact
+              uses: actions/upload-artifact@v7
+              with:
+                  name: wasm-coi
+                  path: |
+                      ./packages/duckdb-wasm/src/bindings/duckdb-coi.js
+                      ./packages/duckdb-wasm/src/bindings/duckdb-coi.pthread.js
+                      ./packages/duckdb-wasm/src/bindings/duckdb-coi.wasm
+                  retention-days: 1
+
+    wasm_mvp_loadable:
+        name: Wasm / mvp (loadable version)
+        runs-on: ubuntu-latest
+        needs:
+            - dataprep
+            - tpchgen
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  submodules: 'recursive'
+                  fetch-depth: 0
+
+            - name: Install dependencies
+              run: |
+                  sudo apt install wabt
+
+            - name: Prepare repository
+              run: |
+                  make apply_patches
+                  cd submodules/duckdb && git tag ${{ inputs.override_git_describe }}
+
+            # Install emsdk at the fixed path /opt/emsdk. mymindstorm/setup-emsdk
+            # installs to a per-run UUID-named temp dir, which gets hashed into
+            # every ccache compile entry and defeats cross-run cache reuse.
+            # A fixed install path keeps ccache keys stable across runs.
+            - name: Cache /opt/emsdk
+              id: cache-emsdk
+              uses: actions/cache@v5
+              with:
+                  path: /opt/emsdk
+                  key: emsdk-${{ env.EMSCRIPTEN_VERSION }}-x86_64-linux
+            - name: Install emsdk at /opt/emsdk
+              if: steps.cache-emsdk.outputs.cache-hit != 'true'
+              shell: bash
+              run: |
+                  set -euxo pipefail
+                  sudo mkdir -p /opt && sudo chown -R "$(id -u):$(id -g)" /opt
+                  git clone --depth=1 https://github.com/emscripten-core/emsdk.git /opt/emsdk
+                  cd /opt/emsdk
+                  ./emsdk install ${{ env.EMSCRIPTEN_VERSION }}
+                  ./emsdk activate ${{ env.EMSCRIPTEN_VERSION }}
+            - name: Activate emsdk on PATH
+              shell: bash
+              run: |
+                  set -exo pipefail   # NOT -u: emsdk_env.sh doesn't always set every var
+                  source /opt/emsdk/emsdk_env.sh
+                  echo "EMSDK=${EMSDK:-/opt/emsdk}" >> "$GITHUB_ENV"
+                  echo "EMSDK_NODE=${EMSDK_NODE:-}" >> "$GITHUB_ENV"
+                  echo "EM_CONFIG=${EM_CONFIG:-/opt/emsdk/.emscripten}" >> "$GITHUB_ENV"
+                  echo "/opt/emsdk"                       >> "$GITHUB_PATH"
+                  echo "/opt/emsdk/upstream/emscripten"   >> "$GITHUB_PATH"
+                  if [ -n "${EMSDK_NODE:-}" ]; then echo "$(dirname "$EMSDK_NODE")" >> "$GITHUB_PATH"; fi
+
+            - name: Setup Ccache
+              uses: hendrikmuhs/ccache-action@main
+              with:
+                  key: ${{ github.job }}
+
+            - name: Git submodule status
+              run: |
+                  git submodule status > git_submodule_status.txt
+
+            - name: Build Wasm module
+              run: |
+                  USE_GENERATED_EXPORTED_LIST="$DEFAULT_USE_GENERATED_EXPORTED_LIST" DUCKDB_PLATFORM="wasm_mvp" DUCKDB_WASM_LOADABLE_EXTENSIONS=1 GEN=ninja ./scripts/wasm_build_lib.sh relsize mvp
+
+            - name: Upload artifact
+              uses: actions/upload-artifact@v7
+              with:
+                  name: wasm-mvp-loadable
+                  path: |
+                      ./packages/duckdb-wasm/src/bindings/duckdb-mvp.js
+                      ./packages/duckdb-wasm/src/bindings/duckdb-mvp.wasm
+                  retention-days: 1
+
+    wasm_eh_loadable:
+        name: Wasm / eh (loadable version)
+        runs-on: ubuntu-latest
+        needs:
+            - dataprep
+            - tpchgen
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  submodules: 'recursive'
+                  fetch-depth: 0
+
+            - name: Install dependencies
+              run: |
+                  sudo apt install wabt
+
+            - name: Prepare repository
+              run: |
+                  make apply_patches
+                  cd submodules/duckdb && git tag ${{ inputs.override_git_describe }}
+
+            # Install emsdk at the fixed path /opt/emsdk. mymindstorm/setup-emsdk
+            # installs to a per-run UUID-named temp dir, which gets hashed into
+            # every ccache compile entry and defeats cross-run cache reuse.
+            # A fixed install path keeps ccache keys stable across runs.
+            - name: Cache /opt/emsdk
+              id: cache-emsdk
+              uses: actions/cache@v5
+              with:
+                  path: /opt/emsdk
+                  key: emsdk-${{ env.EMSCRIPTEN_VERSION }}-x86_64-linux
+            - name: Install emsdk at /opt/emsdk
+              if: steps.cache-emsdk.outputs.cache-hit != 'true'
+              shell: bash
+              run: |
+                  set -euxo pipefail
+                  sudo mkdir -p /opt && sudo chown -R "$(id -u):$(id -g)" /opt
+                  git clone --depth=1 https://github.com/emscripten-core/emsdk.git /opt/emsdk
+                  cd /opt/emsdk
+                  ./emsdk install ${{ env.EMSCRIPTEN_VERSION }}
+                  ./emsdk activate ${{ env.EMSCRIPTEN_VERSION }}
+            - name: Activate emsdk on PATH
+              shell: bash
+              run: |
+                  set -exo pipefail   # NOT -u: emsdk_env.sh doesn't always set every var
+                  source /opt/emsdk/emsdk_env.sh
+                  echo "EMSDK=${EMSDK:-/opt/emsdk}" >> "$GITHUB_ENV"
+                  echo "EMSDK_NODE=${EMSDK_NODE:-}" >> "$GITHUB_ENV"
+                  echo "EM_CONFIG=${EM_CONFIG:-/opt/emsdk/.emscripten}" >> "$GITHUB_ENV"
+                  echo "/opt/emsdk"                       >> "$GITHUB_PATH"
+                  echo "/opt/emsdk/upstream/emscripten"   >> "$GITHUB_PATH"
+                  if [ -n "${EMSDK_NODE:-}" ]; then echo "$(dirname "$EMSDK_NODE")" >> "$GITHUB_PATH"; fi
+
+            - name: Setup Ccache
+              uses: hendrikmuhs/ccache-action@main
+              with:
+                  key: ${{ github.job }}
+
+            - name: Git submodule status
+              run: |
+                  git submodule status > git_submodule_status.txt
+
+            - name: Build Wasm module
+              run: |
+                  USE_GENERATED_EXPORTED_LIST="$DEFAULT_USE_GENERATED_EXPORTED_LIST" DUCKDB_PLATFORM="wasm_eh" DUCKDB_WASM_LOADABLE_EXTENSIONS=1 GEN=ninja ./scripts/wasm_build_lib.sh relsize eh
+
+            - name: Upload artifact
+              uses: actions/upload-artifact@v7
+              with:
+                  name: wasm-eh-loadable
+                  path: |
+                      ./packages/duckdb-wasm/src/bindings/duckdb-eh.js
+                      ./packages/duckdb-wasm/src/bindings/duckdb-eh.wasm
+                  retention-days: 1
+
+    wasm_coi_loadable:
+        name: Wasm / coi (loadable version)
+        runs-on: ubuntu-latest
+        needs:
+            - dataprep
+            - tpchgen
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  submodules: 'recursive'
+                  fetch-depth: 0
+
+            - name: Install dependencies
+              run: |
+                  sudo apt install wabt
+
+            - name: Prepare repository
+              run: |
+                  make apply_patches
+                  cd submodules/duckdb && git tag ${{ inputs.override_git_describe }}
+
+            # Install emsdk at the fixed path /opt/emsdk. mymindstorm/setup-emsdk
+            # installs to a per-run UUID-named temp dir, which gets hashed into
+            # every ccache compile entry and defeats cross-run cache reuse.
+            # A fixed install path keeps ccache keys stable across runs.
+            - name: Cache /opt/emsdk
+              id: cache-emsdk
+              uses: actions/cache@v5
+              with:
+                  path: /opt/emsdk
+                  key: emsdk-${{ env.EMSCRIPTEN_VERSION_COI }}-x86_64-linux
+            - name: Install emsdk at /opt/emsdk
+              if: steps.cache-emsdk.outputs.cache-hit != 'true'
+              shell: bash
+              run: |
+                  set -euxo pipefail
+                  sudo mkdir -p /opt && sudo chown -R "$(id -u):$(id -g)" /opt
+                  git clone --depth=1 https://github.com/emscripten-core/emsdk.git /opt/emsdk
+                  cd /opt/emsdk
+                  ./emsdk install ${{ env.EMSCRIPTEN_VERSION_COI }}
+                  ./emsdk activate ${{ env.EMSCRIPTEN_VERSION_COI }}
+            - name: Activate emsdk on PATH
+              shell: bash
+              run: |
+                  set -exo pipefail   # NOT -u: emsdk_env.sh doesn't always set every var
+                  source /opt/emsdk/emsdk_env.sh
+                  echo "EMSDK=${EMSDK:-/opt/emsdk}" >> "$GITHUB_ENV"
+                  echo "EMSDK_NODE=${EMSDK_NODE:-}" >> "$GITHUB_ENV"
+                  echo "EM_CONFIG=${EM_CONFIG:-/opt/emsdk/.emscripten}" >> "$GITHUB_ENV"
+                  echo "/opt/emsdk"                       >> "$GITHUB_PATH"
+                  echo "/opt/emsdk/upstream/emscripten"   >> "$GITHUB_PATH"
+                  if [ -n "${EMSDK_NODE:-}" ]; then echo "$(dirname "$EMSDK_NODE")" >> "$GITHUB_PATH"; fi
+
+            - name: Setup Ccache
+              uses: hendrikmuhs/ccache-action@main
+              with:
+                  key: ${{ github.job }}
+
+            - name: Git submodule status
+              run: |
+                  git submodule status > git_submodule_status.txt
+
+            - name: Build Wasm module
+              run: |
+                  USE_GENERATED_EXPORTED_LIST="$DEFAULT_USE_GENERATED_EXPORTED_LIST" DUCKDB_PLATFORM="wasm_threads" DUCKDB_WASM_LOADABLE_EXTENSIONS="signed" GEN=ninja ./scripts/wasm_build_lib.sh relsize coi
+
+            - name: Upload artifact
+              uses: actions/upload-artifact@v7
+              with:
+                  name: wasm-coi-loadable
+                  path: |
+                      ./packages/duckdb-wasm/src/bindings/duckdb-coi.js
+                      ./packages/duckdb-wasm/src/bindings/duckdb-coi.pthread.js
+                      ./packages/duckdb-wasm/src/bindings/duckdb-coi.wasm
+                  retention-days: 1
 
     js_libs:
         name: Js / Libraries
         runs-on: ubuntu-latest
         needs:
-            - wasm
+            - wasm_mvp
+            - wasm_eh
+            - wasm_coi
             - eslint
         steps:
             - uses: actions/checkout@v6
@@ -397,8 +689,6 @@ jobs:
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
-                      source /emsdk/emsdk_env.sh >/dev/null 2>&1 || true
-                      command -v yarn >/dev/null 2>&1 || npm install -g --silent yarn
                       git config --global --add safe.directory '*'
                       mkdir -p ./lib/build/wasm/release ./reports
                       yarn install --frozen-lockfile
@@ -499,8 +789,6 @@ jobs:
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
-                      source /emsdk/emsdk_env.sh >/dev/null 2>&1 || true
-                      command -v yarn >/dev/null 2>&1 || npm install -g --silent yarn
                       git config --global --add safe.directory '*'
                       mkdir -p ./lib/build/wasm/release ./reports
                       yarn install --frozen-lockfile
@@ -535,8 +823,6 @@ jobs:
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
-                      source /emsdk/emsdk_env.sh >/dev/null 2>&1 || true
-                      command -v yarn >/dev/null 2>&1 || npm install -g --silent yarn
                       git config --global --add safe.directory '*'
                       mkdir -p ./lib/build/wasm/release ./reports
                       yarn install --frozen-lockfile
@@ -571,8 +857,6 @@ jobs:
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
-                      source /emsdk/emsdk_env.sh >/dev/null 2>&1 || true
-                      command -v yarn >/dev/null 2>&1 || npm install -g --silent yarn
                       git config --global --add safe.directory '*'
                       mkdir -p ./lib/build/wasm/release ./reports
                       yarn install --frozen-lockfile
@@ -607,8 +891,6 @@ jobs:
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
-                      source /emsdk/emsdk_env.sh >/dev/null 2>&1 || true
-                      command -v yarn >/dev/null 2>&1 || npm install -g --silent yarn
                       git config --global --add safe.directory '*'
                       mkdir -p ./lib/build/wasm/release ./reports
                       yarn install --frozen-lockfile
@@ -642,7 +924,9 @@ jobs:
         name: Js / Libraries (loadable version)
         runs-on: ubuntu-latest
         needs:
-            - wasm
+            - wasm_mvp_loadable
+            - wasm_eh_loadable
+            - wasm_coi_loadable
             - eslint
         steps:
             - uses: actions/checkout@v6
@@ -718,8 +1002,6 @@ jobs:
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
-                      source /emsdk/emsdk_env.sh >/dev/null 2>&1 || true
-                      command -v yarn >/dev/null 2>&1 || npm install -g --silent yarn
                       git config --global --add safe.directory '*'
                       mkdir -p ./lib/build/wasm/release ./reports
                       yarn install --frozen-lockfile
@@ -877,8 +1159,6 @@ jobs:
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
-                      source /emsdk/emsdk_env.sh >/dev/null 2>&1 || true
-                      command -v yarn >/dev/null 2>&1 || npm install -g --silent yarn
                       git config --global --add safe.directory '*'
                       mkdir -p ./lib/build/wasm/release ./reports
                       yarn install --frozen-lockfile

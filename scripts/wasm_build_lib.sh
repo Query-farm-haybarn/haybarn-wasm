@@ -53,24 +53,7 @@ set -x
 
 DUCKDB_WASM_VERSION_NAME=${DUCKDB_WASM_VERSION:-unknown}
 
-# Generator selection. Set GEN=ninja in the env to use Ninja (faster
-# incremental rebuilds + better parallelism than make). Default stays
-# make for backward compat with anyone invoking the script outside CI.
-# The choice propagates to ExternalProject_Add subbuilds via cmake's
-# parent-generator inheritance.
-case "${GEN:-make}" in
-  ninja)
-    CMAKE_GEN_FLAGS=(-G Ninja)
-    BUILD_TOOL=ninja
-    ;;
-  *)
-    CMAKE_GEN_FLAGS=()
-    BUILD_TOOL=make
-    ;;
-esac
-
 emcmake cmake \
-    "${CMAKE_GEN_FLAGS[@]}" \
     -S${CPP_SOURCE_DIR} \
     -B${BUILD_DIR} \
     -DDUCKDB_WASM_VERSION=${DUCKDB_WASM_VERSION_NAME} \
@@ -81,7 +64,7 @@ emcmake cmake \
     -DDUCKDB_EXTENSION_CONFIGS=extension_config_wasm.cmake \
     ${ADDITIONAL_FLAGS}
 
-emmake ${BUILD_TOOL} \
+emmake make \
     -C${BUILD_DIR} \
     -j${CORES} \
     duckdb_wasm
@@ -90,7 +73,6 @@ if [ "${USE_GENERATED_EXPORTED_LIST:-no}" == "yes" ]; then
 make TARGET=${FEATURES} update_exported_list
 
 emcmake cmake \
-    "${CMAKE_GEN_FLAGS[@]}" \
     -S${CPP_SOURCE_DIR} \
     -B${BUILD_DIR} \
     -DDUCKDB_WASM_VERSION=${DUCKDB_WASM_VERSION_NAME} \
@@ -102,7 +84,7 @@ emcmake cmake \
     -DUSE_GENERATED_EXPORTED_LIST=1 \
     ${ADDITIONAL_FLAGS}
 
-emmake ${BUILD_TOOL} \
+emmake make \
     -C${BUILD_DIR} \
     -j${CORES} \
     duckdb_wasm
