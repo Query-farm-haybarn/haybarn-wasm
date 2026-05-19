@@ -1,0 +1,29 @@
+Accept `.duckdb_extension.wasm` as the valid extension filename suffix
+when the engine is compiled with WASM_LOADABLE_EXTENSIONS. The engine's
+strict check throws PermissionException for anything not ending in
+`.duckdb_extension`, but Haybarn's wasm extension distribution uses
+the `.duckdb_extension.wasm` suffix (each file IS a WebAssembly
+module — `.duckdb_extension` is the application convention,
+`.wasm` is the file format).
+
+Companion to the suffix changes upstream all_of_them.patch already
+makes to `duckdb_extensions.cpp`, `extension_helper.cpp`, and
+`extension_install.cpp` — those flip the filename construction to
+`.duckdb_extension.wasm`; this extends the same convention to the
+load-side validation.
+
+diff --git a/src/main/extension/extension_load.cpp b/src/main/extension/extension_load.cpp
+--- a/src/main/extension/extension_load.cpp
++++ b/src/main/extension/extension_load.cpp
+@@ -453,9 +453,9 @@
+ 		direct_load = true;
+ 		filename = fs.ExpandPath(filename);
+ 	}
+-	if (!StringUtil::EndsWith(filename, ".duckdb_extension")) {
++	if (!StringUtil::EndsWith(filename, ".duckdb_extension.wasm")) {
+ 		throw PermissionException(
+-		    "Haybarn extensions are files ending with '.duckdb_extension', loading different "
++		    "Haybarn extensions are files ending with '.duckdb_extension.wasm', loading different "
+ 		    "files is not possible, error while loading from '%s', consider 'INSTALL <path>; LOAD <name>;'",
+ 		    filename);
+ 	}
