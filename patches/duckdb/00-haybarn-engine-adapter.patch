@@ -1,0 +1,34 @@
+Pre-adapter that runs before upstream's `all_of_them.patch` so the
+upstream patch can apply verbatim against the haybarn engine fork.
+
+The only point where the haybarn engine's source diverges from
+upstream DuckDB v1.5.2 inside the region upstream's patch touches is
+the rebranded error message in `extension_load.cpp`. Upstream's patch
+has the original "DuckDB extensions are files..." as a removal-context
+line; the haybarn engine says "Haybarn extensions are files...".
+Without this pre-adapter, `patch` can't find that line and the hunk
+(which removes the entire EndsWith check from the wasm-loadable path)
+fails to apply.
+
+We just temporarily rebrand back to "DuckDB" for that one line.
+Upstream's patch then deletes the line entirely (the wasm-loadable
+path doesn't need a filename-suffix gatekeeper since the whole flow
+is replaced by in-memory fetch + signature validation), so the
+"DuckDB" wording never actually reaches a runtime binary or user.
+
+If/when upstream's patch is reworked or the haybarn engine reroutes
+that error string through a different code path, this adapter
+becomes a no-op and can be deleted.
+
+diff --git a/src/main/extension/extension_load.cpp b/src/main/extension/extension_load.cpp
+--- a/src/main/extension/extension_load.cpp
++++ b/src/main/extension/extension_load.cpp
+@@ -454,7 +454,7 @@
+ 	if (!StringUtil::EndsWith(filename, ".duckdb_extension")) {
+ 		throw PermissionException(
+-		    "Haybarn extensions are files ending with '.duckdb_extension', loading different "
++		    "DuckDB extensions are files ending with '.duckdb_extension', loading different "
+ 		    "files is not possible, error while loading from '%s', consider 'INSTALL <path>; LOAD <name>;'",
+ 		    filename);
+ 	}
+
