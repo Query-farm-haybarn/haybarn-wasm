@@ -10,11 +10,18 @@ extension_install_info.hpp:
   (the haybarn engine intentionally has no nightly channel).
 
 extension_load.cpp:
-  Nothing to restore — upstream's patch removes the EndsWith error
-  block entirely (the wasm-loadable path doesn't need a filename
-  gatekeeper), so the "DuckDB extensions" string the pre-adapter
-  briefly introduced no longer exists in the source after upstream
-  runs.
+  Upstream's patch removes the EndsWith error block entirely (the
+  wasm-loadable path doesn't need a filename gatekeeper), so the
+  "DuckDB extensions" string the pre-adapter briefly introduced no
+  longer exists in the source after upstream runs.
+
+  Upstream's patch also ADDS a wasm-only hardcoded fallback URL
+  (`https://extensions.duckdb.org`) inside `#ifdef
+  WASM_LOADABLE_EXTENSIONS` in `TryInitialLoad`. This is the URL the
+  wasm runtime uses when no `CustomExtensionRepository` setting is
+  set, so extension auto-install (e.g. parquet, json) hits it on
+  first call. Flip it to the Haybarn R2 core repository so signed
+  Haybarn extensions actually resolve.
 
 If/when the haybarn engine drops the Haybarn-specific doc comment or
 the URLs move out of this file, this patch can be simplified or
@@ -56,3 +63,15 @@ diff --git a/src/include/duckdb/main/extension_install_info.hpp b/src/include/du
 
  	//! Debugging repositories (target local, relative paths that are produced by DuckDB's build system)
  	static constexpr const char *BUILD_DEBUG_REPOSITORY_PATH = "./build/debug/repository";
+diff --git a/src/main/extension/extension_load.cpp b/src/main/extension/extension_load.cpp
+--- a/src/main/extension/extension_load.cpp
++++ b/src/main/extension/extension_load.cpp
+@@ -384,7 +384,7 @@
+ #ifdef WASM_LOADABLE_EXTENSIONS
+ 		ExtensionRepository repository;
+
+-		repository = ExtensionRepository("custom", "https://extensions.duckdb.org");
++		repository = ExtensionRepository("custom", "http://haybarn-extensions.query.farm/core");
+ 		string custom_endpoint = Settings::Get<CustomExtensionRepositorySetting>(db);
+ 		if (!custom_endpoint.empty()) {
+ 			repository = ExtensionRepository("custom", custom_endpoint);
