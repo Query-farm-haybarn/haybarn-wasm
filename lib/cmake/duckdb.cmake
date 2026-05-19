@@ -12,7 +12,17 @@ if(DUCKDB_LOCATION)
   set(DUCKDB_CORE_DIR ${DUCKDB_LOCATION})
 endif()
 
-set(DUCKDB_CXX_FLAGS "${DUCKDB_CXX_FLAGS} -Wno-unqualified-std-cast-call -DDUCKDB_DEBUG_NO_SAFETY -DDUCKDB_FROM_DUCKDB_WASM")
+# DUCKDB_WASM_VERSION is a *preprocessor* macro the engine reads via
+# `#ifdef DUCKDB_WASM_VERSION` to short-circuit GetVersionDirectoryName().
+# It MUST be on the C++ compile command line — passing it as a cmake
+# variable to ExternalProject_Add (the previous attempt) only makes it a
+# cmake var in the engine's outer cmake, not a -D flag for the compiler.
+# Without it, the engine falls through to SourceID() = git commit SHA,
+# which breaks extension URLs.
+if(NOT DEFINED DUCKDB_WASM_VERSION OR "${DUCKDB_WASM_VERSION}" STREQUAL "")
+  set(DUCKDB_WASM_VERSION "unknown")
+endif()
+set(DUCKDB_CXX_FLAGS "${DUCKDB_CXX_FLAGS} -Wno-unqualified-std-cast-call -DDUCKDB_DEBUG_NO_SAFETY -DDUCKDB_FROM_DUCKDB_WASM -DDUCKDB_WASM_VERSION=${DUCKDB_WASM_VERSION}")
 message("DUCKDB_CXX_FLAGS=${DUCKDB_CXX_FLAGS}")
 
 set(DUCKDB_EXTENSIONS "json;core_functions")
@@ -46,7 +56,6 @@ ExternalProject_Add(
              -DDISABLE_BUILTIN_EXTENSIONS=TRUE
              -DUSE_WASM_THREADS=${USE_WASM_THREADS}
              -DDUCKDB_EXPLICIT_PLATFORM=${DUCKDB_EXPLICIT_PLATFORM}
-             -DDUCKDB_WASM_VERSION=${DUCKDB_WASM_VERSION}
              -DSMALLER_BINARY=1
   BUILD_BYPRODUCTS
     <INSTALL_DIR>/lib/libhaybarn_static.a
