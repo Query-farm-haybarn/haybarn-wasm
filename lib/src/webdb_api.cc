@@ -254,6 +254,11 @@ bool duckdb_web_pending_query_cancel(ConnectionHdl connHdl, const char* script) 
     auto c = reinterpret_cast<WebDB::Connection*>(connHdl);
     return c->CancelPendingQuery();
 }
+/// Get query progress as a fraction in [0, 1]; -1 if not available.
+double duckdb_web_get_query_progress(ConnectionHdl connHdl) {
+    auto c = reinterpret_cast<WebDB::Connection*>(connHdl);
+    return c->connection().GetQueryProgress();
+}
 /// Fetch query results
 void duckdb_web_query_fetch_results(WASMResponse* packed, ConnectionHdl connHdl) {
     auto c = reinterpret_cast<WebDB::Connection*>(connHdl);

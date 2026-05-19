@@ -41,6 +41,7 @@ _duckdb_web_prepared_create
 _duckdb_web_prepared_create_buffer
 _duckdb_web_prepared_run
 _duckdb_web_prepared_send
+_duckdb_web_get_query_progress
 _duckdb_web_query_fetch_results
 _duckdb_web_query_run
 _duckdb_web_query_run_buffer
