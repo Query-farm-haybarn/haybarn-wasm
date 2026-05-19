@@ -239,14 +239,16 @@ jobs:
             - name: Activate emsdk + put on PATH
               shell: bash
               run: |
-                  set -euxo pipefail
+                  set -exo pipefail   # NOT -u: emsdk_env.sh doesn't always set every var
                   source /opt/emsdk/emsdk_env.sh
-                  echo "EMSDK=$EMSDK"               >> "$GITHUB_ENV"
-                  echo "EMSDK_NODE=$EMSDK_NODE"     >> "$GITHUB_ENV"
-                  echo "EM_CONFIG=$EM_CONFIG"       >> "$GITHUB_ENV"
-                  echo "/opt/emsdk"                          >> "$GITHUB_PATH"
-                  echo "/opt/emsdk/upstream/emscripten"      >> "$GITHUB_PATH"
-                  echo "$(dirname "$EMSDK_NODE")"            >> "$GITHUB_PATH"
+                  echo "EMSDK=${EMSDK:-/opt/emsdk}"                               >> "$GITHUB_ENV"
+                  echo "EMSDK_NODE=${EMSDK_NODE:-}"                               >> "$GITHUB_ENV"
+                  echo "EM_CONFIG=${EM_CONFIG:-/opt/emsdk/.emscripten}"           >> "$GITHUB_ENV"
+                  echo "/opt/emsdk"                                                >> "$GITHUB_PATH"
+                  echo "/opt/emsdk/upstream/emscripten"                            >> "$GITHUB_PATH"
+                  if [ -n "${EMSDK_NODE:-}" ]; then
+                      echo "$(dirname "$EMSDK_NODE")"                              >> "$GITHUB_PATH"
+                  fi
 
             # Apt ccache on ubuntu-24.04 is 4.9.1 which has a known HTTP
             # bearer-auth bug that silently drops remote writes. Pull the
