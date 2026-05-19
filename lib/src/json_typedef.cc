@@ -117,7 +117,7 @@ Result<std::shared_ptr<DataType>> ReadDecimalType(const rapidjson::Value::ConstO
     ARROW_ASSIGN_OR_RAISE(const int32_t scale, GetIntField<int32_t>(obj, "scale"));
     if (precision <= 0) return Status::Invalid("Decimal precision must be > 0");
     if (scale < 0) return Status::Invalid("Decimal scale must be >= 0");
-    return decimal(precision, scale);
+    return smallest_decimal(precision, scale);
 }
 
 Result<std::shared_ptr<DataType>> ReadDecimal128Type(const rapidjson::Value::ConstObject& obj) {
