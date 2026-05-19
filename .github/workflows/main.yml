@@ -720,7 +720,6 @@ jobs:
                       yarn workspace @haybarn/haybarn-wasm-app build:release
 
             - name: Test @haybarn/haybarn-wasm on Chrome
-              continue-on-error: true   # rc1: 30/194 chrome tests fail; not blocking the publish
               shell: bash
               run: |
                       CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome
@@ -1052,7 +1051,6 @@ jobs:
                   ./scripts/npm_measure_lib.sh
 
             - name: Test @haybarn/haybarn-wasm on Chrome
-              continue-on-error: true   # rc1: 30/194 chrome tests fail; not blocking the publish
               shell: bash
               run: |
                       CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome
@@ -1205,7 +1203,6 @@ jobs:
                   ./scripts/npm_measure_lib.sh
 
             - name: Test @haybarn/haybarn-wasm on Chrome
-              continue-on-error: true   # rc1: 30/194 chrome tests fail; not blocking the publish
               shell: bash
               run: |
                       CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome
