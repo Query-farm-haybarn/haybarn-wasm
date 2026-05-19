@@ -13,6 +13,14 @@ on:
           type: string
         skip_tests:
           type: string
+        # Haybarn: opt-in to the benchmark suite (TPCH 0.01/0.1/0.25/0.5
+        # + microbenchmarks + merge_reports). Default off — the suite
+        # takes ~30 min per run and we've already established that the
+        # numbers track upstream within the noise. Set to true via
+        # workflow_dispatch when chasing a perf regression.
+        run_benchmarks:
+          type: boolean
+          default: false
     workflow_dispatch:
       inputs:
         override_git_describe:
@@ -21,6 +29,10 @@ on:
           type: string
         skip_tests:
           type: string
+        run_benchmarks:
+          description: 'Run the TPCH + microbenchmark suite (~30 min). Default off.'
+          type: boolean
+          default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.head_ref || '' }}-${{ github.base_ref || '' }}-${{ github.ref != 'refs/heads/haybarn' || github.sha }}-${{ github.event_name}}
@@ -692,11 +704,8 @@ jobs:
                       git config --global --add safe.directory '*'
                       mkdir -p ./lib/build/wasm/release ./reports
                       yarn install --frozen-lockfile
-                      ./scripts/install_tpch_tools.sh
                       ./scripts/generate_tpch_tbl.sh 0.01
                       ./scripts/generate_tpch_arrow.sh 0.01
-                      ./scripts/generate_tpch_duckdb.sh 0.01
-                      ./scripts/generate_tpch_sqlite.sh 0.01
                       ./scripts/generate_uni.sh
                       ./scripts/npm_version.sh
 
@@ -761,6 +770,7 @@ jobs:
                   path: duckdb-wasm-packages.zip
 
             - name: Build @haybarn/benchmarks
+              if: inputs.run_benchmarks
               shell: bash
               run: |
                 rm -r packages/duckdb-wasm/node_modules/*
@@ -773,6 +783,7 @@ jobs:
                 yarn workspace @haybarn/benchmarks bench:system:sum:csv
 
             - name: Upload reports
+              if: inputs.run_benchmarks
               uses: actions/upload-artifact@v7
               with:
                   name: reports_micro
@@ -786,7 +797,7 @@ jobs:
                   retention-days: 1
 
             - name: Preparation TPCH 0.01
-              if: github.ref == 'refs/heads/haybarn'
+              if: inputs.run_benchmarks
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
@@ -800,7 +811,7 @@ jobs:
                       ./scripts/generate_tpch_sqlite.sh 0.01
 
             - name: Benchmarks TPCH 0.01
-              if: github.ref == 'refs/heads/haybarn'
+              if: inputs.run_benchmarks
               shell: bash
               run: |
                 yarn workspace @haybarn/benchmarks bench:system:tpch:duckdb 0.01
@@ -809,7 +820,7 @@ jobs:
                 yarn workspace @haybarn/benchmarks bench:system:tpch:lovefield 0.01
 
             - name: Upload reports TPCH 0.01
-              if: github.ref == 'refs/heads/haybarn'
+              if: inputs.run_benchmarks
               uses: actions/upload-artifact@v7
               with:
                   name: reports_tpch_0_01
@@ -821,7 +832,7 @@ jobs:
                   retention-days: 1
 
             - name: Preparation TPCH 0.1
-              if: github.ref == 'refs/heads/haybarn'
+              if: inputs.run_benchmarks
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
@@ -835,7 +846,7 @@ jobs:
                       ./scripts/generate_tpch_sqlite.sh 0.1
 
             - name: Benchmarks TPCH 0.1
-              if: github.ref == 'refs/heads/haybarn'
+              if: inputs.run_benchmarks
               shell: bash
               run: |
                 yarn workspace @haybarn/benchmarks bench:system:tpch:duckdb 0.1
@@ -844,7 +855,7 @@ jobs:
                 yarn workspace @haybarn/benchmarks bench:system:tpch:lovefield 0.1
 
             - name: Upload reports TPCH 0.1
-              if: github.ref == 'refs/heads/haybarn'
+              if: inputs.run_benchmarks
               uses: actions/upload-artifact@v7
               with:
                   name: reports_tpch_0_1
@@ -856,7 +867,7 @@ jobs:
                   retention-days: 1
 
             - name: Preparation TPCH 0.25
-              if: github.ref == 'refs/heads/haybarn'
+              if: inputs.run_benchmarks
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
@@ -870,7 +881,7 @@ jobs:
                       ./scripts/generate_tpch_sqlite.sh 0.25
 
             - name: Benchmarks TPCH 0.25
-              if: github.ref == 'refs/heads/haybarn'
+              if: inputs.run_benchmarks
               shell: bash
               run: |
                 yarn workspace @haybarn/benchmarks bench:system:tpch:duckdb 0.25
@@ -879,7 +890,7 @@ jobs:
                 yarn workspace @haybarn/benchmarks bench:system:tpch:lovefield 0.25
 
             - name: Upload reports TPCH 0.25
-              if: github.ref == 'refs/heads/haybarn'
+              if: inputs.run_benchmarks
               uses: actions/upload-artifact@v7
               with:
                   name: reports_tpch_0_25
@@ -891,7 +902,7 @@ jobs:
                   retention-days: 1
 
             - name: Preparation TPCH 0.5
-              if: github.ref == 'refs/heads/haybarn'
+              if: inputs.run_benchmarks
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
@@ -905,7 +916,7 @@ jobs:
                       ./scripts/generate_tpch_sqlite.sh 0.5
 
             - name: Benchmarks TPCH 0.5
-              if: github.ref == 'refs/heads/haybarn'
+              if: inputs.run_benchmarks
               shell: bash
               run: |
                 yarn workspace @haybarn/benchmarks bench:system:tpch:duckdb 0.5
@@ -914,7 +925,7 @@ jobs:
                 yarn workspace @haybarn/benchmarks bench:system:tpch:lovefield 0.5
 
             - name: Upload reports TPCH 0.5
-              if: github.ref == 'refs/heads/haybarn'
+              if: inputs.run_benchmarks
               uses: actions/upload-artifact@v7
               with:
                   name: reports_tpch_0_5
@@ -1010,11 +1021,8 @@ jobs:
                       git config --global --add safe.directory '*'
                       mkdir -p ./lib/build/wasm/release ./reports
                       yarn install --frozen-lockfile
-                      ./scripts/install_tpch_tools.sh
                       ./scripts/generate_tpch_tbl.sh 0.01
                       ./scripts/generate_tpch_arrow.sh 0.01
-                      ./scripts/generate_tpch_duckdb.sh 0.01
-                      ./scripts/generate_tpch_sqlite.sh 0.01
                       ./scripts/generate_uni.sh
                       ./scripts/npm_version.sh
 
@@ -1168,11 +1176,8 @@ jobs:
                       git config --global --add safe.directory '*'
                       mkdir -p ./lib/build/wasm/release ./reports
                       yarn install --frozen-lockfile
-                      ./scripts/install_tpch_tools.sh
                       ./scripts/generate_tpch_tbl.sh 0.01
                       ./scripts/generate_tpch_arrow.sh 0.01
-                      ./scripts/generate_tpch_duckdb.sh 0.01
-                      ./scripts/generate_tpch_sqlite.sh 0.01
                       ./scripts/generate_uni.sh
                       ./scripts/npm_version.sh
 
@@ -1249,7 +1254,7 @@ jobs:
     merge_reports:
         name: Merge benchmark reports
         runs-on: ubuntu-latest
-        if: github.ref == 'refs/heads/haybarn'
+        if: inputs.run_benchmarks
         needs:
             - js_libs
         steps:
