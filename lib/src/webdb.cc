@@ -21,6 +21,7 @@
 #include "arrow/array/builder_primitive.h"
 #include "arrow/buffer.h"
 #include "arrow/io/memory.h"
+#include "arrow/ipc/dictionary.h"
 #include "arrow/ipc/options.h"
 #include "arrow/ipc/reader.h"
 #include "arrow/ipc/type_fwd.h"
@@ -155,6 +156,7 @@ arrow::Result<std::shared_ptr<arrow::Buffer>> WebDB::Connection::StreamQueryResu
     current_query_result_ = std::move(result);
     current_schema_.reset();
     current_schema_patched_.reset();
+    sent_dictionaries_.clear();
 
     // Import the schema
     ArrowSchema raw_schema;
@@ -351,10 +353,34 @@ DuckDBWasmResultsWrapper WebDB::Connection::FetchQueryResults() {
         ARROW_ASSIGN_OR_RAISE(auto batch, arrow::ImportRecordBatch(&array, current_schema_));
         // Patch the record batch
         ARROW_ASSIGN_OR_RAISE(batch, patchRecordBatch(batch, current_schema_patched_, webdb_.config_->query));
-        // Serialize the record batch
-        auto options = arrow::ipc::IpcWriteOptions::Defaults();
-        options.use_threads = false;
-        return arrow::ipc::SerializeRecordBatch(*batch, options);
+
+        // Write a valid IPC stream: any not-yet-sent dictionary messages, then the
+        // record batch. SerializeRecordBatch only emits the record batch, leaving
+        // dictionary-encoded columns (DuckDB enums) empty on the JS side.
+        ARROW_ASSIGN_OR_RAISE(auto out, arrow::io::BufferOutputStream::Create());
+        auto ipc_options = arrow::ipc::IpcWriteOptions::Defaults();
+        ipc_options.use_threads = false;
+
+        arrow::ipc::DictionaryFieldMapper mapper(*current_schema_patched_);
+        ARROW_ASSIGN_OR_RAISE(auto dicts, arrow::ipc::CollectDictionaries(*batch, mapper));
+        for (const auto& [dict_id, dict_array] : dicts) {
+            if (sent_dictionaries_.count(dict_id) == 0) {
+                arrow::ipc::IpcPayload dict_payload;
+                ARROW_RETURN_NOT_OK(
+                    arrow::ipc::GetDictionaryPayload(dict_id, dict_array, ipc_options, &dict_payload));
+                int32_t metadata_length = 0;
+                ARROW_RETURN_NOT_OK(
+                    arrow::ipc::WriteIpcPayload(dict_payload, ipc_options, out.get(), &metadata_length));
+                sent_dictionaries_.insert(dict_id);
+            }
+        }
+
+        arrow::ipc::IpcPayload batch_payload;
+        ARROW_RETURN_NOT_OK(arrow::ipc::GetRecordBatchPayload(*batch, ipc_options, &batch_payload));
+        int32_t metadata_length = 0;
+        ARROW_RETURN_NOT_OK(arrow::ipc::WriteIpcPayload(batch_payload, ipc_options, out.get(), &metadata_length));
+
+        return out->Finish();
     } catch (std::exception& e) {
         return arrow::Status{arrow::StatusCode::ExecutionError, e.what()};
     }

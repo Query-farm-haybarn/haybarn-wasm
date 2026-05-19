@@ -9,6 +9,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "duckdb.hpp"
 #include "duckdb/common/file_system.hpp"
@@ -82,6 +83,11 @@ class WebDB {
         std::optional<ArrowInsertOptions> arrow_insert_options_ = std::nullopt;
         /// The current arrow ipc input stream
         std::unique_ptr<BufferingArrowIPCStreamDecoder> arrow_ipc_stream_;
+        /// Dictionary IDs already serialized for the current streaming query result.
+        /// Cleared on each new StreamQueryResult so subsequent FetchQueryResults
+        /// emits a dictionary IPC message before the first record batch that
+        /// references each one.
+        std::unordered_set<int64_t> sent_dictionaries_;
 
         // Fully materialize a given result set and return it as an Arrow Buffer
         arrow::Result<std::shared_ptr<arrow::Buffer>> MaterializeQueryResult(
