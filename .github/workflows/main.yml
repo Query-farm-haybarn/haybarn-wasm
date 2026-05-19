@@ -692,6 +692,7 @@ jobs:
                       git config --global --add safe.directory '*'
                       mkdir -p ./lib/build/wasm/release ./reports
                       yarn install --frozen-lockfile
+                      ./scripts/install_tpch_tools.sh
                       ./scripts/generate_tpch_tbl.sh 0.01
                       ./scripts/generate_tpch_arrow.sh 0.01
                       ./scripts/generate_tpch_duckdb.sh 0.01
@@ -792,6 +793,7 @@ jobs:
                       git config --global --add safe.directory '*'
                       mkdir -p ./lib/build/wasm/release ./reports
                       yarn install --frozen-lockfile
+                      ./scripts/install_tpch_tools.sh
                       ./scripts/generate_tpch_tbl.sh 0.01
                       ./scripts/generate_tpch_arrow.sh 0.01
                       ./scripts/generate_tpch_duckdb.sh 0.01
@@ -826,6 +828,7 @@ jobs:
                       git config --global --add safe.directory '*'
                       mkdir -p ./lib/build/wasm/release ./reports
                       yarn install --frozen-lockfile
+                      ./scripts/install_tpch_tools.sh
                       ./scripts/generate_tpch_tbl.sh 0.1
                       ./scripts/generate_tpch_arrow.sh 0.1
                       ./scripts/generate_tpch_duckdb.sh 0.1
@@ -860,6 +863,7 @@ jobs:
                       git config --global --add safe.directory '*'
                       mkdir -p ./lib/build/wasm/release ./reports
                       yarn install --frozen-lockfile
+                      ./scripts/install_tpch_tools.sh
                       ./scripts/generate_tpch_tbl.sh 0.25
                       ./scripts/generate_tpch_arrow.sh 0.25
                       ./scripts/generate_tpch_duckdb.sh 0.25
@@ -894,6 +898,7 @@ jobs:
                       git config --global --add safe.directory '*'
                       mkdir -p ./lib/build/wasm/release ./reports
                       yarn install --frozen-lockfile
+                      ./scripts/install_tpch_tools.sh
                       ./scripts/generate_tpch_tbl.sh 0.5
                       ./scripts/generate_tpch_arrow.sh 0.5
                       ./scripts/generate_tpch_duckdb.sh 0.5
@@ -1005,6 +1010,7 @@ jobs:
                       git config --global --add safe.directory '*'
                       mkdir -p ./lib/build/wasm/release ./reports
                       yarn install --frozen-lockfile
+                      ./scripts/install_tpch_tools.sh
                       ./scripts/generate_tpch_tbl.sh 0.01
                       ./scripts/generate_tpch_arrow.sh 0.01
                       ./scripts/generate_tpch_duckdb.sh 0.01
@@ -1162,6 +1168,7 @@ jobs:
                       git config --global --add safe.directory '*'
                       mkdir -p ./lib/build/wasm/release ./reports
                       yarn install --frozen-lockfile
+                      ./scripts/install_tpch_tools.sh
                       ./scripts/generate_tpch_tbl.sh 0.01
                       ./scripts/generate_tpch_arrow.sh 0.01
                       ./scripts/generate_tpch_duckdb.sh 0.01
