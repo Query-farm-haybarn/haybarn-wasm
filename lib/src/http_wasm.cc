@@ -30,6 +30,8 @@ extern "C" void duckdb_wasm_sha256(const void *data, int len, void *out_hash) {
 extern "C" {
 void duckdb_wasm_crypto_random(void *buf, int len);
 char *duckdb_wasm_get_page_origin(void);
+char *duckdb_wasm_open_auth_url(const char *url, int timeout_ms);
+char *duckdb_wasm_get_auth_error(int unused);
 }
 
 // Force the linker to keep the stubs above by referencing them from a constructor
@@ -38,9 +40,13 @@ __attribute__((constructor)) static void _register_wasm_platform_stubs() {
     volatile auto p1 = &duckdb_wasm_crypto_random;
     volatile auto p2 = &duckdb_wasm_sha256;
     volatile auto p3 = &duckdb_wasm_get_page_origin;
+    volatile auto p4 = &duckdb_wasm_open_auth_url;
+    volatile auto p5 = &duckdb_wasm_get_auth_error;
     (void)p1;
     (void)p2;
     (void)p3;
+    (void)p4;
+    (void)p5;
 }
 
 namespace duckdb {
