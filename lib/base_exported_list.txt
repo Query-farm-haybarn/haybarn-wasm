@@ -49,8 +49,4 @@ _duckdb_web_reset
 _duckdb_web_tokenize
 _duckdb_web_tokenize_buffer
 _duckdb_web_udf_scalar_create
-_duckdb_wasm_crypto_random
 _duckdb_wasm_sha256
-_duckdb_wasm_get_page_origin
-_duckdb_wasm_open_auth_url
-_duckdb_wasm_get_auth_error

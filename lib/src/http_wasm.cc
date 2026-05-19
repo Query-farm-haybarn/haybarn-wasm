@@ -210,7 +210,7 @@ EM_JS(char*, wasm_xhr_no_body, (const char *url_ptr, int header_count, char **he
     var bodyLen = resp ? resp.byteLength : 0;
     var status = xhr.status;
     if (status === 0) return 0;
-    var hdrs = xhr.getAllResponseHeaders() || '';
+    var hdrs = xhr.getAllResponseHeaders() || "";
     var hdrsBuf = new TextEncoder().encode(hdrs);
     var hdrsLen = hdrsBuf.length;
     var total = 2 + 4 + hdrsLen + 4 + bodyLen;
@@ -255,7 +255,7 @@ EM_JS(char*, wasm_xhr_with_body,
     var bodyLen = resp ? resp.byteLength : 0;
     var status = xhr.status;
     if (status === 0) return 0;
-    var hdrs = xhr.getAllResponseHeaders() || '';
+    var hdrs = xhr.getAllResponseHeaders() || "";
     var hdrsBuf = new TextEncoder().encode(hdrs);
     var hdrsLen = hdrsBuf.length;
     var total = 2 + 4 + hdrsLen + 4 + bodyLen;
