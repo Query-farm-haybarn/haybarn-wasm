@@ -1201,6 +1201,23 @@ jobs:
                       rm -rf ./packages/duckdb-wasm-app/build/
                       yarn workspace @haybarn/haybarn-wasm-app build:release
 
+            # Deploy the rebranded Haybarn shell to Cloudflare Pages
+            # (shell.haybarn.query.farm). The wasm engine itself loads from
+            # jsDelivr at runtime — this only ships the app shell + bundled
+            # xterm UI wasm + the COOP/COEP _headers. `--branch production`
+            # targets the project's production deployment (the one the custom
+            # domain serves). Runs on manual dispatch or on a haybarn-v* tag.
+            - name: Deploy Haybarn shell to Cloudflare Pages
+              if: github.event_name == 'workflow_dispatch' || (github.event_name == 'create' && startsWith(github.ref, 'refs/tags/haybarn-v'))
+              env:
+                  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+                  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+              run: |
+                  npx --yes wrangler@latest pages deploy \
+                      packages/duckdb-wasm-app/build/release \
+                      --project-name haybarn-shell \
+                      --branch production
+
             #- name: Coverage @haybarn/haybarn-wasm
             #  shell: bash
             #  run: |
