@@ -3,16 +3,19 @@
 // Two jobs:
 //   1. Serve the threaded (COI) DuckDB wasm same-origin at /wasm/duckdb-coi.wasm.
 //      It's ~34 MiB — over Pages' 25 MiB static-asset cap — and loading it
-//      cross-origin from jsDelivr trips a shared-memory mismatch in the
-//      duckdb worker. Streaming it through this worker makes it same-origin
-//      with no size limit. The bytes themselves come from the pinned npm
-//      package on jsDelivr.
+//      cross-origin trips a shared-memory mismatch in the duckdb worker.
+//      Streaming it through this worker makes it same-origin with no size
+//      limit. The bytes come from Haybarn's own R2 (haybarn-extensions.query.farm),
+//      uploaded by the release build under a version-pinned key — so the shell
+//      is decoupled from jsDelivr's npm-mirror lag (which previously 502'd a
+//      fresh release until jsDelivr caught up). The path is versioned, so it's
+//      safely immutable per release.
 //   2. Apply COOP/COEP (cross-origin isolation, required for the threaded
 //      variant's SharedArrayBuffer) to every response. In advanced mode the
 //      static `_headers` file is ignored, so the headers are set here.
 //
 // All other requests fall through to the static assets (env.ASSETS).
-const COI_WASM_UPSTREAM = 'https://cdn.jsdelivr.net/npm/@haybarn/haybarn-wasm@1.5.2-rc4/dist/duckdb-coi.wasm';
+const COI_WASM_UPSTREAM = 'https://haybarn-extensions.query.farm/engine/1.5.2-rc4/duckdb-coi.wasm';
 
 function withCoiHeaders(resp, extra) {
     const h = new Headers(resp.headers);

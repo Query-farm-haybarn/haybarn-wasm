@@ -1201,12 +1201,36 @@ jobs:
                       rm -rf ./packages/duckdb-wasm-app/build/
                       yarn workspace @haybarn/haybarn-wasm-app build:release
 
+            # Publish the COI engine wasm to Haybarn R2 (served at
+            # haybarn-extensions.query.farm) under a version-pinned key, so the
+            # shell's _worker.js streams it from our own R2 instead of jsDelivr.
+            # Decouples shell deploys from jsDelivr's npm-mirror lag (which can
+            # 502 a fresh release until jsDelivr catches up). Same R2 creds /
+            # endpoint as the engine repo's extension publish (org-level
+            # secrets). Versioned path => safely immutable per release.
+            - name: Publish COI wasm to R2
+              if: github.event_name == 'workflow_dispatch' || (github.event_name == 'create' && startsWith(github.ref, 'refs/tags/haybarn-v'))
+              env:
+                  AWS_ENDPOINT_URL: ${{ secrets.R2_ENDPOINT }}
+                  AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+                  AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY_ID }}
+                  AWS_DEFAULT_REGION: auto
+                  AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+                  AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+              run: |
+                  VERSION=$(node -p "require('./packages/duckdb-wasm/package.json').version")
+                  WASM=./packages/duckdb-wasm/src/bindings/duckdb-coi.wasm
+                  test -f "$WASM" || { echo "missing $WASM"; exit 1; }
+                  echo "Uploading $WASM -> s3://${{ secrets.R2_BUCKET }}/engine/${VERSION}/duckdb-coi.wasm"
+                  aws s3 cp "$WASM" "s3://${{ secrets.R2_BUCKET }}/engine/${VERSION}/duckdb-coi.wasm" \
+                      --content-type application/wasm \
+                      --cache-control "public, max-age=31536000, immutable"
+
             # Deploy the rebranded Haybarn shell to Cloudflare Pages
-            # (shell.haybarn.query.farm). The wasm engine itself loads from
-            # jsDelivr at runtime — this only ships the app shell + bundled
-            # xterm UI wasm + the COOP/COEP _headers. `--branch production`
-            # targets the project's production deployment (the one the custom
-            # domain serves). Runs on manual dispatch or on a haybarn-v* tag.
+            # (shell.haybarn.query.farm). The COI wasm is streamed same-origin by
+            # _worker.js from Haybarn R2 (uploaded just above). `--branch
+            # production` targets the project's production deployment (the one the
+            # custom domain serves). Runs on manual dispatch or on a haybarn-v* tag.
             - name: Deploy Haybarn shell to Cloudflare Pages
               if: github.event_name == 'workflow_dispatch' || (github.event_name == 'create' && startsWith(github.ref, 'refs/tags/haybarn-v'))
               env:
