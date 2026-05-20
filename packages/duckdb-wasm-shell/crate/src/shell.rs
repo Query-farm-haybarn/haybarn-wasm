@@ -1078,7 +1078,7 @@ impl Shell {
             s.write(vt100::CURSOR_HOME);
 
             s.write(&format!(
-                "{bold}DuckDB Web Shell{normal}{endl}",
+                "{bold}Haybarn Shell{normal}{endl}Haybarn, powered by DuckDB{endl}",
                 bold = vt100::MODE_BOLD,
                 normal = vt100::MODES_OFF,
                 endl = vt100::CRLF

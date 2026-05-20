@@ -36,7 +36,12 @@ const DUCKDB_BUNDLES: duckdb.DuckDBBundles = {
         mainWorker: new URL('@haybarn/haybarn-wasm/dist/duckdb-browser-eh.worker.js', import.meta.url).toString(),
     },
     coi: {
-        mainModule: `${CDN}/duckdb-coi.wasm`,
+        // The threaded COI wasm (~34 MiB) exceeds Cloudflare Pages' 25 MiB
+        // per-static-file limit, so it can't ship as a bundled static asset.
+        // The advanced-mode `_worker.js` streams it same-origin from the CDN
+        // at /wasm/duckdb-coi.wasm (no size cap on the worker route). The
+        // worker glue itself is bundled same-origin like the other variants.
+        mainModule: `${window.location.origin}/wasm/duckdb-coi.wasm`,
         mainWorker: new URL('@haybarn/haybarn-wasm/dist/duckdb-browser-coi.worker.js', import.meta.url).toString(),
         pthreadWorker: new URL(
             '@haybarn/haybarn-wasm/dist/duckdb-browser-coi.pthread.worker.js',

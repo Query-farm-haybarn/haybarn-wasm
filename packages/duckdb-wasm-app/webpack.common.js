@@ -22,6 +22,20 @@ export function configure(params) {
         },
         resolve: {
             extensions: ['.ts', '.tsx', '.js', '.mjs', '.jsx', '.css', '.wasm'],
+            alias: {
+                // Pin the workspace packages to their source dirs. yarn copies
+                // `file:` deps into this package's node_modules at install time —
+                // before the wasm engine / shell are (re)built — so the default
+                // resolution bundles a STALE dist (notably a COI worker that
+                // creates a non-shared WebAssembly.Memory, which breaks the
+                // threaded variant with a shared-state mismatch). Aliasing to the
+                // sibling workspace dirs guarantees we always bundle the freshly
+                // built dist. The non-`$` aliases match the package root and any
+                // subpath (e.g. `/dist/duckdb-browser-coi.worker.js`); they do
+                // NOT match `@haybarn/haybarn-wasm-shell` (different path segment).
+                '@haybarn/haybarn-wasm': path.resolve(__dirname, '../duckdb-wasm'),
+                '@haybarn/haybarn-wasm-shell': path.resolve(__dirname, '../duckdb-wasm-shell'),
+            },
         },
         module: {
             rules: [
@@ -169,6 +183,14 @@ export function configure(params) {
                         // (COOP/COEP for cross-origin isolation + asset caching).
                         from: './static/_headers',
                         to: './_headers',
+                        toType: 'file',
+                    },
+                    {
+                        // Cloudflare Pages advanced-mode worker: serves the COI
+                        // wasm same-origin and applies COOP/COEP to every
+                        // response. Must sit at the deploy root.
+                        from: './_worker.js',
+                        to: './_worker.js',
                         toType: 'file',
                     },
                 ],

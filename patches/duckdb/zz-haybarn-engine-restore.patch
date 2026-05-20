@@ -30,7 +30,7 @@ deleted.
 diff --git a/src/include/duckdb/main/extension_install_info.hpp b/src/include/duckdb/main/extension_install_info.hpp
 --- a/src/include/duckdb/main/extension_install_info.hpp
 +++ b/src/include/duckdb/main/extension_install_info.hpp
-@@ -54,10 +54,28 @@
+@@ -54,10 +54,29 @@
  };
 
  struct ExtensionRepository {
@@ -44,22 +44,23 @@ diff --git a/src/include/duckdb/main/extension_install_info.hpp b/src/include/du
 +	//! one bucket, segregated by top-level path prefix (/core, /community).
 +	//! The upstream nightly repository concept is intentionally dropped.
 +	//!
-+	//! URLs are http:// intentionally — matches upstream's design. The
-+	//! engine's built-in HTTPUtil (httplib without OpenSSL) can only
-+	//! speak HTTP, so the bootstrap install of httpfs itself happens
-+	//! over HTTP. The binary is RSA-signature-verified against the
-+	//! embedded HAYBARN_TRUST_ROOT key on dlopen, so a MitM can't
-+	//! substitute a malicious extension even over plain HTTP. Once
-+	//! httpfs is loaded, HTTPUtil::BumpToSecureProtocol upgrades
-+	//! subsequent install URLs to https://.
++	//! https:// is mandatory for the wasm build: the browser performs each
++	//! extension fetch itself, and a cross-origin-isolated https page hard-
++	//! blocks mixed (http://) subresources, so an http install URL is
++	//! rejected before the request is ever sent. The R2 custom domain
++	//! serves https directly. (The native engine historically used http
++	//! here because its bundled httplib has no OpenSSL and relied on
++	//! HTTPUtil::BumpToSecureProtocol once httpfs was loaded — that whole
++	//! bootstrap does not exist in wasm, where fetch/XHR handle TLS, so the
++	//! native rationale for http:// simply does not apply to this build.)
 +	//!
-+	//! NOTE: a Cloudflare Configuration Rule on the query.farm zone
-+	//! disables "Always Use HTTPS" for hostname == haybarn-extensions
-+	//! .query.farm so R2 serves http directly (otherwise R2 would 301
-+	//! to https and the engine's install path doesn't follow redirects
-+	//! because params.follow_location = false).
-+	static constexpr const char *CORE_REPOSITORY_URL = "http://haybarn-extensions.query.farm/core";
-+	static constexpr const char *COMMUNITY_REPOSITORY_URL = "http://haybarn-extensions.query.farm/community";
++	//! Either way the binaries are RSA-signature-verified against the
++	//! embedded HAYBARN_TRUST_ROOT key on load, so transport security is
++	//! defense-in-depth rather than the trust anchor. Core and community
++	//! both resolve under the single haybarn-extensions.query.farm host,
++	//! split by the /core and /community path prefixes.
++	static constexpr const char *CORE_REPOSITORY_URL = "https://haybarn-extensions.query.farm/core";
++	static constexpr const char *COMMUNITY_REPOSITORY_URL = "https://haybarn-extensions.query.farm/community";
 
  	//! Debugging repositories (target local, relative paths that are produced by DuckDB's build system)
  	static constexpr const char *BUILD_DEBUG_REPOSITORY_PATH = "./build/debug/repository";
@@ -71,7 +72,7 @@ diff --git a/src/main/extension/extension_load.cpp b/src/main/extension/extensio
  		ExtensionRepository repository;
 
 -		repository = ExtensionRepository("custom", "https://extensions.duckdb.org");
-+		repository = ExtensionRepository("custom", "http://haybarn-extensions.query.farm/core");
++		repository = ExtensionRepository("custom", "https://haybarn-extensions.query.farm/core");
  		string custom_endpoint = Settings::Get<CustomExtensionRepositorySetting>(db);
  		if (!custom_endpoint.empty()) {
  			repository = ExtensionRepository("custom", custom_endpoint);
