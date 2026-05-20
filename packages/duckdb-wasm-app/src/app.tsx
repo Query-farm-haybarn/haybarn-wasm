@@ -41,7 +41,13 @@ const DUCKDB_BUNDLES: duckdb.DuckDBBundles = {
         // The advanced-mode `_worker.js` streams it same-origin from the CDN
         // at /wasm/duckdb-coi.wasm (no size cap on the worker route). The
         // worker glue itself is bundled same-origin like the other variants.
-        mainModule: `${window.location.origin}/wasm/duckdb-coi.wasm`,
+        //
+        // The `?v=` is load-bearing: the proxy response is served `immutable`,
+        // but the path is stable across releases, so without a version key a
+        // returning visitor would keep an old engine wasm cached forever (and
+        // miss e.g. the http→https extension-repo fix). Keying the query on the
+        // package version gives each release a distinct cache entry.
+        mainModule: `${window.location.origin}/wasm/duckdb-coi.wasm?v=${HAYBARN_WASM_VERSION}`,
         mainWorker: new URL('@haybarn/haybarn-wasm/dist/duckdb-browser-coi.worker.js', import.meta.url).toString(),
         pthreadWorker: new URL(
             '@haybarn/haybarn-wasm/dist/duckdb-browser-coi.pthread.worker.js',
