@@ -1,6 +1,6 @@
 {
     "name": "@haybarn/react-haybarn",
-    "version": "1.5.2-rc1",
+    "version": "1.5.2-rc3",
     "description": "React components for Haybarn-Wasm.",
     "license": "MIT",
     "private": true,

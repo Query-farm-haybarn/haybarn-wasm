@@ -129,9 +129,9 @@ export async function embed(props: ShellProps) {
     };
 
     // Attach to the database
-    shell.writeln(`${TERM_BOLD}[ RUN ]${TERM_NORMAL} Instantiating DuckDB`);
+    shell.writeln(`${TERM_BOLD}[ RUN ]${TERM_NORMAL} Instantiating Haybarn`);
     runtime.database = await props.resolveDatabase(progressHandler);
-    shell.writeln(`${TERM_CLEAR}${TERM_BOLD}[ OK  ]${TERM_NORMAL} Instantiating DuckDB`);
+    shell.writeln(`${TERM_CLEAR}${TERM_BOLD}[ OK  ]${TERM_NORMAL} Instantiating Haybarn`);
 
     // Additional steps
     const step = async (label: string, work: () => Promise<void>) => {
