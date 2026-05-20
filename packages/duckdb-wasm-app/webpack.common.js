@@ -134,7 +134,13 @@ export function configure(params) {
         plugins: [
             new HtmlWebpackPlugin({
                 template: './static/index.html',
-                filename: './original.html',
+                // Emit as index.html so the app is served at `/`. Upstream
+                // duckdb-wasm-app emitted `original.html` for the GitHub-Pages
+                // coi-serviceworker trick (a SW re-served it at `/` with
+                // COOP/COEP injected, since GH Pages can't set headers). On
+                // Cloudflare Pages we set those headers via static/_headers,
+                // so no service worker / indirection is needed.
+                filename: './index.html',
             }),
             new MiniCssExtractPlugin({
                 filename: './static/css/[id].[contenthash].css',
