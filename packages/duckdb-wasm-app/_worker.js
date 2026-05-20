@@ -12,7 +12,7 @@
 //      static `_headers` file is ignored, so the headers are set here.
 //
 // All other requests fall through to the static assets (env.ASSETS).
-const COI_WASM_UPSTREAM = 'https://cdn.jsdelivr.net/npm/@haybarn/haybarn-wasm@1.5.2-rc3/dist/duckdb-coi.wasm';
+const COI_WASM_UPSTREAM = 'https://cdn.jsdelivr.net/npm/@haybarn/haybarn-wasm@1.5.2-rc4/dist/duckdb-coi.wasm';
 
 function withCoiHeaders(resp, extra) {
     const h = new Headers(resp.headers);
