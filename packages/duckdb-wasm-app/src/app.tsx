@@ -13,26 +13,35 @@ import 'react-popper-tooltip/dist/styles.css';
 
 import * as duckdb from '@haybarn/haybarn-wasm';
 
-// Load the wasm engine + workers from the jsDelivr CDN copy of the published
-// @haybarn/haybarn-wasm npm package at runtime, rather than bundling the
-// workspace build into this app. Pinned to the rc the shell is shipped
-// against so the deployed shell is unambiguously running that release.
+// Load the heavy wasm engine binary from the jsDelivr CDN copy of the
+// published @haybarn/haybarn-wasm npm package at runtime (pinned to the rc
+// the shell ships against). The small worker glue is still bundled into the
+// app and served same-origin: a Worker can't be constructed from a
+// cross-origin script URL (`new Worker('https://cdn.jsdelivr.net/...')`
+// throws a SecurityError, and the COI pthread spawn has the same
+// restriction), so the workers must be same-origin. Each worker fetches its
+// `mainModule` .wasm from the CDN — that's a CORS request, which jsDelivr
+// serves with `access-control-allow-origin: *` (+ a CORP header so it loads
+// fine under our COEP: require-corp).
 const HAYBARN_WASM_VERSION = '1.5.2-rc2';
 const CDN = `https://cdn.jsdelivr.net/npm/@haybarn/haybarn-wasm@${HAYBARN_WASM_VERSION}/dist`;
 
 const DUCKDB_BUNDLES: duckdb.DuckDBBundles = {
     mvp: {
         mainModule: `${CDN}/duckdb-mvp.wasm`,
-        mainWorker: `${CDN}/duckdb-browser-mvp.worker.js`,
+        mainWorker: new URL('@haybarn/haybarn-wasm/dist/duckdb-browser-mvp.worker.js', import.meta.url).toString(),
     },
     eh: {
         mainModule: `${CDN}/duckdb-eh.wasm`,
-        mainWorker: `${CDN}/duckdb-browser-eh.worker.js`,
+        mainWorker: new URL('@haybarn/haybarn-wasm/dist/duckdb-browser-eh.worker.js', import.meta.url).toString(),
     },
     coi: {
         mainModule: `${CDN}/duckdb-coi.wasm`,
-        mainWorker: `${CDN}/duckdb-browser-coi.worker.js`,
-        pthreadWorker: `${CDN}/duckdb-browser-coi.pthread.worker.js`,
+        mainWorker: new URL('@haybarn/haybarn-wasm/dist/duckdb-browser-coi.worker.js', import.meta.url).toString(),
+        pthreadWorker: new URL(
+            '@haybarn/haybarn-wasm/dist/duckdb-browser-coi.pthread.worker.js',
+            import.meta.url,
+        ).toString(),
     },
 };
 const logger = new duckdb.ConsoleLogger(duckdb.LogLevel.WARNING);
