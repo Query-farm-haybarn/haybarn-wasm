@@ -30,7 +30,12 @@ export default {
         const url = new URL(request.url);
 
         if (url.pathname === '/wasm/duckdb-coi.wasm') {
-            const upstream = await fetch(COI_WASM_UPSTREAM, { cf: { cacheTtl: 31536000, cacheEverything: true } });
+            // cacheTtlByStatus (not a blanket cacheTtl) so a transient upstream
+            // 404/5xx is NOT cached for a year — otherwise a missing object
+            // poisons the edge until manual purge.
+            const upstream = await fetch(COI_WASM_UPSTREAM, {
+                cf: { cacheEverything: true, cacheTtlByStatus: { '200-299': 31536000, '300-599': 0 } },
+            });
             if (!upstream.ok || !upstream.body) {
                 return new Response(`upstream wasm fetch failed: ${upstream.status}`, { status: 502 });
             }

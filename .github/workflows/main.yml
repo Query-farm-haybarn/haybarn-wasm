@@ -1218,7 +1218,13 @@ jobs:
                   AWS_REQUEST_CHECKSUM_CALCULATION: when_required
                   AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
               run: |
-                  VERSION=$(node -p "require('./packages/duckdb-wasm/package.json').version")
+                  # Derive the version from the worker's own URL, NOT package.json:
+                  # CI rewrites package.json to a dev version (e.g. 1.5.2-dev1.0) on
+                  # workflow_dispatch, which would upload to a path the (hardcoded,
+                  # rc-pinned) worker never fetches. The worker URL is the single
+                  # source of truth for the path the shell will request.
+                  VERSION=$(grep -oE 'engine/[^/]+/duckdb-coi\.wasm' packages/duckdb-wasm-app/_worker.js | head -1 | sed -E 's|engine/(.+)/duckdb-coi\.wasm|\1|')
+                  test -n "$VERSION" || { echo "could not parse engine version from _worker.js"; exit 1; }
                   WASM=./packages/duckdb-wasm/src/bindings/duckdb-coi.wasm
                   test -f "$WASM" || { echo "missing $WASM"; exit 1; }
                   echo "Uploading $WASM -> s3://${{ secrets.R2_BUCKET }}/engine/${VERSION}/duckdb-coi.wasm"
