@@ -93,7 +93,7 @@
      justify-content: center;
      align-items: center;
 }
- .submenu_item:hover, .ducklogo:hover {
+ .submenu_item:hover, .haybarnlogo:hover {
      background-color: var(--nav_tab_bg_active);
      color: var(--nav_tab_fg_active);
 }

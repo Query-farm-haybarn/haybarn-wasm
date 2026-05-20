@@ -6,6 +6,7 @@ import styles from './navbar.module.css';
 
 import icon_shell from '../../static/svg/icons/shell.svg';
 import icon_book from '../../static/svg/icons/book.svg';
+import haybarn_logo from '../../static/svg/icons/haybarn-icon.png';
 
 type TabProps = {
     route: string;
@@ -57,7 +58,7 @@ export const NavBar: React.FC<Props> = (_props: Props) => {
     return (
         <div className={styles.navbar}>
             <div className={styles.logo}>
-                <img src="https://cdn.jsdelivr.net/npm/@haybarn/haybarn-wasm@1.14.3/dist/img/duckdb.svg" />
+                <img src={haybarn_logo} alt="Haybarn" />
             </div>
             <div className={styles.tabs}>
                 <Tab route="/" location={location.pathname} icon={icon_shell} />

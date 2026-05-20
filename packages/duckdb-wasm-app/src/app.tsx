@@ -3,7 +3,6 @@ import { createRoot } from 'react-dom/client';
 import { Versus } from './pages/versus';
 import { Shell } from './pages/shell';
 import { Route, Routes, Navigate, BrowserRouter } from 'react-router-dom';
-import { NavBarContainer } from './components/navbar';
 import { DuckDBConnectionProvider, DuckDBPlatform, DuckDBProvider } from '@haybarn/react-haybarn';
 
 import '../static/fonts/fonts.module.css';
@@ -13,26 +12,27 @@ import 'xterm/css/xterm.css';
 import 'react-popper-tooltip/dist/styles.css';
 
 import * as duckdb from '@haybarn/haybarn-wasm';
-import duckdb_wasm from '@haybarn/haybarn-wasm/dist/duckdb-mvp.wasm';
-import duckdb_wasm_eh from '@haybarn/haybarn-wasm/dist/duckdb-eh.wasm';
-import duckdb_wasm_coi from '@haybarn/haybarn-wasm/dist/duckdb-coi.wasm';
+
+// Load the wasm engine + workers from the jsDelivr CDN copy of the published
+// @haybarn/haybarn-wasm npm package at runtime, rather than bundling the
+// workspace build into this app. Pinned to the rc the shell is shipped
+// against so the deployed shell is unambiguously running that release.
+const HAYBARN_WASM_VERSION = '1.5.2-rc2';
+const CDN = `https://cdn.jsdelivr.net/npm/@haybarn/haybarn-wasm@${HAYBARN_WASM_VERSION}/dist`;
 
 const DUCKDB_BUNDLES: duckdb.DuckDBBundles = {
     mvp: {
-        mainModule: duckdb_wasm,
-        mainWorker: new URL('@haybarn/haybarn-wasm/dist/duckdb-browser-mvp.worker.js', import.meta.url).toString(),
+        mainModule: `${CDN}/duckdb-mvp.wasm`,
+        mainWorker: `${CDN}/duckdb-browser-mvp.worker.js`,
     },
     eh: {
-        mainModule: duckdb_wasm_eh,
-        mainWorker: new URL('@haybarn/haybarn-wasm/dist/duckdb-browser-eh.worker.js', import.meta.url).toString(),
+        mainModule: `${CDN}/duckdb-eh.wasm`,
+        mainWorker: `${CDN}/duckdb-browser-eh.worker.js`,
     },
     coi: {
-        mainModule: duckdb_wasm_coi,
-        mainWorker: new URL('@haybarn/haybarn-wasm/dist/duckdb-browser-coi.worker.js', import.meta.url).toString(),
-        pthreadWorker: new URL(
-            '@haybarn/haybarn-wasm/dist/duckdb-browser-coi.pthread.worker.js',
-            import.meta.url,
-        ).toString(),
+        mainModule: `${CDN}/duckdb-coi.wasm`,
+        mainWorker: `${CDN}/duckdb-browser-coi.worker.js`,
+        pthreadWorker: `${CDN}/duckdb-browser-coi.pthread.worker.js`,
     },
 };
 const logger = new duckdb.ConsoleLogger(duckdb.LogLevel.WARNING);

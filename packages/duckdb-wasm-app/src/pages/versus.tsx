@@ -8,6 +8,9 @@ import { RectangleWaveSpinner } from '../components/spinners';
 
 import styles from './versus.module.css';
 
+// NOTE: still points at upstream duckdb-wasm's hosted benchmark data — Haybarn
+// doesn't publish its own benchmarks.arrow yet (the suite is gated off by
+// default in CI). Swap to a Haybarn-hosted URL once we deploy benchmark data.
 const DATA_URL = 'https://shell.duckdb.org/data/benchmarks.arrow?35';
 
 enum LoadingStatus {
@@ -71,7 +74,7 @@ export const Versus: React.FC<Props> = (props: Props) => {
                 <div className={styles.root}>
                     <div className={styles.content}>
                         <PageSection>
-                            <h1>DuckDB-Wasm versus X</h1>
+                            <h1>Haybarn versus X</h1>
                             <p className={styles.tldr}>
                                 TL;DR: Consider <b>DuckDB-Wasm</b> for efficient SQL queries, for file formats such as
                                 JSON, CSV, Arrow, Parquet, for partial file reads (locally & remote), for shared SQL
@@ -124,7 +127,7 @@ export const Versus: React.FC<Props> = (props: Props) => {
                                 <a
                                     className={styles.link}
                                     target="_blank"
-                                    href="https://github.com/duckdb/duckdb-wasm/tree/main/packages/benchmarks"
+                                    href="https://github.com/Query-farm-haybarn/haybarn-wasm/tree/haybarn/packages/benchmarks"
                                     rel="noreferrer"
                                 >
                                     here

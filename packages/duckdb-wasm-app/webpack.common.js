@@ -158,6 +158,13 @@ export function configure(params) {
                         from: '../duckdb-wasm/docs',
                         to: './docs',
                     },
+                    {
+                        // Cloudflare Pages reads _headers from the deploy root
+                        // (COOP/COEP for cross-origin isolation + asset caching).
+                        from: './static/_headers',
+                        to: './_headers',
+                        toType: 'file',
+                    },
                 ],
             }),
         ],

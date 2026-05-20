@@ -1,0 +1,20 @@
+# Cloudflare Pages headers for shell.haybarn.query.farm
+#
+# Cross-origin isolation (COOP + COEP) is what unlocks SharedArrayBuffer,
+# which the COI / threaded Haybarn-wasm variant needs. With these set the
+# shell auto-selects the fastest variant it can; without them it silently
+# falls back to the eh / mvp single-threaded variants.
+#
+# The wasm engine + workers are pulled from jsDelivr at runtime
+# (@haybarn/haybarn-wasm@<rc>). jsDelivr serves those assets with
+# `access-control-allow-origin: *` and a cross-origin CORP header, so they
+# load fine under COEP: require-corp.
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+
+# Content-hashed build assets (static/js, static/wasm, static/img, …) are
+# immutable — webpack puts a contenthash in every filename — so let them
+# cache hard.
+/static/*
+  Cache-Control: public, max-age=31536000, immutable
