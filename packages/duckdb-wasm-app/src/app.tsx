@@ -24,7 +24,7 @@ import * as duckdb from '@haybarn/haybarn-wasm';
 // `mainModule` .wasm from the CDN — that's a CORS request, which jsDelivr
 // serves with `access-control-allow-origin: *` (+ a CORP header so it loads
 // fine under our COEP: require-corp).
-const HAYBARN_WASM_VERSION = '1.5.3-rc4';
+const HAYBARN_WASM_VERSION = '1.5.3-rc5';
 const CDN = `https://cdn.jsdelivr.net/npm/@haybarn/haybarn-wasm@${HAYBARN_WASM_VERSION}/dist`;
 
 const DUCKDB_BUNDLES: duckdb.DuckDBBundles = {
