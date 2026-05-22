@@ -1,6 +1,6 @@
 {
     "name": "@haybarn/haybarn-wasm-shell",
-    "version": "1.5.3-rc2",
+    "version": "1.5.3-rc3",
     "description": "Haybarn-Wasm interactive SQL shell.",
     "author": "Andre Kohn <kohn.a@outlook.com>",
     "license": "MIT",
