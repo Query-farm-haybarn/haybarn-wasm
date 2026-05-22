@@ -113,6 +113,30 @@ WebDB::Connection::Connection(WebDB& webdb)
 /// Constructor
 WebDB::Connection::~Connection() = default;
 
+namespace {
+/// Build the ArrowConverter ClientProperties for the wasm IPC encoder.
+///
+/// Honors the session's `TimeZone` setting so TIMESTAMP WITH TIME ZONE columns
+/// are exported with the user's timezone in the IPC schema. Previously this
+/// site (and two more below) hardcoded "UTC", which made the shell render every
+/// TIMESTAMPTZ in UTC regardless of `SET TimeZone='America/New_York'`. The
+/// engine's `ClientContext::GetClientProperties()` reads the same setting; we
+/// reproduce just the TimeZone bit here because the other ClientProperties
+/// fields are intentionally pinned by the wasm packaging layer (REGULAR offset
+/// size, no list/string views, format version V1.0, webdb-level lossless
+/// toggle) rather than driven from session settings.
+ClientProperties MakeArrowClientProperties(duckdb::ClientContext& ctx, bool lossless_conversion) {
+    string session_tz = "UTC";
+    duckdb::Value tz_value;
+    if (ctx.TryGetCurrentSetting("TimeZone", tz_value)) {
+        session_tz = tz_value.ToString();
+    }
+    return ClientProperties(session_tz, ArrowOffsetSize::REGULAR, /*arrow_use_list_view=*/false,
+                            /*arrow_use_string_view=*/false, lossless_conversion,
+                            ArrowFormatVersion::V1_0, &ctx);
+}
+}  // namespace
+
 arrow::Result<std::shared_ptr<arrow::Buffer>> WebDB::Connection::MaterializeQueryResult(
     duckdb::unique_ptr<duckdb::QueryResult> result) {
     current_query_result_.reset();
@@ -122,8 +146,7 @@ arrow::Result<std::shared_ptr<arrow::Buffer>> WebDB::Connection::MaterializeQuer
     // Configure the output writer
     ArrowSchema raw_schema;
     bool lossless_conversion = webdb_.config_->arrow_lossless_conversion;
-    ClientProperties options("UTC", ArrowOffsetSize::REGULAR, false, false, lossless_conversion,
-                             ArrowFormatVersion::V1_0, connection_.context);
+    ClientProperties options = MakeArrowClientProperties(*connection_.context, lossless_conversion);
     auto extension_type_cast = ArrowTypeExtensionData::GetExtensionTypes(*connection_.context, result->types);
     options.arrow_offset_size = ArrowOffsetSize::REGULAR;
     ArrowConverter::ToArrowSchema(&raw_schema, result->types, result->names, options);
@@ -161,8 +184,7 @@ arrow::Result<std::shared_ptr<arrow::Buffer>> WebDB::Connection::StreamQueryResu
     // Import the schema
     ArrowSchema raw_schema;
     bool lossless_conversion = webdb_.config_->arrow_lossless_conversion;
-    ClientProperties options("UTC", ArrowOffsetSize::REGULAR, false, false, lossless_conversion,
-                             ArrowFormatVersion::V1_0, connection_.context);
+    ClientProperties options = MakeArrowClientProperties(*connection_.context, lossless_conversion);
     options.arrow_offset_size = ArrowOffsetSize::REGULAR;
     ArrowConverter::ToArrowSchema(&raw_schema, current_query_result_->types, current_query_result_->names, options);
     ARROW_ASSIGN_OR_RAISE(current_schema_, arrow::ImportSchema(&raw_schema));
@@ -345,8 +367,7 @@ DuckDBWasmResultsWrapper WebDB::Connection::FetchQueryResults() {
         // Serialize the record batch
         ArrowArray array;
         bool lossless_conversion = webdb_.config_->arrow_lossless_conversion;
-        ClientProperties arrow_options("UTC", ArrowOffsetSize::REGULAR, false, false, lossless_conversion,
-                                       ArrowFormatVersion::V1_0, connection_.context);
+        ClientProperties arrow_options = MakeArrowClientProperties(*connection_.context, lossless_conversion);
         auto extension_type_cast = ArrowTypeExtensionData::GetExtensionTypes(*connection_.context, chunk->GetTypes());
         arrow_options.arrow_offset_size = ArrowOffsetSize::REGULAR;
         ArrowConverter::ToArrowArray(*chunk, &array, arrow_options, extension_type_cast);
