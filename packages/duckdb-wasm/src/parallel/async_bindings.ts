@@ -106,6 +106,44 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
         this._workerShutdownResolver = () => {};
     }
 
+    /**
+     * Register a 4-byte SharedArrayBuffer for low-latency query cancellation.
+     *
+     * Wire format: a single `Int32Array[0]`. The main thread signals cancel by
+     * `Atomics.store(int32, 0, 1)`. While a pending query is active the worker
+     * polls this flag every 10 ms (between `pollPendingQuery` iterations) and
+     * calls `cancelPendingQuery` when it sees 1, then writes 0 back.
+     *
+     * Only the most-recently-started pending query is SAB-cancellable; the
+     * 4-byte wire format has no room for a connection id. For multi-connection
+     * cancellation use the existing message-based `connection.cancelSent()`.
+     *
+     * Idempotent and re-callable; supplying a new SAB replaces the previous
+     * one. Must be called after the worker has been attached.
+     */
+    public registerCancelSAB(sab: SharedArrayBuffer): void {
+        if (typeof SharedArrayBuffer === 'undefined') {
+            throw new TypeError(
+                'registerCancelSAB requires SharedArrayBuffer support (cross-origin isolation must be enabled)',
+            );
+        }
+        if (!(sab instanceof SharedArrayBuffer)) {
+            throw new TypeError('registerCancelSAB requires a SharedArrayBuffer (got a non-shared buffer)');
+        }
+        if (sab.byteLength < 4) {
+            throw new RangeError(
+                `registerCancelSAB requires at least 4 bytes for the Int32 flag (got ${sab.byteLength})`,
+            );
+        }
+        if (!this._worker) {
+            console.warn(
+                'registerCancelSAB: worker not attached; cancel SAB will not take effect until a worker is attached',
+            );
+            return;
+        }
+        this._worker.postMessage({ type: 'init-cancel-sab', sab });
+    }
+
     /** Post a task */
     protected async postTask<W extends WorkerTaskVariant>(
         task: W,

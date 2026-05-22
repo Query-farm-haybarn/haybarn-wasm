@@ -412,6 +412,78 @@ export function testAsyncBindings(
                 const anotherOne = await conn.useUnsafe((db, id) => db.cancelPendingQuery(id));
                 expect(anotherOne).toBeFalse();
             });
+
+            it('cancel via SAB', async () => {
+                // Skip if SharedArrayBuffer is unavailable (non-COI test runs).
+                if (typeof SharedArrayBuffer === 'undefined') {
+                    pending('SharedArrayBuffer not available in this test environment');
+                    return;
+                }
+                await adb().open({
+                    path: ':memory:',
+                    query: {
+                        queryPollingInterval: 0,
+                    },
+                });
+                const conn = await adb().connect();
+
+                const sab = new SharedArrayBuffer(4);
+                const flag = new Int32Array(sab);
+                adb().registerCancelSAB(sab);
+
+                const startResult = await conn.useUnsafe((db, id) =>
+                    db.startPendingQuery(id, 'SELECT SUM(i) FROM range(1000000) tbl(i);'),
+                );
+                expect(startResult).toBeNull();
+
+                // Signal cancel via the SAB. The dispatcher's watcher polls
+                // every 10ms and will call cancelPendingQuery on the worker.
+                Atomics.store(flag, 0, 1);
+
+                // Poll until the query reports cancellation or the budget is
+                // exhausted. The watcher needs at least one 10ms tick to fire,
+                // plus a poll round-trip after that.
+                let polledHeader: Uint8Array | null = null;
+                let polledError: Error | null = null;
+                const startedAt = Date.now();
+                while (Date.now() - startedAt < 5000) {
+                    try {
+                        polledHeader = await conn.useUnsafe((db, id) => db.pollPendingQuery(id));
+                    } catch (e: any) {
+                        polledError = e;
+                        break;
+                    }
+                    if (polledHeader != null) break;
+                }
+                expect(polledError).not.toBeNull();
+                expect(polledError!.toString()).toMatch(/cancel(l)?ed/i);
+                // Watcher should have reset the flag after acting on it.
+                expect(Atomics.load(flag, 0)).toEqual(0);
+
+                // Subsequent normal queries on the same connection still work.
+                const table = await conn.query('select 42::integer;');
+                expect(table.schema.fields.length).toEqual(1);
+            });
+
+            it('SAB without cancel: query still completes', async () => {
+                if (typeof SharedArrayBuffer === 'undefined') {
+                    pending('SharedArrayBuffer not available in this test environment');
+                    return;
+                }
+                await adb().open({
+                    path: ':memory:',
+                    query: {
+                        queryPollingInterval: 0,
+                    },
+                });
+                const conn = await adb().connect();
+
+                const sab = new SharedArrayBuffer(4);
+                adb().registerCancelSAB(sab);
+                // Do NOT flip the flag — query should complete normally.
+                const table = await conn.query('SELECT SUM(i) FROM range(1000) tbl(i);');
+                expect(table.numRows).toEqual(1);
+            });
         });
     });
 }

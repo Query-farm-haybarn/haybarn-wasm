@@ -1,4 +1,5 @@
 import { AsyncDuckDBDispatcher, WorkerResponseVariant, WorkerRequestVariant } from '../parallel/';
+import { handlePreInitMessage } from '../parallel/worker_globals';
 import { DuckDBBindings } from '../bindings';
 import { DuckDB } from '../bindings/bindings_node_eh';
 import { NODE_RUNTIME } from '../bindings/runtime_node';
@@ -25,8 +26,10 @@ class NodeWorker extends AsyncDuckDBDispatcher {
 /** Register the worker */
 export function registerWorker(): void {
     const api = new NodeWorker();
-    globalThis.onmessage = async (event: MessageEvent<WorkerRequestVariant>) => {
-        await api.onMessage(event.data);
+    globalThis.onmessage = async (event: MessageEvent) => {
+        const data: any = event.data;
+        if (handlePreInitMessage(data)) return;
+        await api.onMessage(data as WorkerRequestVariant);
     };
 }
 
