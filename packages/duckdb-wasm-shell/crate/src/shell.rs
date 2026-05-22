@@ -27,6 +27,53 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::spawn_local;
 
+/// Extensions silently `LOAD`ed at shell startup when the JS embedder doesn't
+/// override via `ShellOptions.defaultExtensions`. Picked so that most
+/// out-of-the-box workflows just work: TZ-aware queries (icu), JSON, parquet,
+/// and the lake formats (iceberg, ducklake).
+const DEFAULT_EXTENSIONS: &[&str] = &["icu", "json", "parquet", "iceberg", "ducklake"];
+
+/// Resolve the JS-supplied `defaultExtensions` ShellOptions field to a list.
+///
+/// Semantics:
+/// - `undefined` / `null` / wrong type -> built-in [`DEFAULT_EXTENSIONS`].
+/// - Explicit array (even empty) -> use it as-is. An empty array is a valid
+///   opt-out: the embedder is saying "don't load anything for me."
+fn resolve_default_extensions(js: JsValue) -> Vec<String> {
+    if js.is_undefined() || js.is_null() || !js_sys::Array::is_array(&js) {
+        return DEFAULT_EXTENSIONS.iter().map(|s| (*s).to_string()).collect();
+    }
+    js_sys::Array::from(&js)
+        .iter()
+        .filter_map(|v| v.as_string())
+        .collect()
+}
+
+/// Silently issue `LOAD <ext>;` for each given extension via the supplied
+/// connection. Successes are invisible. Failures print a single dim
+/// `(skipped: <ext>)` line in the shell and log the full engine error via
+/// `log::warn!` so devtools shows the detail.
+///
+/// Routed through `AsyncDuckDBConnection::run_query` directly so the
+/// user-visible writer pipeline (echoed SQL, result table, `Elapsed:` timer)
+/// is bypassed entirely.
+async fn load_default_extensions(conn: &AsyncDuckDBConnection, exts: &[String]) {
+    for ext in exts {
+        let sql = format!("LOAD {};", ext);
+        if let Err(e) = conn.run_query(&sql).await {
+            let detail = String::from(e.message());
+            warn!("default extension LOAD failed: {ext}: {detail}");
+            let line = format!(
+                "{dim}(skipped: {ext}){off}",
+                dim = vt100::MODE_DIM,
+                off = vt100::MODES_OFF,
+                ext = ext,
+            );
+            Shell::with_mut(|s| s.writeln(&line));
+        }
+    }
+}
+
 thread_local! {
     static SHELL: RefCell<Shell> = RefCell::new(Shell::default());
 }
@@ -102,6 +149,10 @@ pub struct Shell {
     db_conn: Option<Arc<RwLock<AsyncDuckDBConnection>>>,
     /// The file infos
     file_infos: HashMap<String, FileInfo>,
+    /// Extensions to silently `LOAD` at startup once the connection is ready.
+    /// Initialized from `ShellOptions.defaultExtensions` in `attach`, defaults
+    /// to [`DEFAULT_EXTENSIONS`] otherwise.
+    default_extensions: Vec<String>,
 }
 
 impl Shell {
@@ -122,6 +173,7 @@ impl Shell {
             db: None,
             db_conn: None,
             file_infos: HashMap::new(),
+            default_extensions: DEFAULT_EXTENSIONS.iter().map(|s| (*s).to_string()).collect(),
         }
     }
 
@@ -146,6 +198,7 @@ impl Shell {
         self.runtime = Some(Arc::new(RwLock::new(runtime)));
         self.input.configure(self.terminal_width);
         self.settings.webgl = options.with_webgl();
+        self.default_extensions = resolve_default_extensions(options.get_default_extensions());
 
         // Register on_key callback
         let callback = Closure::wrap(Box::new(move |e: web_sys::KeyboardEvent| {
@@ -176,10 +229,23 @@ impl Shell {
         Shell::write_version_info().await;
         let conn = AsyncDuckDB::connect(db.clone()).await?;
 
-        // Create connection
+        // Print the "Connected to Haybarn..." banner before silently loading
+        // default extensions, so the user sees that the connection is up while
+        // any cold-cache LOADs are still in flight.
+        Shell::with_mut(|s| s.write_connection_ready());
+
+        // Silently `LOAD` the embedder-configured default extension list. The
+        // helper bypasses the user-visible writer pipeline (no echoed SQL, no
+        // result table, no Elapsed: timer); on failure it logs to console and
+        // prints a single dim `(skipped: <ext>)` line per failed extension.
+        let exts = Shell::with_mut(|s| s.default_extensions.clone());
+        if !exts.is_empty() {
+            load_default_extensions(&conn, &exts).await;
+        }
+
+        // Connection is ready for the interactive prompt loop.
         Shell::with_mut(|s| {
             s.db_conn = Some(Arc::new(RwLock::new(conn)));
-            s.write_connection_ready();
             s.prompt();
             s.focus();
         });

@@ -73,6 +73,21 @@ interface ShellProps {
     resolveDatabase: (p: duckdb.InstantiationProgressHandler) => Promise<duckdb.AsyncDuckDB>;
     backgroundColor?: string;
     fontFamily?: string;
+    /**
+     * Extensions to silently `LOAD` at shell startup, just after the
+     * "Connected to Haybarn..." banner and before the first prompt.
+     *
+     * - Omit (or pass `undefined`) to use the shell's built-in default
+     *   (currently `["icu", "json", "parquet", "iceberg", "ducklake"]`).
+     * - Pass `[]` to opt out entirely — no LOADs are issued at startup.
+     * - Pass a custom list to tailor (e.g. a parquet-only viewer).
+     *
+     * Each LOAD is bracketed by the wasm bindings' single-thread guard, so
+     * the verified-working extension-load path is used. Failures don't break
+     * boot; the shell prints one dim `(skipped: <ext>)` notice per failure
+     * and logs the engine error via `console.warn`.
+     */
+    defaultExtensions?: string[];
 }
 
 function formatBytes(value: number): string {
@@ -110,6 +125,11 @@ export async function embed(props: ShellProps) {
         fontFamily: props.fontFamily ?? 'monospace',
         backgroundColor: props.backgroundColor ?? '#333',
         withWebGL: hasWebGL(),
+        // Pass through only when the caller explicitly provided a value — the
+        // Rust side has its own fallback to the built-in default when this
+        // field is `undefined`, which keeps the haybarn-shell app working
+        // without needing to know the list.
+        defaultExtensions: props.defaultExtensions,
     });
     props.container.onresize = runtime.resizeHandler;
 
