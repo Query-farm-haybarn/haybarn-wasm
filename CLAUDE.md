@@ -55,7 +55,7 @@ upstream is a future rebase tax.
 Workspace versions match the embedded engine version:
 `<duckdb-major>.<duckdb-minor>.<duckdb-patch>-rc<N>` while we're in rc,
 dropping the `-rc<N>` suffix when the engine cuts a stable tag.
-Currently `1.5.3-rc5`.
+Currently `1.5.3-rc6`.
 
 ## Local smoke-build setup
 
