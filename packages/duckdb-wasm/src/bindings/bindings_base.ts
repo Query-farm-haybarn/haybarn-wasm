@@ -44,6 +44,8 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
     protected _initPromiseResolver: () => void = () => {};
     /** The next UDF id */
     protected _nextUDFId: number;
+    /** The config the database was opened with (retained for runtime decisions) */
+    protected _config: DuckDBConfig | null = null;
 
     constructor(logger: Logger, runtime: DuckDBRuntime) {
         this._logger = logger;
@@ -106,6 +108,7 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
             throw new Error(readString(this.mod, d, n));
         }
         dropResponseBuffers(this.mod);
+        this._config = config;
     }
 
     /** Reset the database */
@@ -171,8 +174,67 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
         }
     }
 
+    /**
+     * Matches a SQL script that begins with an extension `LOAD`/`INSTALL`
+     * (optionally `FORCE INSTALL`), skipping leading whitespace and SQL
+     * comments. Anchored at the start so it won't match `load`/`install` used
+     * as identifiers elsewhere in a query.
+     */
+    private static readonly EXTENSION_LOAD_RE =
+        /^\s*(?:--[^\n]*\n\s*|\/\*[\s\S]*?\*\/\s*)*(?:force\s+)?(?:install|load)\b/i;
+
+    /** Read the current value of the `threads` setting, or null if unavailable */
+    private readThreadsSetting(conn: number): number | null {
+        try {
+            const table = arrow.tableFromIPC(this.runQueryImpl(conn, "SELECT current_setting('threads')"));
+            if (table.numRows < 1) {
+                return null;
+            }
+            const value = table.getChildAt(0)?.get(0);
+            if (value === null || value === undefined) {
+                return null;
+            }
+            return Number(value);
+        } catch (e) {
+            // Reading the setting should never fail; if it does, fall back to
+            // running the load as-is rather than guessing a thread count.
+            console.warn(`singleThreadedExtensionLoad: failed to read 'threads' setting: ${e}`);
+            return null;
+        }
+    }
+
+    /**
+     * Run `work` with the task scheduler pinned to a single thread *iff* `text`
+     * is an extension `LOAD`/`INSTALL` and the feature is enabled. See
+     * `DuckDBConfig.singleThreadedExtensionLoad` for the rationale. The
+     * `SET threads=1` / restore pair runs synchronously around the load inside
+     * this one worker message, so no other query can interleave at threads=1.
+     */
+    private withSingleThreadedExtensionLoad<T>(conn: number, text: string, work: () => T): T {
+        if (this._config?.singleThreadedExtensionLoad === false) {
+            return work();
+        }
+        if (!DuckDBBindingsBase.EXTENSION_LOAD_RE.test(text)) {
+            return work();
+        }
+        const previousThreads = this.readThreadsSetting(conn);
+        // Nothing to do when already single-threaded (incl. mvp/eh builds).
+        if (previousThreads === null || previousThreads <= 1) {
+            return work();
+        }
+        this.runQueryImpl(conn, 'SET threads=1');
+        try {
+            return work();
+        } finally {
+            this.runQueryImpl(conn, `SET threads=${previousThreads}`);
+        }
+    }
+
     /** Send a query and return the full result */
     public runQuery(conn: number, text: string): Uint8Array {
+        return this.withSingleThreadedExtensionLoad(conn, text, () => this.runQueryImpl(conn, text));
+    }
+    private runQueryImpl(conn: number, text: string): Uint8Array {
         const BUF = TEXT_ENCODER.encode(text);
         const bufferPtr = this.mod._malloc(BUF.length);
         const bufferOfs = this.mod.HEAPU8.subarray(bufferPtr, bufferPtr + BUF.length);
@@ -198,6 +260,13 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
      *  Results can then be fetched using `fetchQueryResults`
      */
     public startPendingQuery(conn: number, text: string, allowStreamResult: boolean = false): Uint8Array | null {
+        // LOAD/INSTALL complete during start (they don't stream), so bracketing
+        // the start call alone single-threads the whole load.
+        return this.withSingleThreadedExtensionLoad(conn, text, () =>
+            this.startPendingQueryImpl(conn, text, allowStreamResult),
+        );
+    }
+    private startPendingQueryImpl(conn: number, text: string, allowStreamResult: boolean = false): Uint8Array | null {
         const BUF = TEXT_ENCODER.encode(text);
         const bufferPtr = this.mod._malloc(BUF.length);
         const bufferOfs = this.mod.HEAPU8.subarray(bufferPtr, bufferPtr + BUF.length);

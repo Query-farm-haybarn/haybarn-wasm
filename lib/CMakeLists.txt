@@ -135,7 +135,12 @@ if(EMSCRIPTEN)
   if(WITH_WASM_THREADS)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -sUSE_PTHREADS=1 -DWEBDB_THREADS=1")
     set(DUCKDB_CXX_FLAGS "${CMAKE_CXX_FLAGS} -sUSE_PTHREADS=1")
-    set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -sUSE_PTHREADS=1 -sPTHREAD_POOL_SIZE=4 -pthread")
+    # Pool sized for the DuckDB task scheduler (up to hardware-concurrency, ~4)
+    # *plus* headroom for threads that loaded extensions spin up themselves
+    # (e.g. vgi's background workers). At =4 the scheduler alone exhausts the
+    # pool, so any extension thread forces dynamic (proxied) thread creation,
+    # which makes blocking joins/fetches deadlock-prone. 8 gives that headroom.
+    set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -sUSE_PTHREADS=1 -sPTHREAD_POOL_SIZE=8 -pthread")
     set(DUCKDB_PLATFORM "wasm_threads")
   else()
     set(CMAKE_CXX_FLAGS

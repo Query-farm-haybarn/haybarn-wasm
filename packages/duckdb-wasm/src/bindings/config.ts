@@ -91,4 +91,21 @@ export interface DuckDBConfig {
      * opfs string
      */
     opfs?: DuckDBOPFSConfig;
+    /**
+     * Run extension `LOAD`/`INSTALL` statements with the task scheduler pinned to
+     * a single thread.
+     *
+     * On a cross-origin-isolated (threaded) build the engine fetches an
+     * extension binary with a *blocking* synchronous XHR. With background
+     * scheduler threads live, that blocking fetch can deadlock across the
+     * worker/main-thread boundary (and exhaust the emscripten pthread pool).
+     * When enabled, the binding brackets each `LOAD`/`INSTALL` with
+     * `SET threads=1` … `SET threads=<previous>` so the fetch runs with no
+     * background workers, then restores the prior thread count.
+     *
+     * Defaults to enabled. It is a no-op on single-threaded (mvp/eh) builds and
+     * whenever `threads` is already 1, so it only ever engages on threaded
+     * builds that actually have background workers. Set to `false` to opt out.
+     */
+    singleThreadedExtensionLoad?: boolean;
 }
