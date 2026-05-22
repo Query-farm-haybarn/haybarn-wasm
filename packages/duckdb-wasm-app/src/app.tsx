@@ -4,6 +4,7 @@ import { Versus } from './pages/versus';
 import { Shell } from './pages/shell';
 import { Route, Routes, Navigate, BrowserRouter } from 'react-router-dom';
 import { DuckDBConnectionProvider, DuckDBPlatform, DuckDBProvider } from '@haybarn/react-haybarn';
+import { installVgiOAuthBridge } from './lib/vgi-oauth-bridge';
 
 import '../static/fonts/fonts.module.css';
 import './globals.css';
@@ -68,7 +69,7 @@ const element = document.getElementById('root');
 const root = createRoot(element!);
 root.render(
     <DuckDBPlatform logger={logger} bundles={DUCKDB_BUNDLES}>
-        <DuckDBProvider>
+        <DuckDBProvider onWorkerCreated={installVgiOAuthBridge}>
             <DuckDBConnectionProvider>
                 <BrowserRouter basename={basename}>
                     <Routes>

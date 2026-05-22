@@ -14,6 +14,10 @@ type DuckDBProps = {
     children: React.ReactElement | ReactElement[];
     config?: duckdb.DuckDBConfig;
     value?: duckdb.AsyncDuckDB;
+    /** Invoked with the DuckDB Worker right after it is constructed, before
+     *  instantiation. Lets the host wire side-channels onto the worker (e.g. the
+     *  VGI OAuth SharedArrayBuffer) without coupling this provider to them. */
+    onWorkerCreated?: (worker: Worker) => void;
 };
 
 export const DuckDBProvider: React.FC<DuckDBProps> = (props: DuckDBProps) => {
@@ -51,6 +55,7 @@ export const DuckDBProvider: React.FC<DuckDBProps> = (props: DuckDBProps) => {
             let next: duckdb.AsyncDuckDB;
             try {
                 worker = new Worker(bundle.mainWorker!);
+                props.onWorkerCreated?.(worker);
                 next = new duckdb.AsyncDuckDB(logger, worker);
             } catch (e: any) {
                 updateSetup(s => s.failWith(e));

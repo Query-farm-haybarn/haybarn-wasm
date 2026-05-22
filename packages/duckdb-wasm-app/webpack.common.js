@@ -193,6 +193,23 @@ export function configure(params) {
                         to: './_worker.js',
                         toType: 'file',
                     },
+                    {
+                        // VGI OAuth popup redirect target. Must sit at the deploy
+                        // root so the IdP-registered redirect URI
+                        // (https://shell.haybarn.query.farm/oauth-callback.html)
+                        // resolves; same-origin so it can relay the auth code over
+                        // BroadcastChannel("vgi-oauth") to the main thread.
+                        from: './static/oauth-callback.html',
+                        to: './oauth-callback.html',
+                        toType: 'file',
+                    },
+                    {
+                        // VGI logo shown on the OAuth popup (oauth-callback.html).
+                        // Stable root path so the un-hashed callback page can ref it.
+                        from: './static/oauth-logo.png',
+                        to: './oauth-logo.png',
+                        toType: 'file',
+                    },
                 ],
             }),
         ],
