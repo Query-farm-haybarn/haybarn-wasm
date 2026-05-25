@@ -57,6 +57,16 @@ Workspace versions match the embedded engine version:
 dropping the `-rc<N>` suffix when the engine cuts a stable tag.
 Currently `1.5.3-rc8`.
 
+Cutting an rc: bump the same ~12 files an existing `release: bump workspace
+to <rc>` commit touched (`grep -rl <old-rc>` finds them: 9 `package.json`
+version fields, `CLAUDE.md`, `_worker.js`'s `COI_WASM_UPSTREAM` engine path,
+`app.tsx`'s `HAYBARN_WASM_VERSION`), then push tag `haybarn-v<version>`. The
+tag fires `main.yml` **twice** — a `push` run and a `create` run. The
+`create` run is the one that publishes (npm via OIDC + the COI engine wasm to
+`engine/<rc>/duckdb-coi.wasm` on R2; the publish step is gated on the `create`
+event). So `engine/<new-rc>/` 404s until the release runs — expected, the
+release resolves its own path.
+
 ## Local smoke-build setup
 
 ```bash
@@ -87,6 +97,42 @@ Gotchas to know:
   to match what CI uses. Older emsdk (≤ 3.1.x) won't work: the wasm-side
   preprocessor checks were updated to use `__EMSCRIPTEN__` (the standard
   reserved-namespace form), which is what 4.x+ defines.
+
+## Debugging extension load/run failures
+
+`eh` and `coi` download **different** per-platform extension binaries
+(`wasm_eh/` vs `wasm_threads/`) from
+`haybarn-extensions.query.farm/{core,community}/v<engine-version>/…` — the
+version dir is the *engine* version (`v1.5.3`), not the workspace rc. Never
+assume "same binary, different variant."
+
+If a Rust C-API extension throws an opaque `TypeError: c is not a function`
+from the worker on `eh` while `coi` works, it's an exception-ABI mismatch:
+the `wasm_eh` build was compiled against the **stable** precompiled `std`
+(legacy emscripten EH — imports `invoke_*` / `__resumeException` /
+`__cxa_find_matching_catch` / `getTempRet0`), but the engine uses **native**
+wasm EH and provides none of those trampolines, so the first exception-path
+call resolves to `undefined`. Diagnose against the published binary:
+
+```bash
+wasm-objdump -x <ext>.duckdb_extension.wasm \
+  | grep -cE '<env\.(invoke_|__resumeException|getTempRet0)'
+# 0 = native EH (matches engine); non-zero = legacy EH (broken on eh)
+```
+
+The fix is out-of-tree (the extension build's Rust toolchain in
+haybarn-extension-ci-tools — extend the nightly + `-Z build-std` gating from
+`wasm_threads` to `wasm_eh` so its `std` is also native-EH), not in this repo.
+Full write-up: haybarn-wasm#9.
+
+To test an extension **functionally**, use Node, not the browser: in-browser
+`INSTALL` can't cache (browser `runtime_browser.ts` directory ops are
+`console.log` stubs; `checkDirectory` always returns false) and `LOAD`-by-path
+is rejected ("dynamic linking not enabled"). Node has a real FS and loads the
+*same* `wasm_eh` engine + extension binary. Recipe: `require('web-worker')`
+for the Worker, `dist/duckdb-node.cjs` `AsyncDuckDB`, offer only the `eh`
+bundle (`duckdb-eh.wasm` + `duckdb-node-eh.worker.cjs`) so `selectBundle`
+picks it, then `INSTALL … FROM community; LOAD …; SELECT …`.
 
 ## Out-of-tree references
 
