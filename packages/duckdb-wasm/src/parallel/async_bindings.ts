@@ -191,6 +191,17 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
             }
         }
 
+        // Engine-glue postMessages that bypass the AsyncDuckDB dispatcher
+        // entirely — these are sent by C++ extensions (e.g. VGI's
+        // _duckdb_wasm_open_auth_url) via `globalThis.postMessage` inside the
+        // worker. They have string `type` values and no `requestId`. Consumers
+        // register their own `subWorker.addEventListener('message', ...)` to
+        // observe them; the dispatcher just shouldn't WARN about them as if
+        // they were lost protocol responses.
+        if (typeof response.type === 'string' && response.requestId === undefined) {
+            return;
+        }
+
         // Get associated task
         const task = this._pendingRequests.get(response.requestId);
         if (!task) {
