@@ -217,13 +217,13 @@ EM_JS(char*, wasm_xhr_no_body, (const char *url_ptr, int header_count, char **he
     var buf = _malloc(total);
     if (buf === 0) return 0;
     var o = buf;
-    Module.HEAPU8[o] = status & 0xFF; Module.HEAPU8[o + 1] = (status >> 8) & 0xFF; o += 2;
-    Module.HEAPU8[o] = hdrsLen & 0xFF; Module.HEAPU8[o + 1] = (hdrsLen >> 8) & 0xFF;
-    Module.HEAPU8[o + 2] = (hdrsLen >> 16) & 0xFF; Module.HEAPU8[o + 3] = (hdrsLen >> 24) & 0xFF; o += 4;
-    if (hdrsLen > 0) Module.HEAPU8.set(hdrsBuf, o); o += hdrsLen;
-    Module.HEAPU8[o] = bodyLen & 0xFF; Module.HEAPU8[o + 1] = (bodyLen >> 8) & 0xFF;
-    Module.HEAPU8[o + 2] = (bodyLen >> 16) & 0xFF; Module.HEAPU8[o + 3] = (bodyLen >> 24) & 0xFF; o += 4;
-    if (bodyLen > 0) Module.HEAPU8.set(new Uint8Array(resp), o);
+    HEAPU8[o] = status & 0xFF; HEAPU8[o + 1] = (status >> 8) & 0xFF; o += 2;
+    HEAPU8[o] = hdrsLen & 0xFF; HEAPU8[o + 1] = (hdrsLen >> 8) & 0xFF;
+    HEAPU8[o + 2] = (hdrsLen >> 16) & 0xFF; HEAPU8[o + 3] = (hdrsLen >> 24) & 0xFF; o += 4;
+    if (hdrsLen > 0) HEAPU8.set(hdrsBuf, o); o += hdrsLen;
+    HEAPU8[o] = bodyLen & 0xFF; HEAPU8[o + 1] = (bodyLen >> 8) & 0xFF;
+    HEAPU8[o + 2] = (bodyLen >> 16) & 0xFF; HEAPU8[o + 3] = (bodyLen >> 24) & 0xFF; o += 4;
+    if (bodyLen > 0) HEAPU8.set(new Uint8Array(resp), o);
     return buf;
 });
 
@@ -249,7 +249,7 @@ EM_JS(char*, wasm_xhr_with_body,
         i += 2;
     }
     try {
-        xhr.send(Module.HEAPU8.slice(payload_ptr, payload_ptr + payload_len));
+        xhr.send(HEAPU8.slice(payload_ptr, payload_ptr + payload_len));
     } catch (e) { console.error('XHR send failed:', e); return 0; }
     var resp = xhr.response;
     var bodyLen = resp ? resp.byteLength : 0;
@@ -262,13 +262,13 @@ EM_JS(char*, wasm_xhr_with_body,
     var buf = _malloc(total);
     if (buf === 0) return 0;
     var o = buf;
-    Module.HEAPU8[o] = status & 0xFF; Module.HEAPU8[o + 1] = (status >> 8) & 0xFF; o += 2;
-    Module.HEAPU8[o] = hdrsLen & 0xFF; Module.HEAPU8[o + 1] = (hdrsLen >> 8) & 0xFF;
-    Module.HEAPU8[o + 2] = (hdrsLen >> 16) & 0xFF; Module.HEAPU8[o + 3] = (hdrsLen >> 24) & 0xFF; o += 4;
-    if (hdrsLen > 0) Module.HEAPU8.set(hdrsBuf, o); o += hdrsLen;
-    Module.HEAPU8[o] = bodyLen & 0xFF; Module.HEAPU8[o + 1] = (bodyLen >> 8) & 0xFF;
-    Module.HEAPU8[o + 2] = (bodyLen >> 16) & 0xFF; Module.HEAPU8[o + 3] = (bodyLen >> 24) & 0xFF; o += 4;
-    if (bodyLen > 0) Module.HEAPU8.set(new Uint8Array(resp), o);
+    HEAPU8[o] = status & 0xFF; HEAPU8[o + 1] = (status >> 8) & 0xFF; o += 2;
+    HEAPU8[o] = hdrsLen & 0xFF; HEAPU8[o + 1] = (hdrsLen >> 8) & 0xFF;
+    HEAPU8[o + 2] = (hdrsLen >> 16) & 0xFF; HEAPU8[o + 3] = (hdrsLen >> 24) & 0xFF; o += 4;
+    if (hdrsLen > 0) HEAPU8.set(hdrsBuf, o); o += hdrsLen;
+    HEAPU8[o] = bodyLen & 0xFF; HEAPU8[o + 1] = (bodyLen >> 8) & 0xFF;
+    HEAPU8[o + 2] = (bodyLen >> 16) & 0xFF; HEAPU8[o + 3] = (bodyLen >> 24) & 0xFF; o += 4;
+    if (bodyLen > 0) HEAPU8.set(new Uint8Array(resp), o);
     return buf;
 });
 
