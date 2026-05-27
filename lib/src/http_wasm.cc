@@ -311,6 +311,18 @@ class HTTPWasmClient : public HTTPClient {
     }
 
     unique_ptr<HTTPResponse> Post(PostRequestInfo &info) override {
+        // Boundary check only: honor an already-set cancellation flag before we start. The XHR
+        // below is synchronous (xhr.open(..., false)), so once send() is entered the JS event
+        // loop is blocked and the request cannot be aborted mid-flight.
+        // TODO(cancellation): real mid-flight cancellation needs an async XHR (xhr.open(..., true))
+        // driven by Asyncify, with a JS poller reading the flag from WASM memory and calling
+        // xhr.abort() — which also means changing the synchronous HTTPClient::Post contract.
+        if (info.cancellation && info.cancellation->load(std::memory_order_relaxed)) {
+            auto res = make_uniq<HTTPResponse>(HTTPStatusCode::INVALID);
+            res->cancelled = true;
+            res->request_error = "HTTP POST request was cancelled";
+            return res;
+        }
         auto path = NormalizeUrl(info.url, host_port);
         WasmHeaderArray h(info.headers, info.params);
         auto res = ParseWasmResponse(wasm_xhr_with_body(path.c_str(), h.count, h.ptrs, "POST",
