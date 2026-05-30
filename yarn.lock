@@ -451,22 +451,6 @@
   resolved "https://registry.yarnpkg.com/@discoveryjs/json-ext/-/json-ext-0.5.7.tgz#1d572bfbbe14b7704e0ba0f39b74815b84870d70"
   integrity sha512-dBVuXR082gk3jsFp7Rd/JI4kytwGHecnCoTtXFb7DB6CNHp4rg5k1bhg0nWdLGLnOV71lmDzGQaLMy8iPLY0pw==
 
-"@duckdb/duckdb-wasm-shell@file:packages/duckdb-wasm-shell":
-  version "1.11.0"
-  dependencies:
-    "@duckdb/duckdb-wasm" "file:packages/duckdb-wasm"
-    qs "^6.14.1"
-    xterm "^5.3.0"
-    xterm-addon-fit "^0.8.0"
-    xterm-addon-web-links "^0.9.0"
-    xterm-addon-webgl "^0.16.0"
-
-"@duckdb/duckdb-wasm@file:packages/duckdb-wasm":
-  version "1.11.0"
-  dependencies:
-    apache-arrow "^17.0.0"
-    qs "^6.14.1"
-
 "@emotion/is-prop-valid@^0.8.2":
   version "0.8.8"
   resolved "https://registry.yarnpkg.com/@emotion/is-prop-valid/-/is-prop-valid-0.8.8.tgz#db28b1c4368a259b60a97311d6a952d4fd01ac1a"
@@ -636,6 +620,22 @@
     "@shikijs/themes" "^3.20.0"
     "@shikijs/types" "^3.20.0"
     "@shikijs/vscode-textmate" "^10.0.2"
+
+"@haybarn/haybarn-wasm-shell@file:packages/duckdb-wasm-shell":
+  version "1.5.3-rc10"
+  dependencies:
+    "@haybarn/haybarn-wasm" "file:packages/duckdb-wasm"
+    qs "^6.14.1"
+    xterm "^5.3.0"
+    xterm-addon-fit "^0.8.0"
+    xterm-addon-web-links "^0.9.0"
+    xterm-addon-webgl "^0.16.0"
+
+"@haybarn/haybarn-wasm@file:packages/duckdb-wasm":
+  version "1.5.3-rc10"
+  dependencies:
+    apache-arrow "^17.0.0"
+    qs "^6.14.1"
 
 "@humanwhocodes/config-array@^0.11.14":
   version "0.11.14"
@@ -9071,14 +9071,14 @@ ws@8.17.0:
   integrity sha512-uJq6108EgZMAl20KagGkzCKfMEjxmKvZHG7Tlq0Z6nOky7YF7aq4mOx6xK8TJ/i1LeK4Qus7INktacctDgY8Ow==
 
 ws@^7.3.1:
-  version "7.5.5"
-  resolved "https://registry.yarnpkg.com/ws/-/ws-7.5.5.tgz#8b4bc4af518cfabd0473ae4f99144287b33eb881"
-  integrity sha512-BAkMFcAzl8as1G/hArkxOxq3G7pjUqQ3gzYbLL0/5zNkph70e+lCoxBGnm6AW1+/aiNeV4fnKqZ8m4GZewmH2w==
+  version "7.5.11"
+  resolved "https://registry.yarnpkg.com/ws/-/ws-7.5.11.tgz#9460daf1812bb81a423c5b9eac746941a86310fa"
+  integrity sha512-zS54Oen9bITtp7kp2XM3AydrCIq1D+HwJOuH+c+e4LfpL/lotP5osijd+UoMnxwAam1GN8R4KtLAyIrIcBNpiA==
 
 ws@^8.18.0:
-  version "8.18.3"
-  resolved "https://registry.yarnpkg.com/ws/-/ws-8.18.3.tgz#b56b88abffde62791c639170400c93dcb0c95472"
-  integrity sha512-PEIGCY5tSlUt50cqyMXfCzX+oOPqN0vuGqWzbcJ2xvnkzkq46oOpz7dQaTDBdfICb4N14+GARUDw2XV2N4tvzg==
+  version "8.21.0"
+  resolved "https://registry.yarnpkg.com/ws/-/ws-8.21.0.tgz#012e413fc07429945121b0c153158c4343086951"
+  integrity sha512-Vsp28b7DRcimFQvrqu2Wek3z1iYxDCWqHYB8Qsnk/S4RfaCQzPGPyBNuVjJV3cd6UiKtUtp6sNM77gWvzcCH+g==
 
 ws@~8.2.3:
   version "8.2.3"
