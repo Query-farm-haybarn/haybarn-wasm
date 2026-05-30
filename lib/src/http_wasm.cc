@@ -179,9 +179,12 @@ struct WasmHeaderArray {
 //   - `Host`          → renamed to `X-Host-Override` (browsers forbid setting Host)
 //   - `User-Agent`    → silently dropped (browsers also forbid; previously logged a
 //                       warning we don't want)
-//   - `Authorization` → value passed through unencoded (OAuth Bearer tokens carry
-//                       `+/=` which encodeURI would mangle)
-//   - everything else → value passes through encodeURI
+//   - header values   → passed through verbatim. HTTP header values are NOT
+//                       URL-encoded: a quoted strong ETag (`"abc-10"`) in
+//                       If-Match/If-None-Match must keep its `"`, which
+//                       encodeURI would mangle to `%22` and break the
+//                       server-side precondition. setRequestHeader accepts the
+//                       raw value directly.
 //===--------------------------------------------------------------------===//
 
 // clang-format off
@@ -200,7 +203,6 @@ EM_JS(char*, wasm_xhr_no_body, (const char *url_ptr, int header_count, char **he
         if (name === 'User-Agent') { i += 2; continue; }
         if (name === 'Host') name = 'X-Host-Override';
         var value = UTF8ToString(p2);
-        if (name !== 'Authorization') value = encodeURI(value);
         try { xhr.setRequestHeader(name, value); }
         catch (e) { console.warn('XHR setRequestHeader failed:', e); }
         i += 2;
@@ -243,7 +245,6 @@ EM_JS(char*, wasm_xhr_with_body,
         if (name === 'User-Agent') { i += 2; continue; }
         if (name === 'Host') name = 'X-Host-Override';
         var value = UTF8ToString(p2);
-        if (name !== 'Authorization') value = encodeURI(value);
         try { xhr.setRequestHeader(name, value); }
         catch (e) { console.warn('XHR setRequestHeader failed:', e); }
         i += 2;
