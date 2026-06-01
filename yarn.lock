@@ -451,22 +451,6 @@
   resolved "https://registry.yarnpkg.com/@discoveryjs/json-ext/-/json-ext-0.5.7.tgz#1d572bfbbe14b7704e0ba0f39b74815b84870d70"
   integrity sha512-dBVuXR082gk3jsFp7Rd/JI4kytwGHecnCoTtXFb7DB6CNHp4rg5k1bhg0nWdLGLnOV71lmDzGQaLMy8iPLY0pw==
 
-"@duckdb/duckdb-wasm-shell@file:packages/duckdb-wasm-shell":
-  version "1.11.0"
-  dependencies:
-    "@duckdb/duckdb-wasm" "file:packages/duckdb-wasm"
-    qs "^6.14.1"
-    xterm "^5.3.0"
-    xterm-addon-fit "^0.8.0"
-    xterm-addon-web-links "^0.9.0"
-    xterm-addon-webgl "^0.16.0"
-
-"@duckdb/duckdb-wasm@file:packages/duckdb-wasm":
-  version "1.11.0"
-  dependencies:
-    apache-arrow "^17.0.0"
-    qs "^6.14.1"
-
 "@emotion/is-prop-valid@^0.8.2":
   version "0.8.8"
   resolved "https://registry.yarnpkg.com/@emotion/is-prop-valid/-/is-prop-valid-0.8.8.tgz#db28b1c4368a259b60a97311d6a952d4fd01ac1a"
@@ -636,6 +620,22 @@
     "@shikijs/themes" "^3.20.0"
     "@shikijs/types" "^3.20.0"
     "@shikijs/vscode-textmate" "^10.0.2"
+
+"@haybarn/haybarn-wasm-shell@file:packages/duckdb-wasm-shell":
+  version "1.5.3-rc11"
+  dependencies:
+    "@haybarn/haybarn-wasm" "file:packages/duckdb-wasm"
+    qs "^6.14.1"
+    xterm "^5.3.0"
+    xterm-addon-fit "^0.8.0"
+    xterm-addon-web-links "^0.9.0"
+    xterm-addon-webgl "^0.16.0"
+
+"@haybarn/haybarn-wasm@file:packages/duckdb-wasm":
+  version "1.5.3-rc11"
+  dependencies:
+    apache-arrow "^17.0.0"
+    qs "^6.14.1"
 
 "@humanwhocodes/config-array@^0.11.14":
   version "0.11.14"
@@ -4583,10 +4583,10 @@ html-minifier-terser@^6.0.2:
     relateurl "^0.2.7"
     terser "^5.7.2"
 
-html-webpack-plugin@^5.6.0:
-  version "5.6.0"
-  resolved "https://registry.yarnpkg.com/html-webpack-plugin/-/html-webpack-plugin-5.6.0.tgz#50a8fa6709245608cb00e811eacecb8e0d7b7ea0"
-  integrity sha512-iwaY4wzbe48AfKLZ/Cc8k0L+FKG6oSNRaZ8x5A/T/IVDGyXcbHncM9TdDa93wn0FsSm82FhTKW7f3vS61thXAw==
+html-webpack-plugin@^5.6.7:
+  version "5.6.7"
+  resolved "https://registry.yarnpkg.com/html-webpack-plugin/-/html-webpack-plugin-5.6.7.tgz#429bab4e12abf3c07e1c608886608e2df2c06b11"
+  integrity sha512-md+vXtdCAe60s1k6AU3dUyMJnDxUyQAwfwPKoLisvgUF1IXjtlLsk2se54+qfL9Mdm26bbwvjJybpNx48NKRLw==
   dependencies:
     "@types/html-minifier-terser" "^6.0.0"
     html-minifier-terser "^6.0.2"
