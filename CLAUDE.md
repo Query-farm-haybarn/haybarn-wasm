@@ -134,6 +134,29 @@ for the Worker, `dist/duckdb-node.cjs` `AsyncDuckDB`, offer only the `eh`
 bundle (`duckdb-eh.wasm` + `duckdb-node-eh.worker.cjs`) so `selectBundle`
 picks it, then `INSTALL … FROM community; LOAD …; SELECT …`.
 
+### Stack-trace symbol names (`-g2`)
+
+The shipped engine **and** extension wasm carry a wasm *name* section, so
+trap/abort/uncaught-`RuntimeError` backtraces show function names instead of
+anonymous `wasm-function[N]`. The names are **mangled** — pipe traces through
+`llvm-cxxfilt` (Rust: `rustfilt`), or use Chrome's "C/C++ DevTools Support
+(DWARF)" extension which demangles automatically. This does **not** add stacks
+to ordinary SQL errors (those surface as Arrow status `e.what()` strings via
+`lib/src/webdb.cc` → `wasm_response.cc`), and `-Oz`/`-O3` inlining means fewer,
+larger frames than source.
+
+The knob is `-g2` at the final `emcc` link, in three places:
+- engine: `lib/CMakeLists.txt` (Release branch `WASM_LINK_FLAGS`)
+- C-API + Rust extensions: haybarn-extension-ci-tools
+  `makefiles/c_api_extensions/base.Makefile` (`link_wasm_release`)
+- C++ extensions (e.g. httpfs): engine fork `extension/extension_build_tools.cmake`
+  (the wasm `SIDE_MODULE` `POST_BUILD` link)
+
+Confirm a binary has it with `wasm-objdump -h <file>.wasm | grep -i name`.
+Trade-off: the name section adds size (text, compresses well) and fights
+`relsize`'s intent; if that ever matters the lean alternative is a separate
+`-gseparate-dwarf` side-car instead of in-binary names.
+
 ## Out-of-tree references
 
 | What                          | Where                                                |

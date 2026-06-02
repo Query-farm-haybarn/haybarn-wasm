@@ -96,6 +96,14 @@ if(EMSCRIPTEN)
       set(CMAKE_CXX_FLAGS_RELEASE "-O3")
       set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -O3")
     endif()
+    # Keep the wasm "name" custom section so exception/trap stack traces show
+    # (mangled) C++ function names instead of anonymous wasm-function[N].
+    # Metadata only, independent of the -O level, not loaded into linear memory;
+    # emcc forwards it to Binaryen so the names survive -Oz/-O3. Demangle traces
+    # with llvm-cxxfilt. (The matching extension-side flag lives in
+    # haybarn-extension-ci-tools base.Makefile and the engine fork's
+    # extension_build_tools.cmake.)
+    set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -g2")
   # Release build with debug symbols
   elseif(CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     # ... with fast linking
