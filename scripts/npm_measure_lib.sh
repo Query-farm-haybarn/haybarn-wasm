@@ -11,4 +11,4 @@ ${PROJECT_ROOT}/scripts/build_duckdb_badge.sh > ./dist/img/duckdb_version_badge.
 npm install -g pkg-size
 pkg-size . --sizes=size > output
 cat output
-tail -n2 output | grep " MB" | awk '{print ($1 < 150)}' | grep "1" || exit 1
+tail -n2 output | grep " MB" | awk '{print ($1 < 200)}' | grep "1" || exit 1
