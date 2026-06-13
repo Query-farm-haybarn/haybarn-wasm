@@ -1,7 +1,7 @@
 {
     "private": true,
     "name": "@haybarn/haybarn-wasm-examples-esbuild-browser",
-    "version": "1.5.3-rc14",
+    "version": "1.5.3-rc15",
     "main": "index.js",
     "license": "MIT",
     "dependencies": {

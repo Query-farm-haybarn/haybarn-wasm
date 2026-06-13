@@ -493,7 +493,7 @@ index 50f95a2bb4..8f5ef30624 100644
 +			    var array = url.split("/");
 +			    var l = array.length;
 +
-+			    var folder = path.join(os.homedir(), ".duckdb/extensions/" + array[l - 4] + "/" + array[l - 3] + "/" +
++			    var folder = path.join(os.homedir(), ".haybarn/extensions/" + array[l - 4] + "/" + array[l - 3] + "/" +
 +			                                             array[l - 2] + "/");
 +			    var filePath = path.join(folder, array[l - 1]);
 +
