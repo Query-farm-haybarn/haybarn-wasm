@@ -1,6 +1,6 @@
 {
     "name": "@haybarn/haybarn-wasm-app",
-    "version": "1.5.3-rc15",
+    "version": "1.5.4-rc1",
     "description": "Haybarn-Wasm demo application.",
     "author": "Andre Kohn <kohn.a@outlook.com>",
     "license": "MIT",

@@ -3,7 +3,7 @@
 # Runs the caller's `script:` inside the shared Haybarn wasm build
 # environment image at:
 #
-#   ghcr.io/query-farm-haybarn/haybarn-wasm-base:v1.5.3
+#   ghcr.io/query-farm-haybarn/haybarn-wasm-base:v1.5.4
 #
 # Same image haybarn-extension-ci-tools / haybarn-community-extensions
 # use to compile community .duckdb_extension.wasm artifacts — Ubuntu
@@ -30,7 +30,7 @@ inputs:
   image:
     description: 'Container image reference'
     required: false
-    default: 'ghcr.io/query-farm-haybarn/haybarn-wasm-base:v1.5.3'
+    default: 'ghcr.io/query-farm-haybarn/haybarn-wasm-base:v1.5.4'
 
 runs:
   using: 'composite'

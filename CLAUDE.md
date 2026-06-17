@@ -55,7 +55,7 @@ upstream is a future rebase tax.
 Workspace versions match the embedded engine version:
 `<duckdb-major>.<duckdb-minor>.<duckdb-patch>-rc<N>` while we're in rc,
 dropping the `-rc<N>` suffix when the engine cuts a stable tag.
-Currently `1.5.3-rc15`.
+Currently `1.5.4-rc1`.
 
 Cutting an rc: bump the same ~12 files an existing `release: bump workspace
 to <rc>` commit touched (`grep -rl <old-rc>` finds them: 9 `package.json`
@@ -103,7 +103,7 @@ Gotchas to know:
 `eh` and `coi` download **different** per-platform extension binaries
 (`wasm_eh/` vs `wasm_threads/`) from
 `haybarn-extensions.query.farm/{core,community}/v<engine-version>/…` — the
-version dir is the *engine* version (`v1.5.3`), not the workspace rc. Never
+version dir is the *engine* version (`v1.5.4`), not the workspace rc. Never
 assume "same binary, different variant."
 
 If a Rust C-API extension throws an opaque `TypeError: c is not a function`
