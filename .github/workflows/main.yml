@@ -75,7 +75,7 @@ jobs:
         name: ESLint
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@v7
               with:
                   submodules: 'recursive'
 
@@ -119,7 +119,7 @@ jobs:
         name: TPCH Generator
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@v7
               with:
                   submodules: 'recursive'
 
@@ -149,7 +149,7 @@ jobs:
         name: Dataprep
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@v7
               with:
                   submodules: 'recursive'
 
@@ -186,7 +186,7 @@ jobs:
             - dataprep
             - tpchgen
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@v7
               with:
                   submodules: 'recursive'
                   fetch-depth: 0
@@ -257,7 +257,7 @@ jobs:
             - dataprep
             - tpchgen
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@v7
               with:
                   submodules: 'recursive'
                   fetch-depth: 0
@@ -328,7 +328,7 @@ jobs:
             - dataprep
             - tpchgen
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@v7
               with:
                   submodules: 'recursive'
                   fetch-depth: 0
@@ -400,7 +400,7 @@ jobs:
             - dataprep
             - tpchgen
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@v7
               with:
                   submodules: 'recursive'
                   fetch-depth: 0
@@ -475,7 +475,7 @@ jobs:
             - dataprep
             - tpchgen
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@v7
               with:
                   submodules: 'recursive'
                   fetch-depth: 0
@@ -550,7 +550,7 @@ jobs:
             - dataprep
             - tpchgen
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@v7
               with:
                   submodules: 'recursive'
                   fetch-depth: 0
@@ -628,7 +628,7 @@ jobs:
             - wasm_coi
             - eslint
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@v7
               with:
                   submodules: 'recursive'
                   fetch-depth: 0
@@ -945,7 +945,7 @@ jobs:
             - wasm_coi_loadable
             - eslint
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@v7
               with:
                   submodules: 'recursive'
                   fetch-depth: 0
@@ -1100,7 +1100,7 @@ jobs:
         needs:
             - js_libs_loadable
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@v7
               with:
                   submodules: 'recursive'
                   fetch-depth: 0
@@ -1305,7 +1305,7 @@ jobs:
         needs:
             - js_libs
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@v7
               with:
                   submodules: 'recursive'
 
