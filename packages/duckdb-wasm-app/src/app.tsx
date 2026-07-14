@@ -5,6 +5,11 @@ import { Shell } from './pages/shell';
 import { Route, Routes, Navigate, BrowserRouter } from 'react-router-dom';
 import { DuckDBConnectionProvider, DuckDBPlatform, DuckDBProvider } from '@haybarn/react-haybarn';
 import { installVgiOAuthBridge } from './lib/vgi-oauth-bridge';
+import { installVgiWebWorkerBridge, composeWorkerBridges } from './lib/vgi-webworker-bridge';
+
+// Both the OAuth bridge and the `worker:` SAB-transport bridge hook the DuckDB
+// worker; DuckDBProvider takes one onWorkerCreated, so compose them.
+const onWorkerCreated = composeWorkerBridges(installVgiOAuthBridge, installVgiWebWorkerBridge());
 
 import '../static/fonts/fonts.module.css';
 import './globals.css';
@@ -69,7 +74,7 @@ const element = document.getElementById('root');
 const root = createRoot(element!);
 root.render(
     <DuckDBPlatform logger={logger} bundles={DUCKDB_BUNDLES}>
-        <DuckDBProvider onWorkerCreated={installVgiOAuthBridge}>
+        <DuckDBProvider onWorkerCreated={onWorkerCreated}>
             <DuckDBConnectionProvider>
                 <BrowserRouter basename={basename}>
                     <Routes>
