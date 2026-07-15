@@ -116,6 +116,12 @@ export function installVgiWebWorkerBridge(
             // Hand the worker DuckDB's shared memory + the channel offset. It boots,
             // acks 'vgi-ready', and starts serving the channel's slots.
             vgiWorker.postMessage({ type: 'vgi-init', buffer: d.buffer, offset: d.offset });
+            // Diagnostic seam: expose the shared channel to the page so a test harness can
+            // read raw slot STATE + ring positions (e.g. repro-threads-deadlock.mjs).
+            (globalThis as unknown as { __vgiDiag?: unknown }).__vgiDiag = {
+                buffer: d.buffer,
+                offset: d.offset,
+            };
         });
     };
 }

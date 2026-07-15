@@ -311,6 +311,9 @@ if(EMSCRIPTEN)
       -s EXPORT_NAME='DuckDB' \
       -s EXPORTED_RUNTIME_METHODS='[\"ccall\", \"stackSave\", \"stackAlloc\", \"stackRestore\", \"HEAP8\", \"HEAPU8\", \"HEAP16\", \"HEAPU16\", \"HEAP32\", \"HEAPU32\", \"HEAPF32\", \"HEAPF64\"]' \
       --js-library=${CMAKE_SOURCE_DIR}/js-stubs.js")
+  # --js-library is a bare link flag, so ninja/make don't otherwise treat js-stubs.js
+  # as a relink trigger — editing it would silently ship a stale glue. Track it.
+  set_target_properties(duckdb_wasm PROPERTIES LINK_DEPENDS ${CMAKE_SOURCE_DIR}/js-stubs.js)
 
 endif()
 
