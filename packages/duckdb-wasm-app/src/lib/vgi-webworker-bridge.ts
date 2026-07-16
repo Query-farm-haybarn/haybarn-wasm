@@ -26,6 +26,15 @@ export interface VgiWebWorkerBridgeOptions {
      * URL to allow, or null to reject. Default: allow same-origin URLs only.
      */
     resolveWorkerUrl?: (location: string) => string | null;
+    /**
+     * Optional extension hook: invoked for any message a spawned VGI worker posts
+     * that this bridge doesn't itself consume (i.e. anything that isn't the
+     * `vgi-ready` / `vgi-error` boot handshake). Lets an app extend the worker↔page
+     * protocol with page-only capabilities the worker realm can't reach — e.g. a
+     * Window-only Web API — WITHOUT baking app-specific logic into this shared
+     * bridge. The handler receives the spawned worker and the raw message data.
+     */
+    onVgiWorkerMessage?: (worker: Worker, data: unknown) => void;
 }
 
 function defaultResolveWorkerUrl(location: string): string | null {
@@ -50,6 +59,7 @@ export function installVgiWebWorkerBridge(
     opts: VgiWebWorkerBridgeOptions = {},
 ): (worker: Worker) => void {
     const resolveWorkerUrl = opts.resolveWorkerUrl ?? defaultResolveWorkerUrl;
+    const onVgiWorkerMessage = opts.onVgiWorkerMessage;
     // location(resolved URL) -> the spawned VGI worker. Shared across every ATTACH
     // that targets the same URL (the engine stub also de-dupes per realm, so this
     // is a secondary guard + serves the cross-realm case where a second pthread
@@ -96,31 +106,8 @@ export function installVgiWebWorkerBridge(
                 return;
             }
             const onMsg = (ev: MessageEvent) => {
-                const m = ev.data as { type?: string; error?: string; geoSab?: SharedArrayBuffer } | undefined;
+                const m = ev.data as { type?: string; error?: string } | undefined;
                 if (!m) return;
-                if (m.type === 'vgi-geo-init' && m.geoSab) {
-                    // The worker can't call navigator.geolocation (Window-only). Resolve it
-                    // here on the page and publish the position into the shared buffer the
-                    // worker reads: [status:i32 @0, lat/lon/accuracy:f64 @8/@16/@24].
-                    const status = new Int32Array(m.geoSab, 0, 1);
-                    const geo = new Float64Array(m.geoSab, 8, 3);
-                    const nav = typeof navigator !== 'undefined' ? navigator : undefined;
-                    if (nav?.geolocation) {
-                        nav.geolocation.getCurrentPosition(
-                            (pos) => {
-                                geo[0] = pos.coords.latitude;
-                                geo[1] = pos.coords.longitude;
-                                geo[2] = pos.coords.accuracy;
-                                Atomics.store(status, 0, 1); // ready (release barrier for geo[])
-                            },
-                            () => Atomics.store(status, 0, -1), // denied / unavailable / timeout
-                            { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 },
-                        );
-                    } else {
-                        Atomics.store(status, 0, -1);
-                    }
-                    return;
-                }
                 if (m.type === 'vgi-ready') {
                     workers.set(url, vgiWorker);
                     signal(1);
@@ -133,6 +120,10 @@ export function installVgiWebWorkerBridge(
                         /* ignore */
                     }
                     signal(-1);
+                } else {
+                    // Not part of the boot handshake — hand to the app's optional
+                    // extension hook (page-only capabilities live in the app, not here).
+                    onVgiWorkerMessage?.(vgiWorker, m);
                 }
             };
             vgiWorker.addEventListener('message', onMsg);
