@@ -96,8 +96,31 @@ export function installVgiWebWorkerBridge(
                 return;
             }
             const onMsg = (ev: MessageEvent) => {
-                const m = ev.data as { type?: string; error?: string } | undefined;
+                const m = ev.data as { type?: string; error?: string; geoSab?: SharedArrayBuffer } | undefined;
                 if (!m) return;
+                if (m.type === 'vgi-geo-init' && m.geoSab) {
+                    // The worker can't call navigator.geolocation (Window-only). Resolve it
+                    // here on the page and publish the position into the shared buffer the
+                    // worker reads: [status:i32 @0, lat/lon/accuracy:f64 @8/@16/@24].
+                    const status = new Int32Array(m.geoSab, 0, 1);
+                    const geo = new Float64Array(m.geoSab, 8, 3);
+                    const nav = typeof navigator !== 'undefined' ? navigator : undefined;
+                    if (nav?.geolocation) {
+                        nav.geolocation.getCurrentPosition(
+                            (pos) => {
+                                geo[0] = pos.coords.latitude;
+                                geo[1] = pos.coords.longitude;
+                                geo[2] = pos.coords.accuracy;
+                                Atomics.store(status, 0, 1); // ready (release barrier for geo[])
+                            },
+                            () => Atomics.store(status, 0, -1), // denied / unavailable / timeout
+                            { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 },
+                        );
+                    } else {
+                        Atomics.store(status, 0, -1);
+                    }
+                    return;
+                }
                 if (m.type === 'vgi-ready') {
                     workers.set(url, vgiWorker);
                     signal(1);
