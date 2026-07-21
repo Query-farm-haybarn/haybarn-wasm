@@ -7,6 +7,11 @@
         // TODO(ankoh): Upgrade node resolution to node12 for exports once typescript 4.6.0 is out
         // https://www.typescriptlang.org/docs/handbook/esm-node.html
         "moduleResolution": "node",
+        // node10 resolution ignores `exports`, so the `/vgi` subpath export has
+        // to be mapped by hand (mirrors the webpack alias in webpack.common.js).
+        "paths": {
+            "@haybarn/haybarn-wasm/vgi": ["../../duckdb-wasm/dist/duckdb-browser-vgi"]
+        },
         "sourceMap": true,
         "noImplicitAny": true,
         "esModuleInterop": true,

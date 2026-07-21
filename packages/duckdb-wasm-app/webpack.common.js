@@ -33,6 +33,13 @@ export function configure(params) {
                 // built dist. The non-`$` aliases match the package root and any
                 // subpath (e.g. `/dist/duckdb-browser-coi.worker.js`); they do
                 // NOT match `@haybarn/haybarn-wasm-shell` (different path segment).
+                //
+                // Aliasing to a directory bypasses the package's `exports` map,
+                // so subpath exports that have no on-disk counterpart at the
+                // package root (`/vgi` -> `dist/duckdb-browser-vgi.mjs`) have to
+                // be spelled out here. Longer keys must come first — the first
+                // matching alias wins.
+                '@haybarn/haybarn-wasm/vgi': path.resolve(__dirname, '../duckdb-wasm/dist/duckdb-browser-vgi.mjs'),
                 '@haybarn/haybarn-wasm': path.resolve(__dirname, '../duckdb-wasm'),
                 '@haybarn/haybarn-wasm-shell': path.resolve(__dirname, '../duckdb-wasm-shell'),
             },
