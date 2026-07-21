@@ -1,6 +1,6 @@
 {
     "name": "@haybarn/haybarn-wasm",
-    "version": "1.5.4-rc2",
+    "version": "1.5.4-rc3",
     "description": "Haybarn for WebAssembly — Query Farm's derived distribution of DuckDB-Wasm. Haybarn, powered by DuckDB.",
     "license": "MIT",
     "homepage": "https://haybarn.query.farm",
