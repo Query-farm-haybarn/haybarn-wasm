@@ -129,6 +129,13 @@
             "import": "./dist/duckdb-node-blocking.mjs",
             "require": "./dist/duckdb-node-blocking.cjs"
         },
+        "./dist/duckdb-browser-vgi.mjs": "./dist/duckdb-browser-vgi.mjs",
+        "./dist/duckdb-browser-vgi.cjs": "./dist/duckdb-browser-vgi.cjs",
+        "./vgi": {
+            "types": "./dist/duckdb-browser-vgi.d.ts",
+            "import": "./dist/duckdb-browser-vgi.mjs",
+            "require": "./dist/duckdb-browser-vgi.cjs"
+        },
         ".": {
             "browser": {
                 "types": "./dist/duckdb-browser.d.ts",

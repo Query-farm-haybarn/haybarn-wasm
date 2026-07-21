@@ -4,8 +4,11 @@ import { Versus } from './pages/versus';
 import { Shell } from './pages/shell';
 import { Route, Routes, Navigate, BrowserRouter } from 'react-router-dom';
 import { DuckDBConnectionProvider, DuckDBPlatform, DuckDBProvider } from '@haybarn/react-haybarn';
-import { installVgiOAuthBridge } from './lib/vgi-oauth-bridge';
-import { installVgiWebWorkerBridge, composeWorkerBridges } from './lib/vgi-webworker-bridge';
+import {
+    installVgiOAuthBridge,
+    installVgiWebWorkerBridge,
+    composeWorkerBridges,
+} from '@haybarn/haybarn-wasm/vgi';
 
 // Both the OAuth bridge and the `worker:` SAB-transport bridge hook the DuckDB
 // worker; DuckDBProvider takes one onWorkerCreated, so compose them.

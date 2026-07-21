@@ -184,6 +184,37 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
         },
     });
 
+    console.log('[ ESBUILD ] duckdb-browser-vgi.mjs');
+    await esbuild.build({
+        entryPoints: ['./src/targets/duckdb-browser-vgi.ts'],
+        outfile: 'dist/duckdb-browser-vgi.mjs',
+        platform: 'browser',
+        format: 'esm',
+        target: TARGET_BROWSER,
+        bundle: true,
+        minify: !is_debug,
+        sourcemap: is_debug ? 'inline' : true,
+        external: EXTERNALS_BROWSER,
+        define: { 'process.release.name': '"browser"' },
+    });
+
+    console.log('[ ESBUILD ] duckdb-browser-vgi.cjs');
+    await esbuild.build({
+        entryPoints: ['./src/targets/duckdb-browser-vgi.ts'],
+        outfile: 'dist/duckdb-browser-vgi.cjs',
+        platform: 'browser',
+        format: 'cjs',
+        target: TARGET_BROWSER,
+        bundle: true,
+        minify: !is_debug,
+        sourcemap: is_debug ? 'inline' : true,
+        external: EXTERNALS_BROWSER,
+        define: {
+            'process.release.name': '"browser"',
+            'process.env.NODE_ENV': '"production"',
+        },
+    });
+
     console.log('[ ESBUILD ] duckdb-browser-mvp.worker.js');
     await esbuild.build({
         entryPoints: ['./src/targets/duckdb-browser-mvp.worker.ts'],
@@ -341,6 +372,10 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
     await fs.promises.writeFile(
         path.join(dist, 'duckdb-browser-blocking.d.ts'),
         "export * from './types/src/targets/duckdb-browser-blocking';",
+    );
+    await fs.promises.writeFile(
+        path.join(dist, 'duckdb-browser-vgi.d.ts'),
+        "export * from './types/src/targets/duckdb-browser-vgi';",
     );
 
     // Node declarations
