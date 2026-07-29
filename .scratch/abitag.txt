@@ -1,0 +1,7 @@
+httpfs-th.wasm           libcpp21=20    libcpp18=0
+up-httpfs-th.wasm        libcpp21=0     libcpp18=20
+coi-rc10.wasm            libcpp21=3967  libcpp18=0
+up-eng-duckdb-coi.wasm   libcpp21=0     libcpp18=9439
+hb_engine __emplace_back: 1344
+hb_engine __push_back:    0
+hb_httpfs __emplace_back: 32

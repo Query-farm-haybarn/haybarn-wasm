@@ -1,0 +1,7 @@
+=== files exist? ===
+ls: /Users/rusty/Development/duckdb-wasm/submodules/duckdb/extension/extension_build_tools.cmake: No such file or directory
+-rw-r--r--  1 rusty  staff  34803 May 20 18:28 /Users/rusty/Development/haybarn/haybarn-wasm/submodules/duckdb/extension/extension_build_tools.cmake
+=== are they identical? ===
+DIFFER
+=== DIFF (upstream vs haybarn) ===
+diff: /Users/rusty/Development/duckdb-wasm/submodules/duckdb/extension/extension_build_tools.cmake: No such file or directory

@@ -1,0 +1,21 @@
+{
+  "counts": {
+    "UP httpfs_eh vs UP engine_eh": 114,
+    "HB httpfs_eh vs UP engine_eh": 158,
+    "HB httpfs_eh vs HB engine_eh": 117,
+    "UP httpfs_th vs UP engine_coi": 72,
+    "HB httpfs_th vs UP engine_coi": 102,
+    "HB httpfs_th vs HB engine_coi(rc10)": 78
+  },
+  "hb_th_unresolved_vs_hb_engine": 78,
+  "of_those_covered_by_upstream_engine": 4,
+  "upstream_coi_exports": 77818,
+  "haybarn_coi_exports": 65152,
+  "upstream_engine_Zexports_not_in_haybarn": 7525,
+  "sample_covered_by_upstream": [
+    "_ZN6duckdb9Exception16ConstructMessageIJNSt3__212basic_stringIcNS2_11char_traitsIcEENS2_9allocatorIcEEEEEEES8_RKS8_DpRKT_",
+    "_ZN6duckdb9Exception16ConstructMessageIJiNSt3__212basic_stringIcNS2_11char_traitsIcEENS2_9allocatorIcEEEES8_EEES8_RKS8_DpRKT_",
+    "_ZN6duckdb9Exception16ConstructMessageIJNSt3__212basic_stringIcNS2_11char_traitsIcEENS2_9allocatorIcEEEES8_S8_EEES8_RKS8_DpRKT_",
+    "_ZN6duckdb9Exception16ConstructMessageIJxyyEEENSt3__212basic_stringIcNS2_11char_traitsIcEENS2_9allocatorIcEEEERKS8_DpRKT_"
+  ]
+}

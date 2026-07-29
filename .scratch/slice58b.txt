@@ -1,0 +1,9 @@
+CHAR AT 71576: "u"
+
+LEFT (…340 before):
++k){g[k]=M;let P=D[k];x.subarray(M,M+P.length).set(P),M+=P.length}}}let A=3*8,T=u._malloc(A),w=Cr(u,T,3);w[0]=m,w[1]=S,w[2]=L,u.HEAPF64[(d>>3)+0]=0,u.HEAPF64[(d>>3)+1]=T,u.HEAPF64[(d>>3)+2]=0}catch(n){Et(u,d,n.toString())}}function U_(){let p=new TextDecoder;return u=>(typeof SharedArrayBuffer<"u"&&u.buffer instanceof SharedArrayBuffer&&(
+
+>>>HERE>>> u
+
+RIGHT (140 after):
+=new Uint8Array(u)),p.decode(u))}var Xe=U_();function re(p,u){console.error(`FAIL WITH: ${u}`),p.ccall("duckdb_web_fail_with",null,["string

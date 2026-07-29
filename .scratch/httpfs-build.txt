@@ -1,0 +1,20 @@
+=== branch/commit ===
+53c5b03 Merge pull request #330 from smvv/init-rand
+=== extension-ci-tools submodule? ===
+-8a5851971fae891f292c2714d86046ee018e9737 duckdb
+-de54d6cef550b4b54cc3e817eeb8c4415faf6c35 extension-ci-tools
+=== build wiring files ===
+CMakeLists.txt
+LICENSE
+Makefile
+README.md
+data
+duckdb
+extension-ci-tools
+extension_config.cmake
+scripts
+src
+test
+vcpkg.json
+---
+=== Makefile wasm targets ===

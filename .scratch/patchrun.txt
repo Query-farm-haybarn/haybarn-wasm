@@ -1,0 +1,4 @@
+-rw-r--r--  1 rusty  staff  1235763 May 22 18:16 /Users/rusty/Development/haybarn/haybarn-wasm/packages/duckdb-wasm/dist/duckdb-node-eh.worker.cjs
+patches applied: 0 []
+contains marker once? 2
+rc=0

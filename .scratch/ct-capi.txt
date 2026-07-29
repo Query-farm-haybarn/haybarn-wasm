@@ -1,0 +1,11 @@
+=== haybarn-extension-ci-tools exists? ===
+/Users/rusty/Development/haybarn/haybarn-extension-ci-tools
+=== C-API wasm link rule ===
+/Users/rusty/Development/haybarn/haybarn-extension-ci-tools/makefiles/c_api_extensions/base.Makefile:212:link_wasm_debug:
+/Users/rusty/Development/haybarn/haybarn-extension-ci-tools/makefiles/c_api_extensions/base.Makefile:213:	emcc $(EXTENSION_BUILD_PATH)/debug/$(EXTENSION_LIB_FILENAME) -o $(EXTENSION_BUILD_PATH)/debug/$(EXTENSION_FILENAME_NO_METADATA) -O3 -g -sSIDE_MODULE=2 -sEXPORTED_FUNCTIONS="_$(EXTENSION_NAME)_init_c_api" $(WASM_LINK_THREAD_FLAGS)
+/Users/rusty/Development/haybarn/haybarn-extension-ci-tools/makefiles/c_api_extensions/base.Makefile:215:link_wasm_release:
+/Users/rusty/Development/haybarn/haybarn-extension-ci-tools/makefiles/c_api_extensions/base.Makefile:216:	emcc $(EXTENSION_BUILD_PATH)/release/$(EXTENSION_LIB_FILENAME) -o $(EXTENSION_BUILD_PATH)/release/$(EXTENSION_FILENAME_NO_METADATA) -O3 -sSIDE_MODULE=2 -sEXPORTED_FUNCTIONS="_$(EXTENSION_NAME)_init_c_api" $(WASM_LINK_THREAD_FLAGS)
+/Users/rusty/Development/haybarn/haybarn-extension-ci-tools/makefiles/c_api_extensions/base.Makefile:219:link_wasm_debug:
+/Users/rusty/Development/haybarn/haybarn-extension-ci-tools/makefiles/c_api_extensions/base.Makefile:220:link_wasm_release:
+/Users/rusty/Development/haybarn/haybarn-extension-ci-tools/makefiles/c_api_extensions/base.Makefile:232:build_extension_with_metadata_debug: check_configure link_wasm_debug build_extension_library_debug
+/Users/rusty/Development/haybarn/haybarn-extension-ci-tools/makefiles/c_api_extensions/base.Makefile:242:build_extension_with_metadata_release: check_configure link_wasm_release build_extension_library_release

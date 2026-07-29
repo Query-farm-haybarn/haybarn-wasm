@@ -1,0 +1,1 @@
+=== find the wasm extension LINK rule (emcc -sSIDE_MODULE) in upstream tree ===

@@ -1,0 +1,52 @@
+9:# without re-running the entire build — workflow_dispatch with a
+10:# source_run_id pointing at a prior `Haybarn Extensions` run consumes that
+14:#   workflow_run     auto-fires after every successful `Haybarn Extensions`
+17:#   workflow_dispatch  explicit operator action. Specify which build run to
+18:#                      publish from (source_run_id) and whether to actually
+19:#                      push (deploy=true). Re-dispatch with the same
+20:#                      source_run_id to retry after a publish failure.
+23:on:
+24:  workflow_run:
+25:    workflows: ["Haybarn Extensions"]
+26:    types: [completed]
+27:  workflow_dispatch:
+28:    inputs:
+29:      source_run_id:
+30:        description: '`Haybarn Extensions` run ID whose artifacts to publish'
+32:        required: true
+33:      deploy:
+34:        description: 'Pass "true" to actually upload to R2 / PyPI / npm (otherwise dry-run)'
+36:        default: 'false'
+45:  group: haybarn-extensions-publish-${{ inputs.source_run_id || github.event.workflow_run.id }}
+51:    # workflow_run fires for every completion (including failures and
+54:      github.event_name == 'workflow_dispatch' ||
+55:      github.event.workflow_run.conclusion == 'success'
+58:      source_run_id: ${{ steps.context.outputs.source_run_id }}
+60:      deploy: ${{ steps.context.outputs.deploy }}
+69:          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+70:            SOURCE_RUN_ID='${{ inputs.source_run_id }}'
+71:            DEPLOY='${{ inputs.deploy }}'
+74:            SOURCE_RUN_ID='${{ github.event.workflow_run.id }}'
+76:            HEAD_SHA='${{ github.event.workflow_run.head_sha }}'
+79:            echo "source_run_id=$SOURCE_RUN_ID"
+81:            echo "deploy=$DEPLOY"
+83:          echo "::notice::publishing artifacts from run $SOURCE_RUN_ID @ $HEAD_SHA (deploy=$DEPLOY)"
+93:      # Overlay the deploy scripts from THIS workflow's ref (branch tip), not the
+94:      # build's frozen head_sha. The publish workflow exists to retry the deploy
+95:      # without rebuilding — that only works for deploy-SCRIPT fixes if the
+98:      - name: Overlay current deploy scripts
+103:          path: deploy-scripts
+108:          run-id: ${{ steps.context.outputs.source_run_id }}
+141:          # "No AWS key found, skipping" — so the deploy-step was green for
+145:          # pre-2024 checksum behavior. Mirrors the community deploy
+151:          DUCKDB_DEPLOY_SCRIPT_MODE: ${{ steps.context.outputs.deploy == 'true' && 'for_real' || 'dry_run' }}
+161:          python3 ./deploy-scripts/scripts/haybarn_extension_upload.py \
+189:        if: ${{ steps.context.outputs.deploy == 'true' }}
+216:            --deploy            true
+219:        if: ${{ steps.context.outputs.deploy == 'true' }}
+226:          # 2 days leaves a short retry-without-rebuild window (source_run_id).
+230:        if: ${{ steps.context.outputs.deploy == 'true' }}
+254:  #     -f artifact_shape=bundled -f source_run_id=<this-run-id> \
+261:    if: ${{ needs.publish.outputs.deploy == 'true' }}
+273:      # Empty source_run_id → publish from this run's just-uploaded
+275:      source_run_id: ''

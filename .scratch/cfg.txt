@@ -1,0 +1,2 @@
+=== config field names (allowUnsigned / extension repo) in d.ts ===
+=== how open() config is shaped — grep DuckDBConfig ===

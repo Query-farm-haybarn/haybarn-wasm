@@ -1,0 +1,4 @@
+up-httpfs-eh.wasm      imports=440  size=  444583
+httpfs-eh.wasm         imports=455  size=  449342
+up-httpfs-th.wasm      imports=345  size=  368929
+httpfs-th.wasm         imports=354  size=  365905

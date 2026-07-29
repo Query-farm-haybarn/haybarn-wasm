@@ -1,0 +1,48 @@
+=== worker requires ===
+require("apache-arrow")
+require("bufferutil")
+require("crypto")
+require("events")
+require("fs")
+require("http")
+require("https")
+require("net")
+require("node:child_process")
+require("node:crypto")
+require("node:fs")
+require("node:worker_threads")
+require("os")
+require("path")
+require("stream")
+require("tls")
+require("url")
+require("utf-8-validate")
+require("util")
+require("zlib")
+=== test harness clues ===
+24777:new Worker(url2),
+32777:new Worker3("const {Worker,isMainThread,parentPort,workerData,} = require('node:worker_threads')
+38766:duckdb-eh.wasm
+54555:new Worker(url2),
+62553:new Worker3("const {Worker,isMainThread,parentPort,workerData,} = require('node:worker_threads')
+66395:new WorkerTask("RESET" /* RESET */, null)
+66400:new WorkerTask("PING" /* PING */, null)
+66405:new WorkerTask("DROP_FILE" /* DROP_FILE */, name2)
+66410:new WorkerTask("DROP_FILES" /* DROP_FILES */, names)
+66415:new WorkerTask("FLUSH_FILES" /* FLUSH_FILES */, null)
+66422:new WorkerTask(
+66430:new WorkerTask("GET_VERSION" /* GET_VERSION */, null)
+66436:new WorkerTask(
+66446:new WorkerTask("OPEN" /* OPEN */, config)
+66451:new WorkerTask("TOKENIZE" /* TOKENIZE */, text)
+=== is there a node test script in package.json ===
+73:        "test:node": "node --enable-source-maps ../../node_modules/jasmine/bin/jasmine ./dist/tests-node.cjs",
+74:        "test:node:debug": "node --inspect-brk --enable-source-maps ../../node_modules/jasmine/bin/jasmine ./dist/tests-node.cjs",
+75:        "test:node:coverage": "nyc -r json --report-dir ./coverage/node node ../../node_modules/jasmine/bin/jasmine ./dist/tests-node.cjs",
+76:        "test:firefox": "karma start ./karma/tests-firefox.cjs",
+77:        "test:chrome": "karma start ./karma/tests-chrome.cjs",
+78:        "test:chrome:eh": "karma start ./karma/tests-chrome-eh.cjs",
+79:        "test:chrome:coverage": "karma start ./karma/tests-chrome-coverage.cjs",
+80:        "test:browser": "karma start ./karma/tests-all.cjs",
+81:        "test:browser:debug": "karma start ./karma/tests-debug.cjs",
+82:        "test": "npm run test:chrome && npm run test:node",

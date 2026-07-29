@@ -1,0 +1,1320 @@
+[Sat May 30 11:05:10 EDT 2026] sourcing emsdk
+[Sat May 30 11:05:10 EDT 2026] emcc: emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 5.0.7 (263db4cffa6f9fc2ec514a70abac81362ea41849)
+[Sat May 30 11:05:10 EDT 2026] cores: 8
+[Sat May 30 11:05:10 EDT 2026] make apply_patches
+Applying patches/arrow/hashing_compile_in_emscripten.patch
+patching file 'cpp/src/arrow/util/hashing.h'
+Ignoring previously applied (or reversed) patch.
+1 out of 1 hunks ignored--saving rejects to 'cpp/src/arrow/util/hashing.h.rej'
+Applying patches/rapidjson/cmake_minimum_required.patch
+patching file CMakeLists.txt
+Ignoring previously applied (or reversed) patch.
+1 out of 1 hunks ignored--saving rejects to CMakeLists.txt.rej
+[Sat May 30 11:05:10 EDT 2026] ====== starting loadable coi build (httpfs enabled) ======
+MODE=relsize
+/Users/rusty/Development/haybarn/haybarn-wasm/submodules/duckdb
+MODE=relsize
+FEATURES=coi
++ DUCKDB_WASM_VERSION_NAME=v1.5.3
++ emcmake cmake -S/Users/rusty/Development/haybarn/haybarn-wasm/lib -B/Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi -DDUCKDB_WASM_VERSION=v1.5.3 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DDUCKDB_LOCATION=/Users/rusty/Development/haybarn/haybarn-wasm/submodules/duckdb '-DWASM_LINK_FLAGS_EXT=-pthread -sSHARED_MEMORY=1' -DDUCKDB_EXTENSION_CONFIGS=extension_config_wasm.cmake -DCMAKE_BUILD_TYPE=Release -DWASM_MIN_SIZE=1 -DWITH_WASM_EXCEPTIONS=1 -DWITH_WASM_THREADS=1 -DWITH_WASM_SIMD=1 -DWITH_WASM_BULK_MEMORY=1 -DDUCKDB_CUSTOM_PLATFORM=wasm_threads -DDUCKDB_EXPLICIT_PLATFORM=wasm_threads
+emcmake: cmake -S/Users/rusty/Development/haybarn/haybarn-wasm/lib -B/Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi -DDUCKDB_WASM_VERSION=v1.5.3 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DDUCKDB_LOCATION=/Users/rusty/Development/haybarn/haybarn-wasm/submodules/duckdb '-DWASM_LINK_FLAGS_EXT=-pthread -sSHARED_MEMORY=1' -DDUCKDB_EXTENSION_CONFIGS=extension_config_wasm.cmake -DCMAKE_BUILD_TYPE=Release -DWASM_MIN_SIZE=1 -DWITH_WASM_EXCEPTIONS=1 -DWITH_WASM_THREADS=1 -DWITH_WASM_SIMD=1 -DWITH_WASM_BULK_MEMORY=1 -DDUCKDB_CUSTOM_PLATFORM=wasm_threads -DDUCKDB_EXPLICIT_PLATFORM=wasm_threads -DCMAKE_TOOLCHAIN_FILE=/private/tmp/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake -DCMAKE_CROSSCOMPILING_EMULATOR=/private/tmp/emsdk/node/22.16.0_64bit/bin/node in directory /Users/rusty/Development/haybarn/haybarn-wasm
+CMake Warning (dev) at CMakeLists.txt:6 (project):
+  cmake_minimum_required() should be called prior to this top-level project()
+  call.  Please see the cmake-commands(7) manual for usage documentation of
+  both commands.
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+-- EMSDK=/private/tmp/emsdk
+-- CCACHE_PROGRAM=/opt/homebrew/bin/ccache
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+DUCKDB_CXX_FLAGS= -std=c++17 -DDUCKDB_WASM=1 -DFSST_MUST_ALIGN -DWASM_LOADABLE_EXTENSIONS=1 -DDUCKDB_EXTENSION_AUTOLOAD_DEFAULT=1 -fPIC -DNDEBUG -fwasm-exceptions -DWEBDB_FAST_EXCEPTIONS=1 -msimd128 -DWEBDB_SIMD=1 -mbulk-memory -DWEBDB_BULK_MEMORY=1 -sUSE_PTHREADS=1 -DWEBDB_THREADS=1 -sUSE_PTHREADS=1 -DDUCKDB_CUSTOM_PLATFORM=wasm_threads -Wno-unqualified-std-cast-call -DDUCKDB_DEBUG_NO_SAFETY -DDUCKDB_FROM_DUCKDB_WASM -DDUCKDB_WASM_VERSION=v1.5.3
+-- Found Git: /opt/homebrew/bin/git (found version "2.53.0")
+-- WASM_LINK_FLAGS= -sSTACK_SIZE=1048576 -Oz -sUSE_PTHREADS=1 -sPTHREAD_POOL_SIZE=8 -pthread -s FILESYSTEM=1 -s ENVIRONMENT='web,node,worker' -s ALLOW_TABLE_GROWTH -lembind -s MAIN_MODULE=1 -s EXPORTED_FUNCTIONS='@../../../lib/base_exported_list.txt'
+-- Configuring done (2.3s)
+-- Generating done (0.0s)
+CMake Warning:
+  Manually-specified variables were not used by the project:
+
+    DUCKDB_CUSTOM_PLATFORM
+    DUCKDB_EXTENSION_CONFIGS
+    WASM_LINK_FLAGS_EXT
+
+
+-- Build files have been written to: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi
++ emmake make -C/Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi -j8 duckdb_wasm
+emmake: "make -C/Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi -j8 duckdb_wasm" in "/Users/rusty/Development/haybarn/haybarn-wasm"
+[  5%] Creating directories for 'duckdb_ep'
+[  5%] Creating directories for 'rapidjson_ep'
+[  5%] Creating directories for 'arrow_ep'
+[ 10%] No download step for 'rapidjson_ep'
+[ 10%] No download step for 'duckdb_ep'
+[ 10%] No download step for 'arrow_ep'
+[ 12%] No update step for 'duckdb_ep'
+[ 15%] No update step for 'rapidjson_ep'
+[ 15%] No update step for 'arrow_ep'
+[ 17%] No patch step for 'duckdb_ep'
+[ 19%] Performing configure step for 'duckdb_ep'
+[ 21%] No patch step for 'rapidjson_ep'
+[ 22%] No patch step for 'arrow_ep'
+CMake Warning:
+  Ignoring extra path from command line:
+
+   "/private/tmp/emsdk/upstream/emscripten/cmake/Modules"
+
+
+CMake Warning:
+  Ignoring extra path from command line:
+
+   "/private/tmp/emsdk/upstream/emscripten/cmake/Modules"
+
+
+[ 24%] Performing configure step for 'rapidjson_ep'
+[ 26%] Performing configure step for 'arrow_ep'
+CMake Warning:
+  Ignoring extra path from command line:
+
+   "/private/tmp/emsdk/upstream/emscripten/cmake/Modules"
+
+
+CMake Warning:
+  Ignoring extra path from command line:
+
+   "/private/tmp/emsdk/upstream/emscripten/cmake/Modules"
+
+
+CMake Warning:
+  Ignoring extra path from command line:
+
+   "/private/tmp/emsdk/upstream/emscripten/cmake/Modules"
+
+
+-- Building using CMake version: 4.2.3
+-- Found Python3: /opt/homebrew/Frameworks/Python.framework/Versions/3.14/bin/python3.14 (found version "3.14.3") found components: Interpreter
+CMake Warning (dev) at CMakeLists.txt:168 (add_custom_command):
+  Exactly one of PRE_BUILD, PRE_LINK, or POST_BUILD must be given.  Assuming
+  POST_BUILD to preserve backward compatibility.
+
+  Policy CMP0175 is not set: add_custom_command() rejects invalid arguments.
+  Run "cmake --help-policy CMP0175" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+-- Configuring done (0.3s)
+-- Generating done (0.0s)
+CMake Warning:
+  Manually-specified variables were not used by the project:
+
+    CMAKE_C_COMPILER_LAUNCHER
+
+
+-- Build files have been written to: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/src/rapidjson_ep-build
+-- Arrow version: 21.0.0 (full: '21.0.0')
+-- Arrow SO version: 2100 (full: 2100.0.0)
+[ 28%] Performing build step for 'rapidjson_ep'
+-- clang-tidy 14 not found
+-- clang-format 14 not found
+-- Could NOT find ClangTools (missing: CLANG_FORMAT_BIN CLANG_TIDY_BIN) 
+-- infer not found
+[ 29%] Performing install step for 'rapidjson_ep'
+Install the project...
+-- Install configuration: "Release"
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/lib/pkgconfig/RapidJSON.pc
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/readme.md
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/fwd.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/memorystream.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/reader.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/prettywriter.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/ostreamwrapper.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/encodedstream.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/filereadstream.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/cursorstreamwrapper.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/istreamwrapper.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/uri.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/stringbuffer.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/internal
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/internal/ieee754.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/internal/strtod.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/internal/swap.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/internal/regex.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/internal/diyfp.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/internal/biginteger.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/internal/strfunc.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/internal/itoa.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/internal/stack.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/internal/dtoa.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/internal/clzll.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/internal/meta.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/internal/pow10.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/encodings.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/schema.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/stream.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/filewritestream.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/rapidjson.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/document.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/allocators.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/writer.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/error
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/error/error.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/error/en.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/memorybuffer.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/pointer.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/msinttypes
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/msinttypes/inttypes.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/include/rapidjson/msinttypes/stdint.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/simpledom
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/simpledom/simpledom.cpp
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/tutorial
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/tutorial/tutorial.cpp
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/prettyauto
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/prettyauto/prettyauto.cpp
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/CMakeLists.txt
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/sortkeys
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/sortkeys/sortkeys.cpp
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/messagereader
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/messagereader/messagereader.cpp
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/parsebyparts
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/parsebyparts/parsebyparts.cpp
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/filterkeydom
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/filterkeydom/filterkeydom.cpp
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/simplewriter
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/simplewriter/simplewriter.cpp
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/lookaheadparser
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/lookaheadparser/lookaheadparser.cpp
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/archiver
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/archiver/archiver.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/archiver/archiver.cpp
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/archiver/archivertest.cpp
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/serialize
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/serialize/serialize.cpp
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/filterkey
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/filterkey/filterkey.cpp
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/jsonx
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/jsonx/jsonx.cpp
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/simplepullreader
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/simplepullreader/simplepullreader.cpp
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/traverseaspointer.cpp
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/pretty
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/pretty/pretty.cpp
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/condense
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/condense/condense.cpp
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/simplereader
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/simplereader/simplereader.cpp
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/capitalize
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/capitalize/capitalize.cpp
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/schemavalidator
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/share/doc/RapidJSON/examples/schemavalidator/schemavalidator.cpp
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/lib/cmake/RapidJSON/RapidJSONConfig.cmake
+-- Up-to-date: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/lib/cmake/RapidJSON/RapidJSONConfig.cmake
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/rapidjson/install/lib/cmake/RapidJSON/RapidJSONConfigVersion.cmake
+-- Found Python3: /opt/homebrew/bin/python3.14 (found version "3.14.3") found components: Interpreter
+[ 31%] Completed 'rapidjson_ep'
+[ 31%] Built target rapidjson_ep
+-- System processor: x86
+-- Arrow build warning level: PRODUCTION
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Using ld linker
+-- Build Type: Release
+-- Performing Test CXX_LINKER_SUPPORTS_VERSION_SCRIPT
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Using /opt/homebrew/bin/ccache as C compiler launcher
+-- Using /opt/homebrew/bin/ccache as C++ compiler launcher
+-- Found Git: /opt/homebrew/bin/git (found version "2.53.0")
+fatal: No tags can describe '6e3e8f3e862111e0fb2989a90f4d0506ca88e508'.
+Try --always, or create some tags.
+CMake Warning at CMakeLists.txt:379 (message):
+  git is available (at /opt/homebrew/bin/git) but has failed to execute
+  'describe --tags --long', likely due to shallow clone.  Consider providing
+  explicit OVERRIDE_GIT_DESCRIBE or clone with tags.  Continuing with dummy
+  version v0.0.1
+
+
+-- Haybarn version: 1.5.3-rc2-8-g6e3e8f3e86
+-- git hash 6e3e8f3e86, version v0.0.1, extension folder v0.0.1
+-- Build workers: compile= link_release=4 link_non_release=2
+-- Extensions will be deployed to: "../../build/extension_repository"
+-- Load extension 'json' from '/Users/rusty/Development/haybarn/haybarn-wasm/submodules/duckdb/extensions' @ v0.0.1
+-- Load extension 'core_functions' from '/Users/rusty/Development/haybarn/haybarn-wasm/submodules/duckdb/extensions' @ v0.0.1
+CMake Warning at extension/extension_build_tools.cmake:550 (message):
+  The 'jemalloc' allocator is no longer provided as an extension, use
+  'ENABLE_JEMALLOC=OFF' to disable jemalloc instead
+Call Stack (most recent call first):
+  CMakeLists.txt:878 (include)
+
+
+-- Load extension 'parquet' from '/Users/rusty/Development/haybarn/haybarn-wasm/submodules/duckdb/extensions' @ v0.0.1
+-- Extensions linked into DuckDB: [core_functions]
+-- Extensions built but not linked: [json, parquet]
+-- Performing Test CXX_LINKER_SUPPORTS_VERSION_SCRIPT - Success
+-- Using AUTO approach to find dependencies
+-- ARROW_ABSL_BUILD_VERSION: 20211102.0
+-- ARROW_ABSL_BUILD_SHA256_CHECKSUM: dcf71b9cba8dc0ca9940c4b316a0c796be8fab42b070bb6b7cab62b48f0e66c4
+-- ARROW_AWS_C_AUTH_BUILD_VERSION: v0.9.0
+-- ARROW_AWS_C_AUTH_BUILD_SHA256_CHECKSUM: aa6e98864fefb95c249c100da4ae7aed36ba13a8a91415791ec6fad20bec0427
+-- ARROW_AWS_C_CAL_BUILD_VERSION: v0.9.2
+-- ARROW_AWS_C_CAL_BUILD_SHA256_CHECKSUM: f9f3bc6a069e2efe25fcdf73e4d2b16b5608c327d2eb57c8f7a8524e9e1fcad0
+-- ARROW_AWS_C_COMMON_BUILD_VERSION: v0.12.3
+-- ARROW_AWS_C_COMMON_BUILD_SHA256_CHECKSUM: a4e7ac6c6f840cb6ab56b8ee0bcd94a61c59d68ca42570bca518432da4c94273
+-- ARROW_AWS_C_COMPRESSION_BUILD_VERSION: v0.3.1
+-- ARROW_AWS_C_COMPRESSION_BUILD_SHA256_CHECKSUM: d89fca17a37de762dc34f332d2da402343078da8dbd2224c46a11a88adddf754
+-- ARROW_AWS_C_EVENT_STREAM_BUILD_VERSION: v0.5.4
+-- ARROW_AWS_C_EVENT_STREAM_BUILD_SHA256_CHECKSUM: cef8b78e362836d15514110fb43a0a0c7a86b0a210d5fe25fd248a82027a7272
+-- ARROW_AWS_C_HTTP_BUILD_VERSION: v0.10.2
+-- ARROW_AWS_C_HTTP_BUILD_SHA256_CHECKSUM: 048d9d683459ade363fd7cc448c2b6329c78f67a2a0c0cb61c16de4634a2fc6b
+-- ARROW_AWS_C_IO_BUILD_VERSION: v0.19.1
+-- ARROW_AWS_C_IO_BUILD_SHA256_CHECKSUM: f2fea0c066924f7fe3c2b1c7b2fa9be640f5b16a6514854226330e63a1faacd0
+-- ARROW_AWS_C_MQTT_BUILD_VERSION: v0.13.1
+-- ARROW_AWS_C_MQTT_BUILD_SHA256_CHECKSUM: c54d02c1e46f55bae8d5e6f9c4b0d78d84c1c9d9ac16ba8d78c3361edcd8b5bb
+-- ARROW_AWS_C_S3_BUILD_VERSION: v0.8.1
+-- ARROW_AWS_C_S3_BUILD_SHA256_CHECKSUM: c8b09780691d2b94e50d101c68f01fa2d1c3debb0ff3aed313d93f0d3c9af663
+-- ARROW_AWS_C_SDKUTILS_BUILD_VERSION: v0.2.4
+-- ARROW_AWS_C_SDKUTILS_BUILD_SHA256_CHECKSUM: 493cbed4fa57e0d4622fcff044e11305eb4fc12445f32c8861025597939175fc
+-- ARROW_AWS_CHECKSUMS_BUILD_VERSION: v0.2.7
+-- ARROW_AWS_CHECKSUMS_BUILD_SHA256_CHECKSUM: 178e8398d98111f29150f7813a70c20ad97ab30be0de02525440355fe84ccb1d
+-- ARROW_AWS_CRT_CPP_BUILD_VERSION: v0.32.8
+-- ARROW_AWS_CRT_CPP_BUILD_SHA256_CHECKSUM: db44260452a0296341fb8e7b987e4c328f08f7829b9f1c740fed9c963e081e93
+-- ARROW_AWS_LC_BUILD_VERSION: v1.52.1
+-- ARROW_AWS_LC_BUILD_SHA256_CHECKSUM: fe552e3c3522f73afc3c30011745c431c633f7b4e25dcd7b38325f194a7b3b75
+-- ARROW_AWSSDK_BUILD_VERSION: 1.11.587
+-- ARROW_AWSSDK_BUILD_SHA256_CHECKSUM: b9944ba9905a68d6e53abb4f36ab2b3bd18ac88d8571647bb9f2b8026b76f8cd
+-- ARROW_AZURE_SDK_BUILD_VERSION: azure-identity_1.9.0
+-- ARROW_AZURE_SDK_BUILD_SHA256_CHECKSUM: 97065bfc971ac8df450853ce805f820f52b59457bd7556510186a1569502e4a1
+-- ARROW_BOOST_BUILD_VERSION: 1.88.0
+-- ARROW_BOOST_BUILD_SHA256_CHECKSUM: dcea50f40ba1ecfc448fdf886c0165cf3e525fef2c9e3e080b9804e8117b9694
+-- ARROW_BROTLI_BUILD_VERSION: v1.0.9
+-- ARROW_BROTLI_BUILD_SHA256_CHECKSUM: f9e8d81d0405ba66d181529af42a3354f838c939095ff99930da6aa9cdf6fe46
+-- ARROW_BZIP2_BUILD_VERSION: 1.0.8
+-- ARROW_BZIP2_BUILD_SHA256_CHECKSUM: ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269
+-- ARROW_CARES_BUILD_VERSION: 1.17.2
+-- ARROW_CARES_BUILD_SHA256_CHECKSUM: 4803c844ce20ce510ef0eb83f8ea41fa24ecaae9d280c468c582d2bb25b3913d
+-- ARROW_CRC32C_BUILD_VERSION: 1.1.2
+-- ARROW_CRC32C_BUILD_SHA256_CHECKSUM: ac07840513072b7fcebda6e821068aa04889018f24e10e46181068fb214d7e56
+-- ARROW_GBENCHMARK_BUILD_VERSION: v1.8.3
+-- ARROW_GBENCHMARK_BUILD_SHA256_CHECKSUM: 6bc180a57d23d4d9515519f92b0c83d61b05b5bab188961f36ac7b06b0d9e9ce
+-- ARROW_GFLAGS_BUILD_VERSION: v2.2.2
+-- ARROW_GFLAGS_BUILD_SHA256_CHECKSUM: 34af2f15cf7367513b352bdcd2493ab14ce43692d2dcd9dfc499492966c64dcf
+-- ARROW_GLOG_BUILD_VERSION: v0.5.0
+-- ARROW_GLOG_BUILD_SHA256_CHECKSUM: eede71f28371bf39aa69b45de23b329d37214016e2055269b3b5e7cfd40b59f5
+-- ARROW_GOOGLE_CLOUD_CPP_BUILD_VERSION: v2.22.0
+-- ARROW_GOOGLE_CLOUD_CPP_BUILD_SHA256_CHECKSUM: 0c68782e57959c82e0c81def805c01460a042c1aae0c2feee905acaa2a2dc9bf
+-- ARROW_GRPC_BUILD_VERSION: v1.46.3
+-- ARROW_GRPC_BUILD_SHA256_CHECKSUM: d6cbf22cb5007af71b61c6be316a79397469c58c82a942552a62e708bce60964
+-- ARROW_GTEST_BUILD_VERSION: 1.16.0
+-- ARROW_GTEST_BUILD_SHA256_CHECKSUM: 78c676fc63881529bf97bf9d45948d905a66833fbfa5318ea2cd7478cb98f399
+-- ARROW_JEMALLOC_BUILD_VERSION: 5.3.0
+-- ARROW_JEMALLOC_BUILD_SHA256_CHECKSUM: 2db82d1e7119df3e71b7640219b6dfe84789bc0537983c3b7ac4f7189aecfeaa
+-- ARROW_LZ4_BUILD_VERSION: v1.10.0
+-- ARROW_LZ4_BUILD_SHA256_CHECKSUM: 537512904744b35e232912055ccf8ec66d768639ff3abe5788d90d792ec5f48b
+-- ARROW_MIMALLOC_BUILD_VERSION: v2.2.4
+-- ARROW_MIMALLOC_BUILD_SHA256_CHECKSUM: 754a98de5e2912fddbeaf24830f982b4540992f1bab4a0a8796ee118e0752bda
+-- ARROW_NLOHMANN_JSON_BUILD_VERSION: v3.12.0
+-- ARROW_NLOHMANN_JSON_BUILD_SHA256_CHECKSUM: 4b92eb0c06d10683f7447ce9406cb97cd4b453be18d7279320f7b2f025c10187
+-- ARROW_OPENTELEMETRY_BUILD_VERSION: v1.21.0
+-- ARROW_OPENTELEMETRY_BUILD_SHA256_CHECKSUM: 98e5546f577a11b52a57faed1f4cc60d8c1daa44760eba393f43eab5a8ec46a2
+-- ARROW_OPENTELEMETRY_PROTO_BUILD_VERSION: v1.7.0
+-- ARROW_OPENTELEMETRY_PROTO_BUILD_SHA256_CHECKSUM: 11330d850f5e24d34c4246bc8cb21fcd311e7565d219195713455a576bb11bed
+-- ARROW_ORC_BUILD_VERSION: 2.1.2
+-- ARROW_ORC_BUILD_SHA256_CHECKSUM: 55451e65dea6ed42afb39fe33a88f9dcea8928dca0a0c9c23ef5545587810b4c
+-- ARROW_PROTOBUF_BUILD_VERSION: v21.3
+-- ARROW_PROTOBUF_BUILD_SHA256_CHECKSUM: 2f723218f6cb709ae4cdc4fb5ed56a5951fc5d466f0128ce4c946b8c78c8c49f
+-- ARROW_RAPIDJSON_BUILD_VERSION: 232389d4f1012dddec4ef84861face2d2ba85709
+-- ARROW_RAPIDJSON_BUILD_SHA256_CHECKSUM: b9290a9a6d444c8e049bd589ab804e0ccf2b05dc5984a19ed5ae75d090064806
+-- ARROW_RE2_BUILD_VERSION: 2022-06-01
+-- ARROW_RE2_BUILD_SHA256_CHECKSUM: f89c61410a072e5cbcf8c27e3a778da7d6fd2f2b5b1445cd4f4508bee946ab0f
+-- ARROW_SNAPPY_BUILD_VERSION: 1.2.2
+-- ARROW_SNAPPY_BUILD_SHA256_CHECKSUM: 90f74bc1fbf78a6c56b3c4a082a05103b3a56bb17bca1a27e052ea11723292dc
+-- ARROW_SUBSTRAIT_BUILD_VERSION: v0.44.0
+-- ARROW_SUBSTRAIT_BUILD_SHA256_CHECKSUM: f989a862f694e7dbb695925ddb7c4ce06aa6c51aca945105c075139aed7e55a2
+-- ARROW_S2N_TLS_BUILD_VERSION: v1.5.21
+-- ARROW_S2N_TLS_BUILD_SHA256_CHECKSUM: 203d69d6f557f6ab303438ad186fca13fd2c60581b2cca6348a9fbee10d79995
+-- ARROW_THRIFT_BUILD_VERSION: 0.22.0
+-- ARROW_THRIFT_BUILD_SHA256_CHECKSUM: 794a0e455787960d9f27ab92c38e34da27e8deeda7a5db0e59dc64a00df8a1e5
+-- ARROW_UTF8PROC_BUILD_VERSION: v2.10.0
+-- ARROW_UTF8PROC_BUILD_SHA256_CHECKSUM: 6f4f1b639daa6dca9f80bc5db1233e9cbaa31a67790887106160b33ef743f136
+-- ARROW_XSIMD_BUILD_VERSION: 13.0.0
+-- ARROW_XSIMD_BUILD_SHA256_CHECKSUM: 8bdbbad0c3e7afa38d88d0d484d70a1671a1d8aefff03f4223ab2eb6a41110a3
+-- ARROW_ZLIB_BUILD_VERSION: 1.3.1
+-- ARROW_ZLIB_BUILD_SHA256_CHECKSUM: 9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23
+-- ARROW_ZSTD_BUILD_VERSION: 1.5.7
+-- ARROW_ZSTD_BUILD_SHA256_CHECKSUM: eb33e51f49a15e023950cd7825ca74a4a2b43db8354825ac24fc1b7ee09e6fa3
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+CMake Warning (dev) at src/CMakeLists.txt:110 (add_library):
+  ADD_LIBRARY called with SHARED option but the target platform does not
+  support dynamic linking.  Building a STATIC library instead.  This may lead
+  to problems.
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+-- Configuring done (2.2s)
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Looking for _M_ARM64
+-- Looking for _M_ARM64 - not found
+-- Looking for __SIZEOF_INT128__
+-- Generating done (1.0s)
+-- Build files have been written to: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/duckdb/src/duckdb_ep-build
+[ 33%] Performing build step for 'duckdb_ep'
+[  1%] Generating duckdb_platform_out
+[  2%] Building CXX object extension/parquet/reader/variant/CMakeFiles/duckdb_parquet_reader_variant.dir/ub_duckdb_parquet_reader_variant.cpp.o
+[  3%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/compress/zstd_compress_superblock.cpp.o
+[  3%] Building CXX object extension/parquet/writer/CMakeFiles/duckdb_parquet_writers.dir/ub_duckdb_parquet_writers.cpp.o
+[  3%] Updating .cache/clangd (duckdb_ep-build)
+[  3%] Building CXX object extension/parquet/reader/CMakeFiles/duckdb_parquet_readers.dir/ub_duckdb_parquet_readers.cpp.o
+[  3%] Building CXX object extension/parquet/decoder/CMakeFiles/duckdb_parquet_decoders.dir/ub_duckdb_parquet_decoders.cpp.o
+[  3%] Built target duckdb_platform
+[  3%] Built target clangd_cache
+[  3%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/compress/zstdmt_compress.cpp.o
+[  3%] Building CXX object extension/parquet/writer/variant/CMakeFiles/duckdb_parquet_writer_variant.dir/ub_duckdb_parquet_writer_variant.cpp.o
+[  3%] Building CXX object src/optimizer/CMakeFiles/duckdb_optimizer.dir/ub_duckdb_optimizer.cpp.o
+[  3%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/compress/zstd_double_fast.cpp.o
+-- Looking for __SIZEOF_INT128__ - found
+-- Building without OpenSSL support. Minimum OpenSSL version 1.0.2 required.
+-- Found hdfs.h at: /Users/rusty/Development/haybarn/haybarn-wasm/submodules/arrow/cpp/thirdparty/hadoop/include/hdfs.h
+-- All bundled static libraries: 
+-- CMAKE_C_FLAGS:  -Qunused-arguments -fPIC -fexceptions  -Wall -Wno-unknown-warning-option -Wno-pass-failed 
+-- CMAKE_CXX_FLAGS:   -std=c++17 -DDUCKDB_WASM=1 -DFSST_MUST_ALIGN -DWASM_LOADABLE_EXTENSIONS=1 -DDUCKDB_EXTENSION_AUTOLOAD_DEFAULT=1 -fPIC -DNDEBUG -fwasm-exceptions -DWEBDB_FAST_EXCEPTIONS=1 -msimd128 -DWEBDB_SIMD=1 -mbulk-memory -DWEBDB_BULK_MEMORY=1 -sUSE_PTHREADS=1 -DWEBDB_THREADS=1 -Qunused-arguments  -fPIC -fexceptions -Wno-error=deprecated-literal-operator  -Wall -Wno-unknown-warning-option -Wno-pass-failed 
+-- CMAKE_C_FLAGS_RELEASE: -O3 -DNDEBUG -O2 
+-- CMAKE_CXX_FLAGS_RELEASE: -O3 -DNDEBUG -O2 
+-- Looking for backtrace
+-- Looking for backtrace - not found
+-- Could NOT find Backtrace (missing: Backtrace_LIBRARY Backtrace_INCLUDE_DIR) 
+[  3%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/compress/zstd_fast.cpp.o
+-- ---------------------------------------------------------------------
+-- Arrow version:                                 21.0.0
+-- 
+-- Build configuration summary:
+--   Generator: Unix Makefiles
+--   Build type: Release
+--   Source directory: /Users/rusty/Development/haybarn/haybarn-wasm/submodules/arrow/cpp
+--   Install prefix: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install
+-- 
+-- Compile and link options:
+-- 
+--   ARROW_CXXFLAGS="" [default=""]
+--       Compiler flags to append when compiling Arrow
+--   ARROW_BUILD_STATIC=ON [default=ON]
+--       Build static libraries
+--   ARROW_BUILD_SHARED=OFF [default=ON]
+--       Build shared libraries
+--   ARROW_PACKAGE_KIND="" [default=""]
+--       Arbitrary string that identifies the kind of package
+--       (for informational purposes)
+--   ARROW_GIT_ID=ee4d09ebef61c663c1efbfa4c18e518a03b798be [default=""]
+--       The Arrow git commit id (if any)
+--   ARROW_GIT_DESCRIPTION=apache-arrow-21.0.0 [default=""]
+--       The Arrow git commit description (if any)
+--   ARROW_POSITION_INDEPENDENT_CODE=ON [default=ON]
+--       Whether to create position-independent target
+--   ARROW_USE_CCACHE=OFF [default=ON]
+--       Use ccache when compiling (if available)
+--   ARROW_USE_SCCACHE=ON [default=ON]
+--       Use sccache when compiling (if available),
+--       takes precedence over ccache if a storage backend is configured
+--   ARROW_USE_LD_GOLD=OFF [default=OFF]
+--       Use ld.gold for linking on Linux (if available)
+--   ARROW_USE_LLD=OFF [default=OFF]
+--       Use the LLVM lld for linking (if available)
+--   ARROW_USE_MOLD=OFF [default=OFF]
+--       Use mold for linking on Linux (if available)
+--   ARROW_SIMD_LEVEL=NONE [default=DEFAULT|NONE|SSE4_2|AVX2|AVX512|NEON|SVE|SVE128|SVE256|SVE512]
+--       Compile-time SIMD optimization level
+--   ARROW_RUNTIME_SIMD_LEVEL=NONE [default=MAX|NONE|SSE4_2|AVX2|AVX512]
+--       Max runtime SIMD optimization level
+--   ARROW_ALTIVEC=OFF [default=ON]
+--       Build with Altivec if compiler has support
+--   ARROW_RPATH_ORIGIN=OFF [default=OFF]
+--       Build Arrow libraries with RATH set to $ORIGIN
+--   ARROW_INSTALL_NAME_RPATH=ON [default=ON]
+--       Build Arrow libraries with install_name set to @rpath
+--   ARROW_GGDB_DEBUG=ON [default=ON]
+--       Pass -ggdb flag to debug builds
+--   ARROW_WITH_MUSL=OFF [default=OFF]
+--       Whether the system libc is musl or not
+--   ARROW_ENABLE_THREADING=ON [default=ON]
+--       Enable threading in Arrow core
+-- 
+-- Test and benchmark options:
+-- 
+--   ARROW_BUILD_EXAMPLES=OFF [default=OFF]
+--       Build the Arrow examples
+--   ARROW_BUILD_TESTS=OFF [default=OFF]
+--       Build the Arrow googletest unit tests
+--   ARROW_ENABLE_TIMING_TESTS=OFF [default=ON]
+--       Enable timing-sensitive tests
+--   ARROW_BUILD_INTEGRATION=OFF [default=OFF]
+--       Build the Arrow integration test executables
+--   ARROW_BUILD_BENCHMARKS=OFF [default=OFF]
+--       Build the Arrow micro benchmarks
+--   ARROW_BUILD_BENCHMARKS_REFERENCE=OFF [default=OFF]
+--       Build the Arrow micro reference benchmarks
+--   ARROW_BUILD_DETAILED_BENCHMARKS=OFF [default=OFF]
+--       Build benchmarks that do a longer exploration of performance
+--   ARROW_TEST_LINKAGE=static [default=static|shared]
+--       Linkage of Arrow libraries with unit tests executables.
+--   ARROW_FUZZING=OFF [default=OFF]
+--       Build Arrow Fuzzing executables
+--   ARROW_LARGE_MEMORY_TESTS=OFF [default=OFF]
+--       Enable unit tests which use large memory
+-- 
+-- Coverage options:
+-- 
+--   ARROW_GENERATE_COVERAGE=OFF [default=OFF]
+--       Build with C++ code coverage enabled
+-- 
+-- Checks options:
+-- 
+--   ARROW_TEST_MEMCHECK=OFF [default=OFF]
+--       Run the test suite using valgrind --tool=memcheck
+--   ARROW_USE_ASAN=OFF [default=OFF]
+--       Enable Address Sanitizer checks
+--   ARROW_USE_TSAN=OFF [default=OFF]
+--       Enable Thread Sanitizer checks
+--   ARROW_USE_UBSAN=OFF [default=OFF]
+--       Enable Undefined Behavior sanitizer checks
+-- 
+-- Project component options:
+-- 
+--   ARROW_ACERO=OFF [default=OFF]
+--       Build the Arrow Acero Engine Module
+--   ARROW_AZURE=OFF [default=OFF]
+--       Build Arrow with Azure support (requires the Azure SDK for C++)
+--   ARROW_BUILD_UTILITIES=OFF [default=OFF]
+--       Build Arrow commandline utilities
+--   ARROW_COMPUTE=OFF [default=OFF]
+--       Build all Arrow Compute kernels
+--   ARROW_CSV=OFF [default=OFF]
+--       Build the Arrow CSV Parser Module
+--   ARROW_CUDA=OFF [default=OFF]
+--       Build the Arrow CUDA extensions (requires CUDA toolkit)
+--   ARROW_DATASET=OFF [default=OFF]
+--       Build the Arrow Dataset Modules
+--   ARROW_FILESYSTEM=OFF [default=OFF]
+--       Build the Arrow Filesystem Layer
+--   ARROW_FLIGHT=OFF [default=OFF]
+--       Build the Arrow Flight RPC System (requires GRPC, Protocol Buffers)
+--   ARROW_FLIGHT_SQL=OFF [default=OFF]
+--       Build the Arrow Flight SQL extension
+--   ARROW_FLIGHT_SQL_ODBC=OFF [default=OFF]
+--       Build the Arrow Flight SQL ODBC extension
+--   ARROW_GANDIVA=OFF [default=OFF]
+--       Build the Gandiva libraries
+--   ARROW_GCS=OFF [default=C++ Client Libraries)]
+--       Build Arrow with GCS support (requires the Google Cloud Platform 
+--   ARROW_HDFS=OFF [default=OFF]
+--       Build the Arrow HDFS bridge
+--   ARROW_IPC=ON [default=ON]
+--       Build the Arrow IPC extensions
+--   ARROW_JEMALLOC=OFF [default=OFF]
+--       Build the Arrow jemalloc-based allocator
+--   ARROW_JSON=OFF [default=OFF]
+--       Build Arrow with JSON support (requires RapidJSON)
+--   ARROW_MIMALLOC=OFF [default=ON]
+--       Build the Arrow mimalloc-based allocator
+--   ARROW_PARQUET=OFF [default=OFF]
+--       Build the Parquet libraries
+--   ARROW_ORC=OFF [default=OFF]
+--       Build the Arrow ORC adapter
+--   ARROW_PYTHON=OFF [default=OFF]
+--       Build some components needed by PyArrow.
+--       (This is a deprecated option. Use CMake presets instead.)
+--   ARROW_S3=OFF [default=OFF]
+--       Build Arrow with S3 support (requires the AWS SDK for C++)
+--   ARROW_S3_MODULE=OFF [default=OFF]
+--       Build the Arrow S3 filesystem as a dynamic module
+--   ARROW_SKYHOOK=OFF [default=OFF]
+--       Build the Skyhook libraries
+--   ARROW_SUBSTRAIT=OFF [default=OFF]
+--       Build the Arrow Substrait Consumer Module
+--   ARROW_TENSORFLOW=OFF [default=OFF]
+--       Build Arrow with TensorFlow support enabled
+--   ARROW_TESTING=OFF [default=OFF]
+--       Build the Arrow testing libraries
+-- 
+-- Thirdparty toolchain options:
+-- 
+--   ARROW_DEPENDENCY_SOURCE=AUTO [default=AUTO|BUNDLED|SYSTEM|CONDA|VCPKG|BREW]
+--       Method to use for acquiring arrow's build dependencies
+--   ARROW_VERBOSE_THIRDPARTY_BUILD=OFF [default=OFF]
+--       Show output from ExternalProjects rather than just logging to files
+--   ARROW_DEPENDENCY_USE_SHARED=OFF [default=ON]
+--       Link to shared libraries
+--   ARROW_BOOST_USE_SHARED=OFF [default=OFF]
+--       Rely on Boost shared libraries where relevant
+--   ARROW_BROTLI_USE_SHARED=OFF [default=OFF]
+--       Rely on Brotli shared libraries where relevant
+--   ARROW_BZ2_USE_SHARED=OFF [default=OFF]
+--       Rely on Bz2 shared libraries where relevant
+--   ARROW_GFLAGS_USE_SHARED=OFF [default=OFF]
+--       Rely on GFlags shared libraries where relevant
+--   ARROW_GRPC_USE_SHARED=OFF [default=OFF]
+--       Rely on gRPC shared libraries where relevant
+--   ARROW_JEMALLOC_USE_SHARED=OFF [default=OFF]
+--       Rely on jemalloc shared libraries where relevant
+--   ARROW_LLVM_USE_SHARED=OFF [default=OFF]
+--       Rely on LLVM shared libraries where relevant
+--   ARROW_LZ4_USE_SHARED=OFF [default=OFF]
+--       Rely on lz4 shared libraries where relevant
+--   ARROW_OPENSSL_USE_SHARED=OFF [default=OFF]
+--       Rely on OpenSSL shared libraries where relevant
+--   ARROW_PROTOBUF_USE_SHARED=OFF [default=OFF]
+--       Rely on Protocol Buffers shared libraries where relevant
+--   ARROW_SNAPPY_USE_SHARED=OFF [default=OFF]
+--       Rely on snappy shared libraries where relevant
+--   ARROW_THRIFT_USE_SHARED=OFF [default=OFF]
+--       Rely on thrift shared libraries where relevant
+--   ARROW_UTF8PROC_USE_SHARED=OFF [default=OFF]
+--       Rely on utf8proc shared libraries where relevant
+--   ARROW_ZSTD_USE_SHARED=OFF [default=OFF]
+--       Rely on zstd shared libraries where relevant
+--   ARROW_USE_GLOG=OFF [default=OFF]
+--       Build libraries with glog support for pluggable logging
+--   ARROW_WITH_BACKTRACE=ON [default=ON]
+--       Build with backtrace support
+--   ARROW_WITH_OPENTELEMETRY=OFF [default=OFF]
+--       Build libraries with OpenTelemetry support for distributed tracing
+--   ARROW_WITH_BROTLI=OFF [default=OFF]
+--       Build with Brotli compression
+--   ARROW_WITH_BZ2=OFF [default=OFF]
+--       Build with BZ2 compression
+--   ARROW_WITH_LZ4=OFF [default=OFF]
+--       Build with lz4 compression
+--   ARROW_WITH_SNAPPY=OFF [default=OFF]
+--       Build with Snappy compression
+--   ARROW_WITH_ZLIB=OFF [default=OFF]
+--       Build with zlib compression
+--   ARROW_WITH_ZSTD=OFF [default=OFF]
+--       Build with zstd compression
+--   ARROW_WITH_UTF8PROC=OFF [default=ON]
+--       Build with support for Unicode properties using the utf8proc library
+--       (only used if ARROW_COMPUTE is ON or ARROW_GANDIVA is ON)
+--   ARROW_WITH_RE2=OFF [default=ON]
+--       Build with support for regular expressions using the re2 library
+--       (only used if ARROW_COMPUTE or ARROW_GANDIVA is ON)
+-- 
+-- Parquet options:
+-- 
+--   PARQUET_BUILD_EXECUTABLES=OFF [default=OFF]
+--       Build the Parquet executable CLI tools. Requires static libraries to be built.
+--   PARQUET_BUILD_EXAMPLES=OFF [default=OFF]
+--       Build the Parquet examples. Requires static libraries to be built.
+--   PARQUET_REQUIRE_ENCRYPTION=OFF [default=OFF]
+--       Build support for encryption. Fail if OpenSSL is not found
+-- 
+-- Gandiva options:
+-- 
+--   ARROW_GANDIVA_STATIC_LIBSTDCPP=OFF [default=OFF]
+--       Include -static-libstdc++ -static-libgcc when linking with
+--       Gandiva static libraries
+--   ARROW_GANDIVA_PC_CXX_FLAGS="" [default=""]
+--       Compiler flags to append when pre-compiling Gandiva operations
+-- 
+-- Cross compiling options:
+-- 
+--   ARROW_GRPC_CPP_PLUGIN="" [default=""]
+--       grpc_cpp_plugin path to be used
+-- 
+-- Advanced developer options:
+-- 
+--   ARROW_EXTRA_ERROR_CONTEXT=OFF [default=OFF]
+--       Compile with extra error context (line numbers, code)
+--   ARROW_OPTIONAL_INSTALL=ON [default=OFF]
+--       If enabled install ONLY targets that have already been built. Please be
+--       advised that if this is enabled 'install' will fail silently on components
+--       that have not been built
+--   ARROW_GDB_INSTALL_DIR="" [default=""]
+--       Use a custom install directory for GDB plugin.
+--       In general, you don't need to specify this because the default
+--       (CMAKE_INSTALL_FULL_BINDIR on Windows, CMAKE_INSTALL_FULL_LIBDIR otherwise)
+--       is reasonable.
+--   Outputting build configuration summary to /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/src/arrow_ep-build/cmake_summary.json
+-- Configuring done (5.5s)
+-- Generating done (0.1s)
+-- Build files have been written to: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/src/arrow_ep-build
+[ 35%] Performing build step for 'arrow_ep'
+[  0%] Building CXX object src/arrow/CMakeFiles/arrow_array.dir/array/array_base.cc.o
+[  4%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/compress/zstd_compress_sequences.cpp.o
+[  4%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/compress/zstd_ldm.cpp.o
+[  4%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/compress/hist.cpp.o
+[  4%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/compress/zstd_compress.cpp.o
+[  4%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/compress/zstd_lazy.cpp.o
+[  4%] Built target duckdb_parquet_reader_variant
+[  4%] Built target duckdb_parquet_decoders
+[  1%] Building CXX object src/arrow/CMakeFiles/arrow_io.dir/io/buffered.cc.o
+[  4%] Built target duckdb_parquet_writers
+[  5%] Building CXX object src/optimizer/compressed_materialization/CMakeFiles/duckdb_optimizer_compressed_materialization.dir/ub_duckdb_optimizer_compressed_materialization.cpp.o
+[  2%] Building CXX object src/arrow/CMakeFiles/arrow_array.dir/array/array_binary.cc.o
+[  5%] Built target duckdb_parquet_readers
+[  5%] Built target duckdb_parquet_writer_variant
+[  6%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/compress/zstd_compress_literals.cpp.o
+[  6%] Building CXX object src/optimizer/join_order/CMakeFiles/duckdb_optimizer_join_order.dir/ub_duckdb_optimizer_join_order.cpp.o
+[  2%] Building CXX object src/arrow/CMakeFiles/arrow_array.dir/array/array_decimal.cc.o
+[  6%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/compress/huf_compress.cpp.o
+[  2%] Building CXX object src/arrow/CMakeFiles/arrow_io.dir/io/caching.cc.o
+[  3%] Building CXX object src/arrow/CMakeFiles/arrow_io.dir/io/compressed.cc.o
+[  6%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/compress/zstd_opt.cpp.o
+[  4%] Building CXX object src/arrow/CMakeFiles/arrow_memory_pool.dir/memory_pool.cc.o
+[  5%] Building CXX object src/arrow/CMakeFiles/arrow_array.dir/array/array_dict.cc.o
+[  6%] Built target duckdb_optimizer_compressed_materialization
+[  6%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/compress/fse_compress.cpp.o
+[  5%] Building CXX object src/arrow/CMakeFiles/arrow_vendored.dir/vendored/base64.cpp.o
+[  6%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/decompress/zstd_ddict.cpp.o
+[  6%] Building CXX object src/optimizer/matcher/CMakeFiles/duckdb_optimizer_matcher.dir/ub_duckdb_optimizer_matcher.cpp.o
+[  7%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/decompress/huf_decompress.cpp.o
+[  5%] Building CXX object src/arrow/CMakeFiles/arrow_io.dir/io/file.cc.o
+[  5%] Built target arrow_memory_pool
+[  5%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/align_util.cc.o
+[  6%] Building CXX object src/arrow/CMakeFiles/arrow_vendored.dir/vendored/datetime.cpp.o
+[  7%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/decompress/zstd_decompress.cpp.o
+[  7%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/decompress/zstd_decompress_block.cpp.o
+[  7%] Built target duckdb_optimizer_matcher
+[  6%] Building CXX object src/arrow/CMakeFiles/arrow_array.dir/array/array_nested.cc.o
+[  7%] Building CXX object src/arrow/CMakeFiles/arrow_io.dir/io/hdfs.cc.o
+[  8%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/async_util.cc.o
+[  7%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/common/entropy_common.cpp.o
+[  7%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/common/fse_decompress.cpp.o
+[  8%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/common/debug.cpp.o
+[  8%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/common/xxhash.cpp.o
+[  8%] Building CXX object src/arrow/CMakeFiles/arrow_vendored.dir/vendored/double-conversion/bignum-dtoa.cc.o
+[  8%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/common/pool.cpp.o
+[  9%] Building CXX object src/arrow/CMakeFiles/arrow_io.dir/io/hdfs_internal.cc.o
+[ 10%] Building CXX object src/arrow/CMakeFiles/arrow_vendored.dir/vendored/double-conversion/bignum.cc.o
+[ 11%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/atfork_internal.cc.o
+[  8%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/common/threading.cpp.o
+[  8%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/common/zstd_common.cpp.o
+[ 11%] Building CXX object src/arrow/CMakeFiles/arrow_vendored.dir/vendored/double-conversion/cached-powers.cc.o
+[  9%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/common/error_private.cpp.o
+[  9%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/dict/cover.cpp.o
+[ 12%] Building CXX object src/arrow/CMakeFiles/arrow_vendored.dir/vendored/double-conversion/double-to-string.cc.o
+[ 12%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/basic_decimal.cc.o
+[  9%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/dict/divsufsort.cpp.o
+[  9%] Built target duckdb_optimizer_join_order
+[ 13%] Building CXX object src/arrow/CMakeFiles/arrow_compute_core.dir/compute/api_aggregate.cc.o
+[ 14%] Building CXX object src/arrow/CMakeFiles/arrow_vendored.dir/vendored/double-conversion/fast-dtoa.cc.o
+[ 14%] Building CXX object src/arrow/CMakeFiles/arrow_io.dir/io/interfaces.cc.o
+[ 14%] Building CXX object src/arrow/CMakeFiles/arrow_vendored.dir/vendored/double-conversion/fixed-dtoa.cc.o
+[  9%] Building CXX object src/optimizer/pullup/CMakeFiles/duckdb_optimizer_pullup.dir/ub_duckdb_optimizer_pullup.cpp.o
+[  9%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/dict/fastcover.cpp.o
+[ 15%] Building CXX object src/arrow/CMakeFiles/arrow_vendored.dir/vendored/double-conversion/string-to-double.cc.o
+[ 16%] Building CXX object src/arrow/CMakeFiles/arrow_array.dir/array/array_primitive.cc.o
+[  9%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/dict/zdict.cpp.o
+[ 17%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/bit_block_counter.cc.o
+[ 10%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/deprecated/zbuff_common.cpp.o
+[ 10%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/deprecated/zbuff_decompress.cpp.o
+[ 10%] Building CXX object third_party/zstd/CMakeFiles/duckdb_zstd.dir/deprecated/zbuff_compress.cpp.o
+[ 17%] Building CXX object src/arrow/CMakeFiles/arrow_vendored.dir/vendored/double-conversion/strtod.cc.o
+[ 10%] Linking CXX static library libduckdb_zstd.a
+[ 18%] Building C object src/arrow/CMakeFiles/arrow_vendored.dir/vendored/musl/strptime.c.o
+[ 10%] Built target duckdb_optimizer_pullup
+[ 19%] Building CXX object src/arrow/CMakeFiles/arrow_ipc.dir/ipc/dictionary.cc.o
+[ 10%] Built target duckdb_zstd
+[ 19%] Building CXX object src/arrow/CMakeFiles/arrow_compute_core.dir/compute/api_scalar.cc.o
+[ 20%] Building CXX object src/arrow/CMakeFiles/arrow_array.dir/array/array_run_end.cc.o
+[ 20%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/bit_run_reader.cc.o
+[ 20%] Building C object src/arrow/CMakeFiles/arrow_vendored.dir/vendored/uriparser/UriCommon.c.o
+[ 21%] Building C object src/arrow/CMakeFiles/arrow_vendored.dir/vendored/uriparser/UriCompare.c.o
+[ 22%] Building CXX object src/arrow/CMakeFiles/arrow_io.dir/io/memory.cc.o
+[ 23%] Building C object src/arrow/CMakeFiles/arrow_vendored.dir/vendored/uriparser/UriEscape.c.o
+[ 23%] Building C object src/arrow/CMakeFiles/arrow_vendored.dir/vendored/uriparser/UriFile.c.o
+[ 24%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/bit_util.cc.o
+[ 25%] Building C object src/arrow/CMakeFiles/arrow_vendored.dir/vendored/uriparser/UriIp4.c.o
+[ 25%] Building C object src/arrow/CMakeFiles/arrow_vendored.dir/vendored/uriparser/UriIp4Base.c.o
+[ 26%] Building C object src/arrow/CMakeFiles/arrow_vendored.dir/vendored/uriparser/UriMemory.c.o
+[ 26%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/bitmap.cc.o
+[ 26%] Building CXX object src/arrow/CMakeFiles/arrow_io.dir/io/slow.cc.o
+[ 26%] Building CXX object src/arrow/CMakeFiles/arrow_array.dir/array/builder_adaptive.cc.o
+[ 26%] Building C object src/arrow/CMakeFiles/arrow_vendored.dir/vendored/uriparser/UriNormalize.c.o
+[ 10%] Building CXX object src/optimizer/pushdown/CMakeFiles/duckdb_optimizer_pushdown.dir/ub_duckdb_optimizer_pushdown.cpp.o
+[ 10%] Built target duckdb_optimizer
+[ 27%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/bitmap_builders.cc.o
+[ 28%] Building CXX object src/arrow/CMakeFiles/arrow_ipc.dir/ipc/feather.cc.o
+[ 29%] Building C object src/arrow/CMakeFiles/arrow_vendored.dir/vendored/uriparser/UriNormalizeBase.c.o
+[ 30%] Building C object src/arrow/CMakeFiles/arrow_vendored.dir/vendored/uriparser/UriParse.c.o
+[ 31%] Building CXX object src/arrow/CMakeFiles/arrow_io.dir/io/stdio.cc.o
+[ 31%] Building C object src/arrow/CMakeFiles/arrow_vendored.dir/vendored/uriparser/UriParseBase.c.o
+[ 32%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/bitmap_ops.cc.o
+[ 32%] Building CXX object src/arrow/CMakeFiles/arrow_ipc.dir/ipc/message.cc.o
+[ 33%] Building C object src/arrow/CMakeFiles/arrow_vendored.dir/vendored/uriparser/UriQuery.c.o
+[ 33%] Building C object src/arrow/CMakeFiles/arrow_vendored.dir/vendored/uriparser/UriRecompose.c.o
+[ 34%] Building CXX object src/arrow/CMakeFiles/arrow_array.dir/array/builder_base.cc.o
+[ 35%] Building C object src/arrow/CMakeFiles/arrow_vendored.dir/vendored/uriparser/UriResolve.c.o
+[ 35%] Building CXX object src/arrow/CMakeFiles/arrow_io.dir/io/transform.cc.o
+[ 36%] Building C object src/arrow/CMakeFiles/arrow_vendored.dir/vendored/uriparser/UriShorten.c.o
+[ 36%] Built target arrow_vendored
+[ 37%] Building CXX object src/arrow/CMakeFiles/arrow_compute_core.dir/compute/api_vector.cc.o
+[ 37%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/bpacking.cc.o
+[ 37%] Building CXX object src/arrow/CMakeFiles/arrow_array.dir/array/builder_binary.cc.o
+[ 37%] Built target arrow_io
+[ 11%] Building CXX object src/optimizer/rule/CMakeFiles/duckdb_optimizer_rules.dir/ub_duckdb_optimizer_rules.cpp.o
+[ 38%] Building CXX object src/arrow/CMakeFiles/arrow_ipc.dir/ipc/metadata_internal.cc.o
+[ 39%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/byte_size.cc.o
+[ 39%] Building CXX object src/arrow/CMakeFiles/arrow_compute_core.dir/compute/cast.cc.o
+[ 11%] Built target duckdb_optimizer_pushdown
+[ 39%] Building CXX object src/arrow/CMakeFiles/arrow_ipc.dir/ipc/options.cc.o
+[ 40%] Building CXX object src/arrow/CMakeFiles/arrow_array.dir/array/builder_decimal.cc.o
+[ 40%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/cancel.cc.o
+[ 11%] Building CXX object src/optimizer/statistics/expression/CMakeFiles/duckdb_optimizer_statistics_expr.dir/ub_duckdb_optimizer_statistics_expr.cpp.o
+[ 41%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/compression.cc.o
+[ 41%] Building CXX object src/arrow/CMakeFiles/arrow_array.dir/array/builder_dict.cc.o
+[ 42%] Building CXX object src/arrow/CMakeFiles/arrow_ipc.dir/ipc/reader.cc.o
+[ 42%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/counting_semaphore.cc.o
+[ 11%] Building CXX object src/optimizer/statistics/operator/CMakeFiles/duckdb_optimizer_statistics_op.dir/ub_duckdb_optimizer_statistics_op.cpp.o
+[ 43%] Building CXX object src/arrow/CMakeFiles/arrow_compute_core.dir/compute/exec.cc.o
+[ 44%] Building CXX object src/arrow/CMakeFiles/arrow_array.dir/array/builder_run_end.cc.o
+[ 45%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/cpu_info.cc.o
+[ 11%] Built target duckdb_optimizer_rules
+[ 45%] Building CXX object src/arrow/CMakeFiles/arrow_ipc.dir/ipc/writer.cc.o
+[ 11%] Built target duckdb_optimizer_statistics_expr
+[ 46%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/crc32.cc.o
+[ 46%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/debug.cc.o
+[ 47%] Building CXX object src/arrow/CMakeFiles/arrow_compute_core.dir/compute/expression.cc.o
+[ 48%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/decimal.cc.o
+[ 48%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/delimiting.cc.o
+[ 49%] Building CXX object src/arrow/CMakeFiles/arrow_array.dir/array/builder_nested.cc.o
+[ 12%] Building CXX object src/planner/CMakeFiles/duckdb_planner.dir/ub_duckdb_planner.cpp.o
+[ 50%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/dict_util.cc.o
+[ 50%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/fixed_width_internal.cc.o
+[ 51%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/float16.cc.o
+[ 51%] Building CXX object src/arrow/CMakeFiles/arrow_array.dir/array/builder_primitive.cc.o
+[ 51%] Built target arrow_ipc
+[ 51%] Building CXX object src/arrow/CMakeFiles/arrow_compute_core.dir/compute/function.cc.o
+[ 52%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/formatting.cc.o
+[ 12%] Built target duckdb_optimizer_statistics_op
+[ 53%] Building CXX object src/arrow/CMakeFiles/arrow_compute_core.dir/compute/function_internal.cc.o
+[ 54%] Building CXX object src/arrow/CMakeFiles/arrow_array.dir/array/builder_union.cc.o
+[ 54%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/future.cc.o
+[ 12%] Building CXX object src/planner/expression/CMakeFiles/duckdb_planner_expression.dir/ub_duckdb_planner_expression.cpp.o
+[ 55%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/hashing.cc.o
+[ 55%] Building CXX object src/arrow/CMakeFiles/arrow_array.dir/array/concatenate.cc.o
+[ 13%] Building CXX object src/planner/binder/expression/CMakeFiles/duckdb_bind_expression.dir/ub_duckdb_bind_expression.cpp.o
+[ 55%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/int_util.cc.o
+[ 55%] Building CXX object src/arrow/CMakeFiles/arrow_compute_core.dir/compute/kernel.cc.o
+[ 13%] Building CXX object src/planner/binder/query_node/CMakeFiles/duckdb_bind_query_node.dir/ub_duckdb_bind_query_node.cpp.o
+[ 56%] Building CXX object src/arrow/CMakeFiles/arrow_array.dir/array/data.cc.o
+[ 57%] Building CXX object src/arrow/CMakeFiles/arrow_compute_core.dir/compute/ordering.cc.o
+[ 57%] Building CXX object src/arrow/CMakeFiles/arrow_array.dir/array/diff.cc.o
+[ 58%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/io_util.cc.o
+[ 59%] Building CXX object src/arrow/CMakeFiles/arrow_array.dir/array/statistics.cc.o
+[ 59%] Building CXX object src/arrow/CMakeFiles/arrow_compute_core.dir/compute/registry.cc.o
+[ 13%] Built target duckdb_planner_expression
+[ 59%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/list_util.cc.o
+[ 60%] Building CXX object src/arrow/CMakeFiles/arrow_array.dir/array/util.cc.o
+[ 13%] Built target duckdb_planner
+[ 13%] Building CXX object src/planner/binder/statement/CMakeFiles/duckdb_bind_statement.dir/ub_duckdb_bind_statement.cpp.o
+[ 61%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/logger.cc.o
+[ 62%] Building CXX object src/arrow/CMakeFiles/arrow_compute_core.dir/compute/kernels/chunked_internal.cc.o
+[ 62%] Building CXX object src/arrow/CMakeFiles/arrow_array.dir/array/validate.cc.o
+[ 63%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/logging.cc.o
+[ 13%] Built target duckdb_bind_expression
+[ 64%] Building CXX object src/arrow/CMakeFiles/arrow_compute_core.dir/compute/kernels/codegen_internal.cc.o
+[ 13%] Building CXX object src/planner/binder/tableref/CMakeFiles/duckdb_bind_tableref.dir/ub_duckdb_bind_tableref.cpp.o
+[ 64%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/key_value_metadata.cc.o
+[ 64%] Building CXX object src/arrow/CMakeFiles/arrow_compute_core.dir/compute/kernels/scalar_cast_boolean.cc.o
+[ 13%] Built target duckdb_bind_query_node
+[ 13%] Building CXX object src/planner/expression_binder/CMakeFiles/duckdb_expression_binders.dir/ub_duckdb_expression_binders.cpp.o
+[ 65%] Building CXX object src/arrow/CMakeFiles/arrow_compute_core.dir/compute/kernels/scalar_cast_dictionary.cc.o
+[ 65%] Built target arrow_array
+[ 13%] Building CXX object src/planner/filter/CMakeFiles/duckdb_planner_filter.dir/ub_duckdb_planner_filter.cpp.o
+[ 66%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/math_internal.cc.o
+[ 66%] Building CXX object src/arrow/CMakeFiles/arrow_compute_core.dir/compute/kernels/scalar_cast_extension.cc.o
+[ 66%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/memory.cc.o
+[ 67%] Building CXX object src/arrow/CMakeFiles/arrow_compute_core.dir/compute/kernels/scalar_cast_internal.cc.o
+[ 13%] Building CXX object src/planner/operator/CMakeFiles/duckdb_planner_operator.dir/ub_duckdb_planner_operator.cpp.o
+[ 68%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/mutex.cc.o
+[ 68%] Building CXX object src/arrow/CMakeFiles/arrow_compute_core.dir/compute/kernels/scalar_cast_nested.cc.o
+[ 69%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/ree_util.cc.o
+[ 70%] Building CXX object src/arrow/CMakeFiles/arrow_compute_core.dir/compute/kernels/scalar_cast_numeric.cc.o
+[ 13%] Built target duckdb_expression_binders
+[ 70%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/secure_string.cc.o
+[ 13%] Built target duckdb_planner_filter
+[ 13%] Building CXX object src/planner/subquery/CMakeFiles/duckdb_planner_subquery.dir/ub_duckdb_planner_subquery.cpp.o
+[ 71%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/string.cc.o
+[ 71%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/string_util.cc.o
+[ 13%] Building CXX object src/parser/CMakeFiles/duckdb_parser.dir/ub_duckdb_parser.cpp.o
+[ 72%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/task_group.cc.o
+[ 13%] Built target duckdb_bind_tableref
+[ 72%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/tdigest.cc.o
+[ 14%] Building CXX object src/parser/constraints/CMakeFiles/duckdb_constraints.dir/ub_duckdb_constraints.cpp.o
+[ 73%] Building CXX object src/arrow/CMakeFiles/arrow_compute_core.dir/compute/kernels/scalar_cast_string.cc.o
+[ 14%] Built target duckdb_bind_statement
+[ 74%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/thread_pool.cc.o
+[ 14%] Built target duckdb_planner_operator
+[ 15%] Building CXX object src/parser/expression/CMakeFiles/duckdb_expression.dir/ub_duckdb_expression.cpp.o
+[ 16%] Building CXX object src/parser/parsed_data/CMakeFiles/duckdb_parsed_data.dir/ub_duckdb_parsed_data.cpp.o
+[ 16%] Built target duckdb_constraints
+[ 75%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/time.cc.o
+[ 16%] Building CXX object src/parser/query_node/CMakeFiles/duckdb_query_node.dir/ub_duckdb_query_node.cpp.o
+[ 75%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/tracing.cc.o
+[ 16%] Built target duckdb_planner_subquery
+[ 75%] Building CXX object src/arrow/CMakeFiles/arrow_compute_core.dir/compute/kernels/scalar_cast_temporal.cc.o
+[ 76%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/trie.cc.o
+[ 76%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/union_util.cc.o
+[ 16%] Built target duckdb_parser
+[ 77%] Building CXX object src/arrow/CMakeFiles/arrow_compute_core.dir/compute/kernels/vector_hash.cc.o
+[ 78%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/unreachable.cc.o
+[ 16%] Built target duckdb_expression
+[ 16%] Building CXX object src/parser/statement/CMakeFiles/duckdb_statement.dir/ub_duckdb_statement.cpp.o
+[ 16%] Built target duckdb_query_node
+[ 78%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/uri.cc.o
+[ 78%] Building CXX object src/arrow/CMakeFiles/arrow_compute_core.dir/compute/kernels/vector_selection.cc.o
+[ 79%] Building CXX object src/arrow/CMakeFiles/arrow_compute_core.dir/compute/kernels/vector_selection_filter_internal.cc.o
+[ 80%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/utf8.cc.o
+[ 81%] Building CXX object src/arrow/CMakeFiles/arrow_util.dir/util/value_parsing.cc.o
+[ 16%] Built target duckdb_parsed_data
+[ 82%] Building CXX object src/arrow/CMakeFiles/arrow_compute_core.dir/compute/kernels/vector_selection_internal.cc.o
+[ 16%] Building CXX object src/parser/tableref/CMakeFiles/duckdb_parser_tableref.dir/ub_duckdb_parser_tableref.cpp.o
+[ 82%] Built target arrow_util
+[ 82%] Building CXX object src/arrow/CMakeFiles/arrow_compute_core.dir/compute/kernels/vector_selection_take_internal.cc.o
+[ 16%] Building CXX object src/parser/transform/constraint/CMakeFiles/duckdb_transformer_constraint.dir/ub_duckdb_transformer_constraint.cpp.o
+[ 16%] Built target duckdb_statement
+[ 16%] Building CXX object src/parser/transform/expression/CMakeFiles/duckdb_transformer_expression.dir/ub_duckdb_transformer_expression.cpp.o
+[ 16%] Building CXX object src/parser/transform/helpers/CMakeFiles/duckdb_transformer_helpers.dir/ub_duckdb_transformer_helpers.cpp.o
+[ 17%] Building CXX object src/parser/transform/statement/CMakeFiles/duckdb_transformer_statement.dir/ub_duckdb_transformer_statement.cpp.o
+[ 17%] Building CXX object src/parser/transform/tableref/CMakeFiles/duckdb_transformer_tableref.dir/ub_duckdb_transformer_tableref.cpp.o
+[ 17%] Building CXX object src/function/CMakeFiles/duckdb_function.dir/ub_duckdb_function.cpp.o
+[ 17%] Built target duckdb_transformer_constraint
+[ 18%] Building CXX object src/function/aggregate/CMakeFiles/duckdb_func_aggr.dir/ub_duckdb_func_aggr.cpp.o
+[ 18%] Built target duckdb_parser_tableref
+[ 18%] Building CXX object src/function/aggregate/distributive/CMakeFiles/duckdb_aggr_distr.dir/ub_duckdb_aggr_distr.cpp.o
+[ 82%] Built target arrow_compute_core
+[ 83%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/builder.cc.o
+[ 18%] Built target duckdb_transformer_helpers
+[ 83%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/buffer.cc.o
+[ 18%] Built target duckdb_transformer_expression
+[ 18%] Building CXX object src/function/cast/CMakeFiles/duckdb_func_cast.dir/ub_duckdb_func_cast.cpp.o
+[ 18%] Built target duckdb_transformer_tableref
+[ 84%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/chunked_array.cc.o
+[ 18%] Built target duckdb_func_aggr
+[ 18%] Building CXX object src/function/cast/union/CMakeFiles/duckdb_union_cast.dir/ub_duckdb_union_cast.cpp.o
+[ 84%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/chunk_resolver.cc.o
+[ 85%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/compare.cc.o
+[ 18%] Built target duckdb_transformer_statement
+[ 85%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/config.cc.o
+[ 18%] Built target duckdb_union_cast
+[ 18%] Building CXX object src/function/cast/variant/CMakeFiles/duckdb_variant_cast.dir/ub_duckdb_variant_cast.cpp.o
+[ 18%] Building CXX object src/function/pragma/CMakeFiles/duckdb_func_pragma.dir/ub_duckdb_func_pragma.cpp.o
+[ 18%] Building CXX object src/function/scalar/CMakeFiles/duckdb_func_scalar.dir/ub_duckdb_func_scalar.cpp.o
+[ 18%] Built target duckdb_function
+[ 86%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/datum.cc.o
+[ 18%] Building CXX object src/function/scalar/compressed_materialization/CMakeFiles/duckdb_func_compressed_materialization.dir/ub_duckdb_func_compressed_materialization.cpp.o
+[ 18%] Built target duckdb_aggr_distr
+[ 87%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/device.cc.o
+[ 18%] Building CXX object src/function/scalar/date/CMakeFiles/duckdb_func_date.dir/ub_duckdb_func_date.cpp.o
+[ 18%] Built target duckdb_func_pragma
+[ 87%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/device_allocation_type_set.cc.o
+[ 88%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/extension_type.cc.o
+[ 88%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/extension/bool8.cc.o
+[ 18%] Built target duckdb_variant_cast
+[ 89%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/extension/json.cc.o
+[ 18%] Building CXX object src/function/scalar/generic/CMakeFiles/duckdb_func_generic_main.dir/ub_duckdb_func_generic_main.cpp.o
+[ 18%] Built target duckdb_func_scalar
+[ 89%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/extension/uuid.cc.o
+[ 18%] Built target duckdb_func_date
+[ 90%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/pretty_print.cc.o
+[ 91%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/record_batch.cc.o
+[ 91%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/result.cc.o
+[ 18%] Built target duckdb_func_compressed_materialization
+[ 92%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/scalar.cc.o
+[ 92%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/sparse_tensor.cc.o
+[ 93%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/status.cc.o
+[ 18%] Built target duckdb_func_cast
+[ 18%] Building CXX object src/function/scalar/list/CMakeFiles/duckdb_func_list_nested.dir/ub_duckdb_func_list_nested.cpp.o
+[ 19%] Building CXX object src/function/scalar/map/CMakeFiles/duckdb_function_map.dir/ub_duckdb_function_map.cpp.o
+[ 94%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/table.cc.o
+[ 19%] Built target duckdb_func_generic_main
+[ 94%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/table_builder.cc.o
+[ 19%] Building CXX object src/function/scalar/operator/CMakeFiles/duckdb_func_ops_main.dir/ub_duckdb_func_ops_main.cpp.o
+[ 20%] Building CXX object src/function/scalar/sequence/CMakeFiles/duckdb_func_seq.dir/ub_duckdb_func_seq.cpp.o
+[ 20%] Built target duckdb_function_map
+[ 95%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/tensor.cc.o
+[ 20%] Building CXX object src/function/scalar/string/CMakeFiles/duckdb_func_string_main.dir/ub_duckdb_func_string_main.cpp.o
+[ 20%] Building CXX object src/function/scalar/string/regexp/CMakeFiles/duckdb_func_string_regexp.dir/ub_duckdb_func_string_regexp.cpp.o
+[ 95%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/tensor/coo_converter.cc.o
+[ 20%] Built target duckdb_func_list_nested
+[ 20%] Building CXX object src/function/scalar/struct/CMakeFiles/duckdb_func_struct_main.dir/ub_duckdb_func_struct_main.cpp.o
+[ 20%] Building CXX object src/function/scalar/variant/CMakeFiles/duckdb_func_variant_main.dir/ub_duckdb_func_variant_main.cpp.o
+[ 20%] Built target duckdb_func_seq
+[ 96%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/tensor/csf_converter.cc.o
+[ 20%] Built target duckdb_func_string_regexp
+[ 96%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/tensor/csx_converter.cc.o
+[ 20%] Building CXX object src/function/scalar/system/CMakeFiles/duckdb_func_system.dir/ub_duckdb_func_system.cpp.o
+[ 21%] Building CXX object src/function/scalar/geometry/CMakeFiles/duckdb_func_geometry.dir/ub_duckdb_func_geometry.cpp.o
+[ 22%] Building CXX object src/function/table/CMakeFiles/duckdb_func_table.dir/ub_duckdb_func_table.cpp.o
+[ 22%] Built target duckdb_func_string_main
+[ 97%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/type.cc.o
+[ 22%] Built target duckdb_func_variant_main
+[ 23%] Building CXX object src/function/table/system/CMakeFiles/duckdb_table_func_system.dir/ub_duckdb_table_func_system.cpp.o
+[ 23%] Built target duckdb_func_ops_main
+[ 23%] Building CXX object src/function/table/version/CMakeFiles/duckdb_func_table_version.dir/ub_duckdb_func_table_version.cpp.o
+[ 23%] Built target duckdb_func_geometry
+[ 98%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/type_traits.cc.o
+[ 98%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/visitor.cc.o
+[ 23%] Built target duckdb_func_struct_main
+[ 99%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/c/bridge.cc.o
+[ 23%] Built target duckdb_func_system
+[ 99%] Building CXX object src/arrow/CMakeFiles/arrow_objlib.dir/c/dlpack.cc.o
+[ 23%] Building CXX object src/function/table/arrow/CMakeFiles/duckdb_arrow_conversion.dir/ub_duckdb_arrow_conversion.cpp.o
+[ 23%] Building CXX object src/function/window/CMakeFiles/duckdb_func_window.dir/ub_duckdb_func_window.cpp.o
+[ 23%] Building CXX object src/function/variant/CMakeFiles/duckdb_function_variant.dir/ub_duckdb_function_variant.cpp.o
+[ 23%] Built target duckdb_func_table_version
+[ 23%] Building CXX object src/catalog/CMakeFiles/duckdb_catalog.dir/ub_duckdb_catalog.cpp.o
+[ 23%] Building CXX object src/catalog/catalog_entry/CMakeFiles/duckdb_catalog_entries.dir/ub_duckdb_catalog_entries.cpp.o
+[ 23%] Built target duckdb_function_variant
+[ 23%] Building CXX object src/catalog/catalog_entry/dependency/CMakeFiles/duckdb_catalog_entries_dependency.dir/ub_duckdb_catalog_entries_dependency.cpp.o
+[ 23%] Built target duckdb_arrow_conversion
+[ 24%] Building CXX object src/catalog/default/CMakeFiles/duckdb_catalog_default_entries.dir/ub_duckdb_catalog_default_entries.cpp.o
+[ 99%] Built target arrow_objlib
+[100%] Linking CXX static library ../../release/libarrow.a
+[100%] Built target arrow_static
+[ 36%] Performing install step for 'arrow_ep'
+[ 12%] Built target arrow_array
+[ 24%] Built target duckdb_catalog_entries_dependency
+[ 18%] Built target arrow_io
+[ 19%] Built target arrow_memory_pool
+[ 34%] Built target arrow_vendored
+[ 24%] Building CXX object src/common/CMakeFiles/duckdb_common.dir/ub_duckdb_common.cpp.o
+[ 63%] Built target arrow_util
+[ 78%] Built target arrow_compute_core
+[ 82%] Built target arrow_ipc
+[ 99%] Built target arrow_objlib
+[100%] Built target arrow_static
+Install the project...
+-- Install configuration: "Release"
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/config.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/lib/libarrow.a
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/lib/cmake/Arrow/ArrowConfig.cmake
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/lib/cmake/Arrow/ArrowConfigVersion.cmake
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/lib/cmake/Arrow/ArrowTargets.cmake
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/lib/cmake/Arrow/ArrowTargets-release.cmake
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/lib/pkgconfig/arrow.pc
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/api.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/array.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/buffer.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/buffer_builder.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/builder.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/chunk_resolver.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/chunked_array.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/compare.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/config.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/datum.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/device.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/device_allocation_type_set.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/extension_type.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/memory_pool.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/memory_pool_test.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/pretty_print.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/record_batch.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/result.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/scalar.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/sparse_tensor.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/status.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/stl.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/stl_allocator.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/stl_iterator.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/table.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/table_builder.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/tensor.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/type.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/type_fwd.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/type_traits.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/visit_array_inline.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/visit_data_inline.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/visit_scalar_inline.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/visit_type_inline.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/visitor.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/visitor_generate.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/lib/cmake/Arrow/ArrowOptions.cmake
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/lib/cmake/Arrow/arrow-config.cmake
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/testing/async_test_util.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/testing/builder.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/testing/executor_util.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/testing/extension_type.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/testing/fixed_width_test_util.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/testing/future_util.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/testing/generator.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/testing/gtest_compat.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/testing/gtest_util.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/testing/matchers.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/testing/math.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/testing/process.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/testing/random.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/testing/uniform_real.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/testing/util.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/testing/visibility.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/array/array_base.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/array/array_binary.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/array/array_decimal.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/array/array_dict.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/array/array_nested.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/array/array_primitive.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/array/array_run_end.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/array/builder_adaptive.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/array/builder_base.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/array/builder_binary.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/array/builder_decimal.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/array/builder_dict.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/array/builder_nested.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/array/builder_primitive.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/array/builder_run_end.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/array/builder_time.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/array/builder_union.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/array/concatenate.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/array/data.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/array/diff.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/array/statistics.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/array/util.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/array/validate.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/c/abi.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/c/bridge.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/c/dlpack.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/c/dlpack_abi.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/c/helpers.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/compute/api.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/compute/api_aggregate.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/compute/api_scalar.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/compute/api_vector.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/compute/cast.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/compute/exec.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/compute/expression.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/compute/function.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/compute/function_options.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/compute/initialize.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/compute/kernel.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/compute/ordering.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/compute/registry.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/compute/type_fwd.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/compute/util.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/compute/visibility.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/compute/row/grouper.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/extension/bool8.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/extension/fixed_shape_tensor.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/extension/json.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/extension/opaque.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/extension/uuid.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/io/api.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/io/buffered.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/io/caching.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/io/compressed.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/io/concurrency.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/io/file.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/io/hdfs.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/io/interfaces.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/io/memory.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/io/mman.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/io/slow.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/io/stdio.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/io/test_common.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/io/transform.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/io/type_fwd.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/tensor/converter.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/algorithm.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/align_util.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/aligned_storage.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/async_generator.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/async_generator_fwd.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/async_util.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/base64.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/basic_decimal.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/benchmark_util.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/binary_view_util.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/bit_block_counter.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/bit_run_reader.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/bit_util.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/bitmap.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/bitmap_builders.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/bitmap_generate.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/bitmap_ops.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/bitmap_reader.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/bitmap_visit.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/bitmap_writer.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/byte_size.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/cancel.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/checked_cast.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/compare.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/compression.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/concurrent_map.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/converter.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/cpu_info.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/crc32.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/debug.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/decimal.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/delimiting.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/endian.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/float16.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/formatting.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/functional.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/future.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/hash_util.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/hashing.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/int_util.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/int_util_overflow.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/io_util.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/iterator.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/key_value_metadata.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/launder.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/list_util.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/logger.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/logging.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/macros.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/math_constants.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/mutex.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/parallel.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/pcg_random.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/prefetch.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/queue.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/range.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/ree_util.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/regex.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/rows_to_batches.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/secure_string.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/simd.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/small_vector.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/span.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/string.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/string_util.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/task_group.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/test_common.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/thread_pool.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/time.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/tracing.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/type_fwd.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/type_traits.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/ubsan.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/union_util.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/unreachable.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/uri.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/utf8.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/value_parsing.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/vector.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/visibility.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/windows_compatibility.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/util/windows_fixup.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/vendored/ProducerConsumerQueue.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/vendored/datetime.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/vendored/strptime.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/vendored/xxhash.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/vendored/datetime/date.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/vendored/datetime/ios.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/vendored/datetime/tz.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/vendored/datetime/tz_private.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/vendored/datetime/visibility.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/vendored/double-conversion/bignum-dtoa.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/vendored/double-conversion/bignum.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/vendored/double-conversion/cached-powers.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/vendored/double-conversion/diy-fp.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/vendored/double-conversion/double-conversion.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/vendored/double-conversion/double-to-string.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/vendored/double-conversion/fast-dtoa.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/vendored/double-conversion/fixed-dtoa.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/vendored/double-conversion/ieee.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/vendored/double-conversion/string-to-double.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/vendored/double-conversion/strtod.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/vendored/double-conversion/utils.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/vendored/pcg/pcg_extras.hpp
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/vendored/pcg/pcg_random.hpp
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/vendored/pcg/pcg_uint128.hpp
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/vendored/portable-snippets/debug-trap.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/vendored/portable-snippets/safe-math.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/vendored/xxhash/xxhash.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/ipc/api.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/ipc/dictionary.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/ipc/feather.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/ipc/message.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/ipc/options.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/ipc/reader.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/ipc/test_common.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/ipc/type_fwd.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/ipc/util.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/include/arrow/ipc/writer.h
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/share/doc/arrow/LICENSE.txt
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/share/doc/arrow/NOTICE.txt
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/share/doc/arrow/README.md
+-- Installing: /Users/rusty/Development/haybarn/haybarn-wasm/build/relsize/coi/third_party/arrow/install/share/arrow/gdb/gdb_arrow.py
+[ 38%] Completed 'arrow_ep'
+[ 38%] Built target arrow_ep
+[ 24%] Building CXX object src/common/adbc/CMakeFiles/duckdb_adbc.dir/ub_duckdb_adbc.cpp.o
+[ 24%] Built target duckdb_catalog_default_entries
+[ 24%] Building CXX object src/common/adbc/nanoarrow/CMakeFiles/duckdb_adbc_nanoarrow.dir/ub_duckdb_adbc_nanoarrow.cpp.o
+[ 24%] Built target duckdb_table_func_system
+[ 24%] Building CXX object src/common/allocator/CMakeFiles/duckdb_common_allocator.dir/ub_duckdb_common_allocator.cpp.o
+[ 24%] Built target duckdb_func_table
+[ 25%] Building CXX object src/common/arrow/CMakeFiles/duckdb_common_arrow.dir/ub_duckdb_common_arrow.cpp.o
+[ 25%] Built target duckdb_catalog
+[ 25%] Building CXX object src/common/arrow/appender/CMakeFiles/duckdb_common_arrow_appender.dir/ub_duckdb_common_arrow_appender.cpp.o
+[ 25%] Built target duckdb_common_allocator
+[ 25%] Building CXX object src/common/crypto/CMakeFiles/duckdb_common_crypto.dir/ub_duckdb_common_crypto.cpp.o
+[ 25%] Built target duckdb_func_window
+[ 25%] Building CXX object src/common/enums/CMakeFiles/duckdb_common_enums.dir/ub_duckdb_common_enums.cpp.o
+[ 25%] Built target duckdb_catalog_entries
+[ 25%] Building CXX object src/common/exception/CMakeFiles/duckdb_common_exception.dir/ub_duckdb_common_exception.cpp.o
+[ 25%] Built target duckdb_common_arrow_appender
+[ 25%] Built target duckdb_adbc
+[ 25%] Building CXX object src/common/multi_file/CMakeFiles/duckdb_common_multi_file.dir/ub_duckdb_common_multi_file.cpp.o
+[ 25%] Building CXX object src/common/operator/CMakeFiles/duckdb_common_operators.dir/ub_duckdb_common_operators.cpp.o
+[ 25%] Built target duckdb_adbc_nanoarrow
+[ 25%] Building CXX object src/common/progress_bar/CMakeFiles/duckdb_progress_bar.dir/ub_duckdb_progress_bar.cpp.o
+[ 25%] Built target duckdb_common_crypto
+[ 25%] Building CXX object src/common/tree_renderer/CMakeFiles/duckdb_common_tree_renderer.dir/ub_duckdb_common_tree_renderer.cpp.o
+[ 25%] Built target duckdb_common_exception
+[ 25%] Building CXX object src/common/row_operations/CMakeFiles/duckdb_row_operations.dir/ub_duckdb_row_operations.cpp.o
+[ 25%] Built target duckdb_common_enums
+[ 25%] Building CXX object src/common/serializer/CMakeFiles/duckdb_common_serializer.dir/ub_duckdb_common_serializer.cpp.o
+[ 25%] Built target duckdb_common_arrow
+[ 25%] Building CXX object src/common/sort/CMakeFiles/duckdb_sort.dir/ub_duckdb_sort.cpp.o
+[ 25%] Built target duckdb_progress_bar
+[ 26%] Building CXX object src/common/types/CMakeFiles/duckdb_common_types.dir/ub_duckdb_common_types.cpp.o
+[ 26%] Built target duckdb_common_serializer
+[ 26%] Building CXX object src/common/types/column/CMakeFiles/duckdb_common_types_column.dir/ub_duckdb_common_types_column.cpp.o
+[ 26%] Built target duckdb_common_tree_renderer
+[ 26%] Building CXX object src/common/types/row/CMakeFiles/duckdb_common_types_row.dir/ub_duckdb_common_types_row.cpp.o
+[ 26%] Built target duckdb_common_multi_file
+[ 26%] Building CXX object src/common/types/variant/CMakeFiles/duckdb_common_variant.dir/ub_duckdb_common_variant.cpp.o
+[ 26%] Built target duckdb_row_operations
+[ 26%] Building CXX object src/common/value_operations/CMakeFiles/duckdb_value_operations.dir/ub_duckdb_value_operations.cpp.o
+[ 26%] Built target duckdb_common_operators
+[ 26%] Building CXX object src/common/vector_operations/CMakeFiles/duckdb_vector_operations.dir/boolean_operators.cpp.o
+[ 26%] Building CXX object src/common/vector_operations/CMakeFiles/duckdb_vector_operations.dir/vector_cast.cpp.o
+[ 26%] Built target duckdb_common_variant
+[ 27%] Building CXX object src/common/vector_operations/CMakeFiles/duckdb_vector_operations.dir/comparison_operators.cpp.o
+[ 27%] Built target duckdb_value_operations
+[ 28%] Building CXX object src/logging/CMakeFiles/duckdb_logging.dir/ub_duckdb_logging.cpp.o
+[ 28%] Building CXX object src/common/vector_operations/CMakeFiles/duckdb_vector_operations.dir/vector_copy.cpp.o
+[ 28%] Built target duckdb_common_types_column
+[ 28%] Building CXX object src/common/vector_operations/CMakeFiles/duckdb_vector_operations.dir/generators.cpp.o
+[ 28%] Building CXX object src/execution/CMakeFiles/duckdb_execution.dir/ub_duckdb_execution.cpp.o
+[ 28%] Built target duckdb_common
+[ 28%] Building CXX object src/common/vector_operations/CMakeFiles/duckdb_vector_operations.dir/vector_hash.cpp.o
+[ 28%] Built target duckdb_common_types_row
+[ 28%] Building CXX object src/common/vector_operations/CMakeFiles/duckdb_vector_operations.dir/vector_storage.cpp.o
+[ 29%] Building CXX object src/common/vector_operations/CMakeFiles/duckdb_vector_operations.dir/null_operations.cpp.o
+[ 29%] Building CXX object src/common/vector_operations/CMakeFiles/duckdb_vector_operations.dir/numeric_inplace_operators.cpp.o
+[ 29%] Building CXX object src/execution/expression_executor/CMakeFiles/duckdb_expression_executor.dir/ub_duckdb_expression_executor.cpp.o
+[ 29%] Building CXX object src/execution/nested_loop_join/CMakeFiles/duckdb_nested_loop_join.dir/ub_duckdb_nested_loop_join.cpp.o
+[ 29%] Building CXX object src/execution/operator/aggregate/CMakeFiles/duckdb_operator_aggregate.dir/ub_duckdb_operator_aggregate.cpp.o
+[ 29%] Building CXX object src/common/vector_operations/CMakeFiles/duckdb_vector_operations.dir/is_distinct_from.cpp.o
+[ 29%] Built target duckdb_logging
+[ 29%] Building CXX object src/execution/operator/csv_scanner/buffer_manager/CMakeFiles/duckdb_csv_buffer_manager.dir/ub_duckdb_csv_buffer_manager.cpp.o
+[ 29%] Built target duckdb_common_types
+[ 29%] Building CXX object src/execution/operator/csv_scanner/encode/CMakeFiles/duckdb_csv_encode.dir/ub_duckdb_csv_encode.cpp.o
+[ 29%] Built target duckdb_execution
+[ 29%] Building CXX object src/execution/operator/csv_scanner/scanner/CMakeFiles/duckdb_csv_scanner.dir/ub_duckdb_csv_scanner.cpp.o
+[ 29%] Built target duckdb_nested_loop_join
+[ 29%] Building CXX object src/execution/operator/csv_scanner/sniffer/CMakeFiles/duckdb_csv_sniffer.dir/ub_duckdb_csv_sniffer.cpp.o
+[ 29%] Built target duckdb_csv_buffer_manager
+[ 30%] Building CXX object src/execution/operator/csv_scanner/state_machine/CMakeFiles/duckdb_csv_state_machine.dir/ub_duckdb_csv_state_machine.cpp.o
+[ 30%] Built target duckdb_sort
+[ 30%] Building CXX object src/execution/operator/csv_scanner/table_function/CMakeFiles/duckdb_operator_csv_table_function.dir/ub_duckdb_operator_csv_table_function.cpp.o
+[ 30%] Built target duckdb_expression_executor
+[ 30%] Building CXX object src/execution/operator/csv_scanner/util/CMakeFiles/duckdb_csv_util.dir/ub_duckdb_csv_util.cpp.o
+[ 30%] Built target duckdb_operator_aggregate
+[ 31%] Building CXX object src/execution/operator/filter/CMakeFiles/duckdb_operator_filter.dir/ub_duckdb_operator_filter.cpp.o
+[ 31%] Built target duckdb_csv_encode
+[ 31%] Building CXX object src/execution/operator/helper/CMakeFiles/duckdb_operator_helper.dir/ub_duckdb_operator_helper.cpp.o
+[ 31%] Built target duckdb_vector_operations
+[ 31%] Building CXX object src/execution/operator/join/CMakeFiles/duckdb_operator_join.dir/ub_duckdb_operator_join.cpp.o
+[ 31%] Built target duckdb_csv_state_machine
+[ 31%] Building CXX object src/execution/operator/order/CMakeFiles/duckdb_operator_order.dir/ub_duckdb_operator_order.cpp.o
+[ 31%] Built target duckdb_operator_filter
+[ 31%] Building CXX object src/execution/operator/persistent/CMakeFiles/duckdb_operator_persistent.dir/ub_duckdb_operator_persistent.cpp.o

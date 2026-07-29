@@ -1,0 +1,21 @@
+=== build workflow dispatch inputs ===
+  workflow_dispatch:
+    inputs:
+      override_git_describe:
+        description: 'Engine ref to build extensions against (e.g. haybarn-v1.5.3-rc3); a haybarn-v1.5.3* ref embeds v1.5.3. Defaults to the pushed tag.'
+        type: string
+
+concurrency:
+  group: haybarn-extensions-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # extension-ci-tools appends `extra_extension_config` verbatim into the
+  # generated extension_config.cmake, so it must be CMake *content*, not a path.
+=== latest 1.5.3 tags ===
+haybarn-v1.5.3-rc2
+haybarn-v1.5.3-rc3
+haybarn-v1.5.3-rc4
+=== gh auth ===
+  ✓ Logged in to github.com account rustyconover (keyring)
+  - Active account: true

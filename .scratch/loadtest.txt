@@ -1,0 +1,47 @@
+[test] instantiating eh engine: /Users/rusty/Development/haybarn/haybarn-wasm/packages/duckdb-wasm/dist/duckdb-eh.wasm
+[test] engine version: v1.5.4-dev112
+[test] opening db with allowUnsignedExtensions=true ...
+[test] configuring custom extension repository...
+{
+  timestamp: 2026-05-30T17:29:13.083Z,
+  level: 2,
+  origin: 4,
+  topic: 4,
+  event: 4,
+  value: "SET custom_extension_repository = 'https://haybarn-extensions.query.farm/core';"
+}
+{
+  timestamp: 2026-05-30T17:29:13.096Z,
+  level: 2,
+  origin: 4,
+  topic: 4,
+  event: 4,
+  value: 'SET autoinstall_known_extensions = true;'
+}
+{
+  timestamp: 2026-05-30T17:29:13.099Z,
+  level: 2,
+  origin: 4,
+  topic: 4,
+  event: 4,
+  value: 'SET autoload_known_extensions = true;'
+}
+[test] INSTALL httpfs ...
+{
+  timestamp: 2026-05-30T17:29:13.100Z,
+  level: 2,
+  origin: 4,
+  topic: 4,
+  event: 4,
+  value: 'INSTALL httpfs;'
+}
+[test] INSTALL ok. LOAD httpfs ...
+{
+  timestamp: 2026-05-30T17:29:13.126Z,
+  level: 2,
+  origin: 4,
+  topic: 4,
+  event: 4,
+  value: 'LOAD httpfs;'
+}
+[test] LOAD ok — httpfs loaded successfully. (unexpected if reproducing the bug)

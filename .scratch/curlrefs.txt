@@ -1,0 +1,18 @@
+=== httpfs_extension.cpp ===
+23:	auto &httpfs_util = static_cast<HTTPFSUtil &>(config.GetHTTPUtil());
+130:		auto &http_util = config.GetHTTPUtil();
+142:			config.SetHTTPUtil(make_shared_ptr<HTTPFSCurlUtil>());
+146:			config.SetHTTPUtil(make_shared_ptr<HTTPFSUtil>());
+158:		auto &http_util = config.GetHTTPUtil();
+161:			auto *curl_util = static_cast<HTTPFSCurlUtil *>(&http_util);
+173:	auto &http_util = config.GetHTTPUtil();
+178:		config.SetHTTPUtil(make_shared_ptr<HTTPFSCurlUtil>());
+180:		config.SetHTTPUtil(make_shared_ptr<HTTPFSUtil>());
+=== httpfs_client_wasm.cpp ===
+6:unique_ptr<HTTPClient> HTTPFSUtil::InitializeClient(HTTPParams &http_params, const string &proto_host_port) {
+7:	throw InternalException("HTTPFSUtil::InitializeClient is not expected to be called");
+10:unordered_map<string, string> HTTPFSUtil::ParseGetParameters(const string &text) {
+12:	// TODO: HTTPFSUtil::ParseGetParameters is currently not implemented
+=== httpfs_client.hpp ===
+77:class HTTPFSUtil : public HTTPUtil {
+94:class HTTPFSCurlUtil : public HTTPFSUtil {

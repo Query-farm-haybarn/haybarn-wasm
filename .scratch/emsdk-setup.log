@@ -1,0 +1,41 @@
+[Sat May 30 10:05:15 EDT 2026] cloning emsdk
+Cloning into '/tmp/emsdk'...
+[Sat May 30 10:05:16 EDT 2026] installing 5.0.7
+#=#=#                                                                                                                                                     0.0%                                                                           0.7%###                                                                        4.7%############                                                              17.3%###################                                                       26.7%#############################                                             40.4%#####################################                                     52.1%############################################                              61.8%######################################################                    75.2%#################################################################         91.1%######################################################################## 100.0%
+                                                                           0.0%                                                                           0.6%###                                                                        5.2%#############                                                             19.3%############################                                              39.3%############################################                              61.6%############################################################              83.8%######################################################################## 100.0%
+                                                                           0.0%                                                                           0.1%                                                                           0.6%#                                                                          2.4%####                                                                       5.9%######                                                                     8.9%########                                                                  12.3%###########                                                               16.1%##############                                                            20.1%#################                                                         23.9%###################                                                       27.5%######################                                                    31.5%#########################                                                 35.6%############################                                              39.4%###############################                                           43.3%#################################                                         47.0%####################################                                      50.7%######################################                                    54.2%#########################################                                 58.1%############################################                              62.0%###############################################                           65.7%##################################################                        69.8%#####################################################                     73.7%#######################################################                   77.6%##########################################################                81.2%#############################################################             85.3%################################################################          89.0%##################################################################        92.6%#####################################################################     96.5%######################################################################## 100.0%
+Resolving SDK version '5.0.7' to 'sdk-releases-6cd98e86d7749ff98b82b7f2ae78eb4f01942788-64bit'
+Installing SDK 'sdk-releases-6cd98e86d7749ff98b82b7f2ae78eb4f01942788-64bit'..
+Installing tool 'node-22.16.0-64bit'..
+Downloading: /private/tmp/emsdk/downloads/node-v22.16.0-darwin-arm64.tar.gz from https://storage.googleapis.com/webassembly/emscripten-releases-builds/deps/node-v22.16.0-darwin-arm64.tar.gz
+Unpacking '/private/tmp/emsdk/downloads/node-v22.16.0-darwin-arm64.tar.gz' to '/private/tmp/emsdk/node/22.16.0_64bit'
+Done installing tool 'node-22.16.0-64bit'.
+Installing tool 'python-3.13.3-64bit'..
+Downloading: /private/tmp/emsdk/downloads/python-3.13.3-0-macos-arm64.tar.gz from https://storage.googleapis.com/webassembly/emscripten-releases-builds/deps/python-3.13.3-0-macos-arm64.tar.gz
+Unpacking '/private/tmp/emsdk/downloads/python-3.13.3-0-macos-arm64.tar.gz' to '/private/tmp/emsdk/python/3.13.3_64bit'
+Done installing tool 'python-3.13.3-64bit'.
+Installing tool 'releases-6cd98e86d7749ff98b82b7f2ae78eb4f01942788-64bit'..
+Downloading: /private/tmp/emsdk/downloads/6cd98e86d7749ff98b82b7f2ae78eb4f01942788-wasm-binaries-arm64.tar.xz from https://storage.googleapis.com/webassembly/emscripten-releases-builds/mac/6cd98e86d7749ff98b82b7f2ae78eb4f01942788/wasm-binaries-arm64.tar.xz
+Unpacking '/private/tmp/emsdk/downloads/6cd98e86d7749ff98b82b7f2ae78eb4f01942788-wasm-binaries-arm64.tar.xz' to '/private/tmp/emsdk/upstream'
+Done installing tool 'releases-6cd98e86d7749ff98b82b7f2ae78eb4f01942788-64bit'.
+Done installing SDK 'sdk-releases-6cd98e86d7749ff98b82b7f2ae78eb4f01942788-64bit'.
+[Sat May 30 10:05:37 EDT 2026] activating 5.0.7
+Resolving SDK version '5.0.7' to 'sdk-releases-6cd98e86d7749ff98b82b7f2ae78eb4f01942788-64bit'
+Setting the following tools as active:
+   node-22.16.0-64bit
+   python-3.13.3-64bit
+   releases-6cd98e86d7749ff98b82b7f2ae78eb4f01942788-64bit
+
+Next steps:
+- To conveniently access emsdk tools from the command line,
+  consider adding the following directories to your PATH:
+    /private/tmp/emsdk
+    /private/tmp/emsdk/upstream/emscripten
+- This can be done for the current shell by running:
+    source "/private/tmp/emsdk/emsdk_env.sh"
+- Configure emsdk in your shell startup scripts by running:
+    echo 'source "/private/tmp/emsdk/emsdk_env.sh"' >> $HOME/.bash_profile
+[Sat May 30 10:05:39 EDT 2026] DONE emsdk; emcc version:
+shared:INFO: (Emscripten: Running sanity checks)
+emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 5.0.7 (263db4cffa6f9fc2ec514a70abac81362ea41849)
+EXIT=0

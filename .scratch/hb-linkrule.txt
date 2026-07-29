@@ -1,0 +1,7 @@
+=== haybarn engine wasm extension LINK rule ===
+137:        set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -sSIDE_MODULE=1 -DWASM_LOADABLE_EXTENSIONS")
+186:        set(TO_BE_LINKED ${DUCKDB_EXTENSION_${EXTENSION_NAME_UPPERCASE}_LINKED_LIBS} )
+187:        separate_arguments(TO_BE_LINKED)
+189:            set(EXPORTED_FUNCTIONS "_${NAME}_duckdb_cpp_init")
+191:            set(EXPORTED_FUNCTIONS "_${NAME}_init_c_api")
+196:                COMMAND emcc $<TARGET_FILE:${TARGET_NAME}> -o $<TARGET_FILE:${TARGET_NAME}>.wasm -O3 -sSIDE_MODULE=2 -sEXPORTED_FUNCTIONS="${EXPORTED_FUNCTIONS}" ${WASM_THREAD_FLAGS} ${TO_BE_LINKED}

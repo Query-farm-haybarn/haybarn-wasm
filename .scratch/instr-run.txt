@@ -1,0 +1,75 @@
+[test] instantiating eh engine: /Users/rusty/Development/haybarn/haybarn-wasm/packages/duckdb-wasm/dist/duckdb-eh.wasm
+[test] engine version: v1.5.4-dev112
+[test] opening db with allowUnsignedExtensions=true ...
+[test] configuring custom extension repository...
+{
+  timestamp: 2026-05-30T15:55:16.472Z,
+  level: 2,
+  origin: 4,
+  topic: 4,
+  event: 4,
+  value: "SET custom_extension_repository = 'https://haybarn-extensions.query.farm/core';"
+}
+{
+  timestamp: 2026-05-30T15:55:16.480Z,
+  level: 2,
+  origin: 4,
+  topic: 4,
+  event: 4,
+  value: 'SET autoinstall_known_extensions = true;'
+}
+{
+  timestamp: 2026-05-30T15:55:16.483Z,
+  level: 2,
+  origin: 4,
+  topic: 4,
+  event: 4,
+  value: 'SET autoload_known_extensions = true;'
+}
+[test] INSTALL httpfs ...
+{
+  timestamp: 2026-05-30T15:55:16.483Z,
+  level: 2,
+  origin: 4,
+  topic: 4,
+  event: 4,
+  value: 'INSTALL httpfs;'
+}
+[test] INSTALL ok. LOAD httpfs ...
+{
+  timestamp: 2026-05-30T15:55:16.502Z,
+  level: 2,
+  origin: 4,
+  topic: 4,
+  event: 4,
+  value: 'LOAD httpfs;'
+}
+HB_UNRESOLVED	REQUIRED	_ZTVN6duckdb14HTTPFSCurlUtilE
+Error: IO Error: Extension "https://haybarn-extensions.query.farm/core/v1.5.3/wasm_eh/httpfs.duckdb_extension.wasm" could not be loaded: could not load dynamic lib: httpfs
+Error: HB_UNRESOLVED_REQUIRED: _ZTVN6duckdb14HTTPFSCurlUtilE
+    at jr.runQueryImpl (/Users/rusty/Development/haybarn/haybarn-wasm/packages/duckdb-wasm/dist/duckdb-node-eh.worker.instrumented.cjs:58:75957)
+    at /Users/rusty/Development/haybarn/haybarn-wasm/packages/duckdb-wasm/dist/duckdb-node-eh.worker.instrumented.cjs:58:75696
+    at jr.withSingleThreadedExtensionLoad (/Users/rusty/Development/haybarn/haybarn-wasm/packages/duckdb-wasm/dist/duckdb-node-eh.worker.instrumented.cjs:58:75520)
+    at jr.runQuery (/Users/rusty/Development/haybarn/haybarn-wasm/packages/duckdb-wasm/dist/duckdb-node-eh.worker.instrumented.cjs:58:75651)
+    at Cn.onMessage (/Users/rusty/Development/haybarn/haybarn-wasm/packages/duckdb-wasm/dist/duckdb-node-eh.worker.instrumented.cjs:58:87602)
+    at P_.globalThis.onmessage (/Users/rusty/Development/haybarn/haybarn-wasm/packages/duckdb-wasm/dist/duckdb-node-eh.worker.instrumented.cjs:58:97235)
+    at dispatchEvent (/Users/rusty/Development/haybarn/haybarn-wasm/node_modules/web-worker/cjs/node.js:37:32)
+    at MessagePort.<anonymous> (/Users/rusty/Development/haybarn/haybarn-wasm/node_modules/web-worker/cjs/node.js:171:25)
+    at [nodejs.internal.kHybridDispatch] (node:internal/event_target:843:20)
+    at MessagePort.<anonymous> (node:internal/per_context/messageport:23:28)
+[test] FAILURE:
+  name   : Error
+  message: IO Error: Extension "https://haybarn-extensions.query.farm/core/v1.5.3/wasm_eh/httpfs.duckdb_extension.wasm" could not be loaded: could not load dynamic lib: httpfs
+Error: HB_UNRESOLVED_REQUIRED: _ZTVN6duckdb14HTTPFSCurlUtilE
+  stack  :
+    Error: IO Error: Extension "https://haybarn-extensions.query.farm/core/v1.5.3/wasm_eh/httpfs.duckdb_extension.wasm" could not be loaded: could not load dynamic lib: httpfs
+    Error: HB_UNRESOLVED_REQUIRED: _ZTVN6duckdb14HTTPFSCurlUtilE
+        at O.onMessage (/Users/rusty/Development/haybarn/haybarn-wasm/packages/duckdb-wasm/dist/duckdb-node.cjs:1:16168)
+        at /Users/rusty/Development/haybarn/haybarn-wasm/node_modules/web-worker/cjs/node.js:47:17
+        at Array.forEach (<anonymous>)
+        at Worker.dispatchEvent (/Users/rusty/Development/haybarn/haybarn-wasm/node_modules/web-worker/cjs/node.js:45:10)
+        at Worker.<anonymous> (/Users/rusty/Development/haybarn/haybarn-wasm/node_modules/web-worker/cjs/node.js:124:14)
+        at Worker.emit (node:events:508:20)
+        at MessagePort.<anonymous> (node:internal/worker:333:53)
+        at [nodejs.internal.kHybridDispatch] (node:internal/event_target:843:20)
+        at MessagePort.<anonymous> (node:internal/per_context/messageport:23:28)

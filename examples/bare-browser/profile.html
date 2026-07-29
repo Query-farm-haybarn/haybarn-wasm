@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>duckdb-wasm startup profile</title>
+<script type="importmap">
+{ "imports": { "apache-arrow": "https://esm.sh/apache-arrow@17.0.0" } }
+</script>
+</head>
+<body>
+<pre id="out">running…</pre>
+<script type="module">
+const N_QUERIES = 5;
+const tag = {};
+function mark(name) { tag[name] = performance.now(); }
+function span(a, b) { return +(tag[b] - tag[a]).toFixed(1); }
+
+try {
+  mark('t0_module_eval');
+  const duckdb = await import('./duckdb-browser-blocking.mjs');
+  mark('t1_module_loaded');
+
+  const BUNDLES = {
+    mvp: { mainModule: './duckdb-mvp.wasm' },
+    eh:  { mainModule: './duckdb-eh.wasm'  },
+  };
+  const logger = new duckdb.ConsoleLogger();
+  mark('t2_pre_create');
+
+  const db = await duckdb.createDuckDB(BUNDLES, logger, duckdb.BROWSER_RUNTIME);
+  mark('t3_db_created');
+
+  await db.instantiate();
+  mark('t4_db_instantiated');
+
+  db.open({});
+  mark('t5_db_opened');
+
+  const conn = db.connect();
+  mark('t6_connected');
+
+  const queryTimes = [];
+  for (let i = 0; i < N_QUERIES; i++) {
+    const s = performance.now();
+    conn.query(`SELECT count(*)::INTEGER AS v FROM generate_series(0, 100) t(v)`);
+    queryTimes.push(performance.now() - s);
+  }
+  mark('t7_queries_done');
+
+  conn.close();
+
+  const cold_q = +queryTimes[0].toFixed(1);
+  const warm_q = +(queryTimes.slice(1).reduce((a,b)=>a+b,0)/(queryTimes.length-1)).toFixed(1);
+  const result = {
+    variant_used: db.constructor.name,
+    phases: {
+      'module-eval-import':              span('t0_module_eval',  't1_module_loaded'),
+      'logger+config':                   span('t1_module_loaded','t2_pre_create'),
+      'createDuckDB':                    span('t2_pre_create',   't3_db_created'),
+      'db.instantiate (fetch+compile+init)': span('t3_db_created', 't4_db_instantiated'),
+      'db.open':                         span('t4_db_instantiated','t5_db_opened'),
+      'first-connect':                   span('t5_db_opened',    't6_connected'),
+      'cold-query-ms':                   cold_q,
+      'warm-queries-avg-ms':             warm_q,
+      'total-import-to-ready':           span('t0_module_eval',  't6_connected'),
+      'total-import-to-first-result':    +(span('t0_module_eval', 't6_connected') + cold_q).toFixed(1),
+    },
+    all_query_times: queryTimes.map(x => +x.toFixed(1)),
+  };
+  document.getElementById('out').textContent = JSON.stringify(result, null, 2);
+  window.__PROFILE_RESULT__ = result;
+} catch (e) {
+  document.getElementById('out').textContent = 'ERROR: ' + e.stack;
+  window.__PROFILE_ERROR__ = e.stack;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+patched at offset 124180  marker at 118975
+context after patch: "hBytesUTF8(a):o=a.length;var c=_malloc(4+o+\"\\nJSSTACK:\"+((o&&o.stack)||\"\")+1),l=c+4;if(HEAPU32[c>>>2"
+----RUN----
+Error: IO Error: Extension "https://haybarn-extensions.query.farm/core/v1.5.3/wasm_eh/httpfs.duckdb_extension.wasm" could not be loaded: could not load dynamic lib: httpfs
+    at jr.runQueryImpl (/Users/rusty/Development/haybarn/haybarn-wasm/packages/duckdb-wasm/dist/duckdb-node-eh.worker.instrumented.cjs:58:75957)
+    at /Users/rusty/Development/haybarn/haybarn-wasm/packages/duckdb-wasm/dist/duckdb-node-eh.worker.instrumented.cjs:58:75696
+    at jr.withSingleThreadedExtensionLoad (/Users/rusty/Development/haybarn/haybarn-wasm/packages/duckdb-wasm/dist/duckdb-node-eh.worker.instrumented.cjs:58:75520)
+    at jr.runQuery (/Users/rusty/Development/haybarn/haybarn-wasm/packages/duckdb-wasm/dist/duckdb-node-eh.worker.instrumented.cjs:58:75651)
+    at Cn.onMessage (/Users/rusty/Development/haybarn/haybarn-wasm/packages/duckdb-wasm/dist/duckdb-node-eh.worker.instrumented.cjs:58:87602)
+    at P_.globalThis.onmessage (/Users/rusty/Development/haybarn/haybarn-wasm/packages/duckdb-wasm/dist/duckdb-node-eh.worker.instrumented.cjs:58:97235)
+    at dispatchEvent (/Users/rusty/Development/haybarn/haybarn-wasm/node_modules/web-worker/cjs/node.js:37:32)
+    at MessagePort.<anonymous> (/Users/rusty/Development/haybarn/haybarn-wasm/node_modules/web-worker/cjs/node.js:171:25)
+    at MessagePort.<anonymous> (node:internal/per_context/messageport:23:28)
+[test] FAILURE:
+  message: IO Error: Extension "https://haybarn-extensions.query.farm/core/v1.5.3/wasm_eh/httpfs.duckdb_extension.wasm" could not be loaded: could not load dynamic lib: httpfs
+    Error: IO Error: Extension "https://haybarn-extensions.query.farm/core/v1.5.3/wasm_eh/httpfs.duckdb_extension.wasm" could not be loaded: could not load dynamic lib: httpfs
+        at O.onMessage (/Users/rusty/Development/haybarn/haybarn-wasm/packages/duckdb-wasm/dist/duckdb-node.cjs:1:16168)
+        at /Users/rusty/Development/haybarn/haybarn-wasm/node_modules/web-worker/cjs/node.js:47:17
+        at Array.forEach (<anonymous>)
+        at Worker.dispatchEvent (/Users/rusty/Development/haybarn/haybarn-wasm/node_modules/web-worker/cjs/node.js:45:10)
+        at Worker.<anonymous> (/Users/rusty/Development/haybarn/haybarn-wasm/node_modules/web-worker/cjs/node.js:124:14)
+        at Worker.emit (node:events:508:20)
+        at MessagePort.<anonymous> (node:internal/worker:333:53)
+        at MessagePort.<anonymous> (node:internal/per_context/messageport:23:28)

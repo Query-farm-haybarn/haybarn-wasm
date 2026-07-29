@@ -1,0 +1,17 @@
+=== upstream USE_GENERATED_EXPORTED_LIST in CI? ===
+/Users/rusty/Development/duckdb-wasm/.github/workflows/main.yml:32:  DEFAULT_USE_GENERATED_EXPORTED_LIST: 'no'
+/Users/rusty/Development/duckdb-wasm/.github/workflows/main.yml:522:                  USE_GENERATED_EXPORTED_LIST="$DEFAULT_USE_GENERATED_EXPORTED_LIST" DUCKDB_PLATFORM="wasm_mvp" DUCKDB_WASM_LOADABLE_EXTENSIONS=1 GEN=ninja ./scripts/wasm_build_lib.sh relsize mvp
+/Users/rusty/Development/duckdb-wasm/.github/workflows/main.yml:569:                  USE_GENERATED_EXPORTED_LIST="$DEFAULT_USE_GENERATED_EXPORTED_LIST" DUCKDB_PLATFORM="wasm_eh" DUCKDB_WASM_LOADABLE_EXTENSIONS=1 GEN=ninja ./scripts/wasm_build_lib.sh relsize eh
+/Users/rusty/Development/duckdb-wasm/.github/workflows/main.yml:616:                  USE_GENERATED_EXPORTED_LIST="$DEFAULT_USE_GENERATED_EXPORTED_LIST" DUCKDB_PLATFORM="wasm_threads" DUCKDB_WASM_LOADABLE_EXTENSIONS="signed" GEN=ninja ./scripts/wasm_build_lib.sh relsize coi
+=== upstream base_exported_list.txt size + has duckdb symbols? ===
+      50 /Users/rusty/Development/duckdb-wasm/lib/base_exported_list.txt
+0
+=== haybarn base_exported_list size + duckdb syms ===
+      52 /Users/rusty/Development/haybarn/haybarn-wasm/lib/base_exported_list.txt
+0
+=== upstream: any checked-in generated/curated export list naming httpfs/HTTP symbols? ===
+=== haybarn DEFAULT in main.yml ===
+44:  DEFAULT_USE_GENERATED_EXPORTED_LIST: 'no'
+460:                  DUCKDB_WASM_VERSION="v1.5.3" USE_GENERATED_EXPORTED_LIST="$DEFAULT_USE_GENERATED_EXPORTED_LIST" DUCKDB_PLATFORM="wasm_mvp" DUCKDB_WASM_LOADABLE_EXTENSIONS=1 GEN=ninja ./scripts/wasm_build_lib.sh relsize mvp
+535:                  DUCKDB_WASM_VERSION="v1.5.3" USE_GENERATED_EXPORTED_LIST="$DEFAULT_USE_GENERATED_EXPORTED_LIST" DUCKDB_PLATFORM="wasm_eh" DUCKDB_WASM_LOADABLE_EXTENSIONS=1 GEN=ninja ./scripts/wasm_build_lib.sh relsize eh
+610:                  DUCKDB_WASM_VERSION="v1.5.3" USE_GENERATED_EXPORTED_LIST="$DEFAULT_USE_GENERATED_EXPORTED_LIST" DUCKDB_PLATFORM="wasm_threads" DUCKDB_WASM_LOADABLE_EXTENSIONS="signed" GEN=ninja ./scripts/wasm_build_lib.sh relsize coi

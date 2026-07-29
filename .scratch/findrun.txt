@@ -1,0 +1,2 @@
+done; resolveGlobalSymbol hits: 8
+exit=0 bytes=    5454

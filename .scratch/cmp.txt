@@ -1,0 +1,6 @@
+TH_mem= - memory[0] pages: initial=1 max=65536 shared <- env.memory
+EH_mem= - memory[0] pages: initial=1 <- env.memory
+TH_legacyEH=0
+EH_legacyEH=0
+TH_total_imports=370
+EH_total_imports=476
