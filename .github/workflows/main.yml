@@ -80,7 +80,7 @@ jobs:
                   submodules: 'recursive'
 
             - name: Cache node_modules
-              uses: actions/cache@v5
+              uses: actions/cache@v6
               with:
                   path: |
                       ./node_modules
@@ -124,7 +124,7 @@ jobs:
                   submodules: 'recursive'
 
             - name: Cache generator
-              uses: actions/cache@v5
+              uses: actions/cache@v6
               id: cache-generator
               with:
                   path: ./submodules/tpch-dbgen/dbgen/dbgen
@@ -154,7 +154,7 @@ jobs:
                   submodules: 'recursive'
 
             - name: Cache rust build
-              uses: actions/cache@v5
+              uses: actions/cache@v6
               with:
                   path: |
                       ./.cargo/bin/
@@ -202,7 +202,7 @@ jobs:
             # A fixed install path keeps ccache keys stable across runs.
             - name: Cache /opt/emsdk
               id: cache-emsdk
-              uses: actions/cache@v5
+              uses: actions/cache@v6
               with:
                   path: /opt/emsdk
                   key: emsdk-${{ env.EMSCRIPTEN_VERSION }}-x86_64-linux
@@ -273,7 +273,7 @@ jobs:
             # A fixed install path keeps ccache keys stable across runs.
             - name: Cache /opt/emsdk
               id: cache-emsdk
-              uses: actions/cache@v5
+              uses: actions/cache@v6
               with:
                   path: /opt/emsdk
                   key: emsdk-${{ env.EMSCRIPTEN_VERSION }}-x86_64-linux
@@ -344,7 +344,7 @@ jobs:
             # A fixed install path keeps ccache keys stable across runs.
             - name: Cache /opt/emsdk
               id: cache-emsdk
-              uses: actions/cache@v5
+              uses: actions/cache@v6
               with:
                   path: /opt/emsdk
                   key: emsdk-${{ env.EMSCRIPTEN_VERSION_COI }}-x86_64-linux
@@ -420,7 +420,7 @@ jobs:
             # A fixed install path keeps ccache keys stable across runs.
             - name: Cache /opt/emsdk
               id: cache-emsdk
-              uses: actions/cache@v5
+              uses: actions/cache@v6
               with:
                   path: /opt/emsdk
                   key: emsdk-${{ env.EMSCRIPTEN_VERSION }}-x86_64-linux
@@ -495,7 +495,7 @@ jobs:
             # A fixed install path keeps ccache keys stable across runs.
             - name: Cache /opt/emsdk
               id: cache-emsdk
-              uses: actions/cache@v5
+              uses: actions/cache@v6
               with:
                   path: /opt/emsdk
                   key: emsdk-${{ env.EMSCRIPTEN_VERSION }}-x86_64-linux
@@ -570,7 +570,7 @@ jobs:
             # A fixed install path keeps ccache keys stable across runs.
             - name: Cache /opt/emsdk
               id: cache-emsdk
-              uses: actions/cache@v5
+              uses: actions/cache@v6
               with:
                   path: /opt/emsdk
                   key: emsdk-${{ env.EMSCRIPTEN_VERSION_COI }}-x86_64-linux
@@ -643,7 +643,7 @@ jobs:
                   git submodule status > git_submodule_status.txt
 
             - name: Cache rust build
-              uses: actions/cache@v5
+              uses: actions/cache@v6
               with:
                   path: |
                       ./.cargo/bin/
@@ -656,7 +656,7 @@ jobs:
                       ${{ runner.os }}-shell-
 
             - name: Cache node_modules
-              uses: actions/cache@v5
+              uses: actions/cache@v6
               with:
                   path: |
                       ./node_modules
@@ -960,7 +960,7 @@ jobs:
                   git submodule status > git_submodule_status.txt
 
             - name: Cache rust build
-              uses: actions/cache@v5
+              uses: actions/cache@v6
               with:
                   path: |
                       ./.cargo/bin/
@@ -973,7 +973,7 @@ jobs:
                       ${{ runner.os }}-shell-
 
             - name: Cache node_modules
-              uses: actions/cache@v5
+              uses: actions/cache@v6
               with:
                   path: |
                       ./node_modules
@@ -1115,7 +1115,7 @@ jobs:
                   git submodule status > git_submodule_status.txt
 
             - name: Cache rust build
-              uses: actions/cache@v5
+              uses: actions/cache@v6
               with:
                   path: |
                       ./.cargo/bin/
@@ -1128,7 +1128,7 @@ jobs:
                       ${{ runner.os }}-shell-
 
             - name: Cache node_modules
-              uses: actions/cache@v5
+              uses: actions/cache@v6
               with:
                   path: |
                       ./node_modules
