@@ -3,7 +3,15 @@
 # Runs the caller's `script:` inside the shared Haybarn wasm build
 # environment image at:
 #
-#   ghcr.io/query-farm-haybarn/haybarn-wasm-base:v1.5.4
+#   ghcr.io/query-farm-haybarn/haybarn-wasm-base:v<engine-version>
+#
+# The tag is *derived*, not pinned — see the "Resolve base image" step.
+# The image is rebuilt once per engine release train (v1.5.4, v1.5.5, …)
+# and its tag carries the same `<major>.<minor>.<patch>` as the workspace
+# version, so the workspace version is the single source of truth. This
+# keeps the build toolchain in lockstep with haybarn-extension-ci-tools,
+# which builds extension .wasm against the same image family — toolchain
+# drift between the two is what produces exception-ABI mismatches (#9).
 #
 # Same image haybarn-extension-ci-tools / haybarn-community-extensions
 # use to compile community .duckdb_extension.wasm artifacts — Ubuntu
@@ -28,16 +36,65 @@ inputs:
     description: 'Script to execute inside the container'
     required: true
   image:
-    description: 'Container image reference'
+    description: >-
+      Container image reference. Leave empty to derive the tag from the
+      workspace version; set it to pin an explicit image (e.g. when
+      bisecting a toolchain regression).
     required: false
-    default: 'ghcr.io/query-farm-haybarn/haybarn-wasm-base:v1.5.4'
+    default: ''
 
 runs:
   using: 'composite'
   steps:
+    # Derive `…haybarn-wasm-base:v<M.N.P>` from the workspace version so
+    # rolling the engine doesn't leave a stale hardcoded tag behind.
+    #
+    # Read the version from `git show HEAD:` rather than the working
+    # tree: scripts/npm_version.sh rewrites package.json in place partway
+    # through the js_libs jobs (to a `-dev<N>.0` prerelease off the last
+    # tag), so a later step in the same job would otherwise resolve a
+    # different image than an earlier one. The committed value is stable
+    # for the whole run.
+    #
+    # Stripping at the first `-` is what makes this robust across every
+    # version shape the repo produces — `1.5.5-rc1`, `1.5.5`, and
+    # `1.5.2-dev1.0` all yield the same `<M.N.P>` image tag.
+    - name: Resolve base image
+      id: resolve
+      shell: bash
+      run: |
+        set -euo pipefail
+        REPO=ghcr.io/query-farm-haybarn/haybarn-wasm-base
+        IMAGE='${{ inputs.image }}'
+
+        if [ -z "$IMAGE" ]; then
+            RAW=$(git show HEAD:packages/duckdb-wasm/package.json \
+                  | node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8")).version')
+            test -n "$RAW" || { echo "could not read workspace version"; exit 1; }
+            IMAGE="${REPO}:v${RAW%%-*}"
+            echo "workspace version ${RAW} -> ${IMAGE}"
+
+            # The image is built out-of-tree, so a freshly-rolled engine
+            # version can point at a tag that doesn't exist yet. Warn and
+            # fall back rather than failing every job in the workflow.
+            if ! docker manifest inspect "$IMAGE" > /dev/null 2>&1; then
+                echo "::warning title=Base image not found::${IMAGE} is not in ghcr yet; falling back to :latest"
+                IMAGE="${REPO}:latest"
+            fi
+        else
+            echo "using caller-pinned image ${IMAGE}"
+        fi
+
+        echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+
     - name: Pull container image
       shell: bash
-      run: docker pull "${{ inputs.image }}"
+      run: |
+        docker pull "${{ steps.resolve.outputs.image }}"
+        # Log the digest so a build is reproducible from its own log even
+        # though the tag it resolved is mutable.
+        docker image inspect --format '{{index .RepoDigests 0}}' \
+            "${{ steps.resolve.outputs.image }}"
 
     - name: Fix workspace permissions (pre)
       shell: bash
@@ -63,7 +120,7 @@ runs:
           -e SCCACHE_WEBDAV_TOKEN \
           -e RUSTC_WRAPPER=sccache \
           -e CARGO_INCREMENTAL \
-          "${{ inputs.image }}" \
+          "${{ steps.resolve.outputs.image }}" \
           bash -lc "source /emsdk/emsdk_env.sh >/dev/null 2>&1 || true; command -v yarn >/dev/null || npm install -g --silent yarn; ${{ inputs.script }}"
 
     - name: Fix workspace permissions (post)
