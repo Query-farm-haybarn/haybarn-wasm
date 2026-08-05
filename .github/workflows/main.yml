@@ -1232,22 +1232,6 @@ jobs:
                       --content-type application/wasm \
                       --cache-control "public, max-age=31536000, immutable"
 
-            # Deploy the rebranded Haybarn shell to Cloudflare Pages
-            # (shell.haybarn.query.farm). The COI wasm is streamed same-origin by
-            # _worker.js from Haybarn R2 (uploaded just above). `--branch
-            # production` targets the project's production deployment (the one the
-            # custom domain serves). Runs on manual dispatch or on a haybarn-v* tag.
-            - name: Deploy Haybarn shell to Cloudflare Pages
-              if: github.event_name == 'workflow_dispatch' || (github.event_name == 'create' && startsWith(github.ref, 'refs/tags/haybarn-v'))
-              env:
-                  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-                  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-              run: |
-                  npx --yes wrangler@latest pages deploy \
-                      packages/duckdb-wasm-app/build/release \
-                      --project-name haybarn-shell \
-                      --branch production
-
             #- name: Coverage @haybarn/haybarn-wasm
             #  shell: bash
             #  run: |
@@ -1297,6 +1281,39 @@ jobs:
               run: |
                   echo "TAG=${TAG} ref=${GITHUB_REF}"
                   ./scripts/npm_publish_lib.sh
+
+            # Deploy the rebranded Haybarn shell to Cloudflare Pages
+            # (shell.haybarn.query.farm). The COI wasm is streamed same-origin by
+            # _worker.js from Haybarn R2 (uploaded earlier). `--branch
+            # production` targets the project's production deployment (the one the
+            # custom domain serves). Runs on manual dispatch or on a haybarn-v* tag.
+            #
+            # Deliberately ordered AFTER the npm publish. This step used to sit
+            # before it, so when wrangler rejected the account ID during
+            # 1.5.5-rc1 the job aborted and skipped the publish entirely — a
+            # cosmetic shell deploy took down the actual package release. The
+            # shell is downstream of the package, so publishing first is also
+            # the correct dependency order.
+            #
+            # wrangler is pinned rather than `@latest`: 4.112.0 deployed
+            # 1.5.4-rc3 fine, then 4.119.0 shipped stricter account-ID
+            # validation and broke the 1.5.5-rc1 release with no change on our
+            # side. 4.119.0 is the version that has since been verified green.
+            - name: Deploy Haybarn shell to Cloudflare Pages
+              if: github.event_name == 'workflow_dispatch' || (github.event_name == 'create' && startsWith(github.ref, 'refs/tags/haybarn-v'))
+              env:
+                  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+                  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+              run: |
+                  # Strip stray whitespace from the secret — wrangler >= 4.119
+                  # rejects an account ID containing anything outside
+                  # [A-Za-z0-9_-], and a trailing newline in the stored secret
+                  # is invisible in the UI.
+                  export CLOUDFLARE_ACCOUNT_ID="$(printf '%s' "${CLOUDFLARE_ACCOUNT_ID}" | tr -d '[:space:]')"
+                  npx --yes wrangler@4.119.0 pages deploy \
+                      packages/duckdb-wasm-app/build/release \
+                      --project-name haybarn-shell \
+                      --branch production
 
     merge_reports:
         name: Merge benchmark reports
