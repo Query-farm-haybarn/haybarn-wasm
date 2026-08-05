@@ -23,15 +23,22 @@ jobs:
                   submodules: 'recursive'
                   fetch-depth: 0
 
-            - uses: actions/setup-node@v6
+            - uses: actions/setup-node@v7
               with:
                   node-version: '18.x'
                   registry-url: 'https://registry.npmjs.org'
 
+            # `npm dist-tag add` is a write against the registry, so it needs a
+            # real token — setup-node only writes an .npmrc referencing
+            # ${NODE_AUTH_TOKEN}, it doesn't supply one. This workflow is
+            # dormant (no caller, never run; inherited from upstream and only
+            # reachable via workflow_dispatch), so the missing token has never
+            # surfaced. Wire it up rather than leave the trap armed.
             - name: Change tags
               env:
                   TAG: ${{ inputs.tag }}
                   VERSION: ${{ inputs.version }}
+                  NODE_AUTH_TOKEN: ${{ secrets.HAYBARN_NPM_TOKEN }}
               run: |
                   npm dist-tag ls @haybarn/haybarn-wasm@"${VERSION}"
                   npm dist-tag add @haybarn/haybarn-wasm@"${VERSION}" "${TAG}"

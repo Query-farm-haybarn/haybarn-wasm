@@ -42,6 +42,19 @@ env:
   EMSCRIPTEN_VERSION: '5.0.7'
   EMSCRIPTEN_VERSION_COI: '5.0.7'
   DEFAULT_USE_GENERATED_EXPORTED_LIST: 'no'
+  # Placeholder npm token. `actions/setup-node` with `registry-url:` writes
+  # an .npmrc (pointed at by NPM_CONFIG_USERCONFIG) containing a literal
+  # `${NODE_AUTH_TOKEN}`, and yarn 1.x hard-errors with "Failed to replace
+  # env in config" if that variable is unset — even for a plain
+  # `yarn install` that never authenticates.
+  #
+  # setup-node v6 papered over this by exporting a dummy NODE_AUTH_TOKEN
+  # itself; v7 stopped, which is what broke every Js / Libraries job on the
+  # v7 bump. Exporting our own placeholder restores v6's behaviour without
+  # putting the real token in every step's environment — the publish step
+  # sets the genuine HAYBARN_NPM_TOKEN at step level, which takes
+  # precedence over this.
+  NODE_AUTH_TOKEN: 'XXXXX-XXXXX-XXXXX-XXXXX'
   # R2-backed ccache shared with haybarn-extension-ci-tools — same
   # Cloudflare Worker, same bucket, same bearer-token-auth scheme.
   # Survives across runs, branches, and the duckdb-wasm <-> extensions
@@ -633,7 +646,7 @@ jobs:
                   submodules: 'recursive'
                   fetch-depth: 0
 
-            - uses: actions/setup-node@v6
+            - uses: actions/setup-node@v7
               with:
                   node-version: '18.x'
                   registry-url: 'https://registry.npmjs.org'
@@ -950,7 +963,7 @@ jobs:
                   submodules: 'recursive'
                   fetch-depth: 0
 
-            - uses: actions/setup-node@v6
+            - uses: actions/setup-node@v7
               with:
                   node-version: '18.x'
                   registry-url: 'https://registry.npmjs.org'
@@ -1105,7 +1118,7 @@ jobs:
                   submodules: 'recursive'
                   fetch-depth: 0
 
-            - uses: actions/setup-node@v6
+            - uses: actions/setup-node@v7
               with:
                   node-version: '24'
                   registry-url: 'https://registry.npmjs.org'
