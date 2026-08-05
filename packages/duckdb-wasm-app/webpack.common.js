@@ -71,6 +71,14 @@ export function configure(params) {
                                     exportGlobals: true,
                                     localIdentName: params.cssIdentifier,
                                     localIdentContext: path.resolve(__dirname, 'src'),
+                                    // css-loader 7 flipped this default to true, which
+                                    // drops the default export from CSS modules. Our
+                                    // components all use `import styles from
+                                    // './x.module.css'`, so leaving it on the v7 default
+                                    // resolves `styles` to undefined — and webpack only
+                                    // *warns*, so the build stays green and ships an
+                                    // unstyled app. Keep the v6 behaviour.
+                                    namedExport: false,
                                 },
                             },
                         },
