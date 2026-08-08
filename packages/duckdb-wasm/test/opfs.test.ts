@@ -15,49 +15,51 @@ export function testOPFS(baseDir: string, bundle: () => DuckDBBundle): void {
     let db: AsyncDuckDB;
     let conn: AsyncDuckDBConnection;
 
-    beforeAll(async () => {
-        await removeFiles();
-    });
-
-    afterAll(async () => {
-        if (conn) {
-            await conn.close();
-        }
-        if (db) {
-            await db.terminate();
-        }
-        await removeFiles();
-    });
-
-    beforeEach(async () => {
-        await removeFiles();
-        const worker = new Worker(bundle().mainWorker!);
-        db = new AsyncDuckDB(logger, worker);
-        await db.instantiate(bundle().mainModule, bundle().pthreadWorker);
-        await db.open({
-            path: 'opfs://test.db',
-            accessMode: DuckDBAccessMode.READ_WRITE
-        });
-        conn = await db.connect();
-    });
-
-    afterEach(async () => {
-        if (conn) {
-            await conn.close().catch(() => {
-            });
-        }
-        if (db) {
-            await db.reset().catch(() => {
-            });
-            await db.terminate().catch(() => {
-            });
-            await db.dropFiles().catch(() => {
-            });
-        }
-        await removeFiles();
-    });
-
     describe('Load Data in OPFS', () => {
+        // These hooks must stay inside the describe. Declared at the top level of
+        // testOPFS() they attach to jasmine's *root* suite, so every spec in the
+        // whole run pays for a fresh worker + wasm instantiation + OPFS open.
+        beforeAll(async () => {
+            await removeFiles();
+        });
+
+        afterAll(async () => {
+            // afterEach already closed the connection and terminated the worker;
+            // touching conn/db again here only logs "worker is not set".
+            await removeFiles();
+        });
+
+        beforeEach(async () => {
+            await removeFiles();
+            const worker = new Worker(bundle().mainWorker!);
+            db = new AsyncDuckDB(logger, worker);
+            await db.instantiate(bundle().mainModule, bundle().pthreadWorker);
+            await db.open({
+                path: 'opfs://test.db',
+                accessMode: DuckDBAccessMode.READ_WRITE
+            });
+            conn = await db.connect();
+        });
+
+        afterEach(async () => {
+            if (conn) {
+                await conn.close().catch(() => {
+                });
+            }
+            if (db) {
+                // dropFiles() before terminate(): terminate() nulls the worker, and
+                // postTask() then logs "cannot send a message since the worker is not
+                // set!" instead of rejecting, so the .catch() would not hide it.
+                await db.reset().catch(() => {
+                });
+                await db.dropFiles().catch(() => {
+                });
+                await db.terminate().catch(() => {
+                });
+            }
+            await removeFiles();
+        });
+
         it('Import Small Parquet file', async () => {
             //1. data preparation
             await conn.send(`CREATE TABLE stu AS SELECT * FROM "${ baseDir }/uni/studenten.parquet"`);
