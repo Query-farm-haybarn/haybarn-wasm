@@ -222,7 +222,7 @@ index 83795046ad..a0de442312 100644
  class BufferManager;
  class DatabaseManager;
  class StorageManager;
-@@ -99,6 +101,11 @@ private:
+@@ -99,6 +101,14 @@ private:
  	unique_ptr<ResultSetManager> result_set_manager;
  
  	duckdb_ext_api_v1 (*create_api_v1)();
@@ -231,6 +231,9 @@ index 83795046ad..a0de442312 100644
 +       static void SetPreferredRepository(const string& extension, const string &repository);
 +       static string GetPreferredRepository(const string& extension);
 +       static unordered_map<string, string> extensionsRepos;
++       static void SetPreferredVersion(const string& extension, const string &version);
++       static string GetPreferredVersion(const string& extension);
++       static unordered_map<string, string> extensionVersions;
  };
  
  //! The database object. This object holds the catalog and all the
@@ -271,7 +274,7 @@ index 212250af13..702744c133 100644
 +bool preloaded_httpfs = false;
 +
  DBConfig::DBConfig() {
-@@ -348,6 +348,28 @@ DuckDB::DuckDB(DatabaseInstance &instance_p) : instance(instance_p.shared_from_t
+@@ -348,6 +348,53 @@ DuckDB::DuckDB(DatabaseInstance &instance_p) : instance(instance_p.shared_from_t
  DuckDB::~DuckDB() {
  }
  
@@ -289,6 +292,31 @@ index 212250af13..702744c133 100644
 +
 +string DatabaseInstance::GetPreferredRepository(const string& extension) {
 +	const auto &x = extensionsRepos;
++	auto it = x.find(extension);
++	if (it != x.end()) {
++		return it->second;
++	}
++	return "";
++}
++
++unordered_map<string, string> DatabaseInstance::extensionVersions = {};
++
++void DatabaseInstance::SetPreferredVersion(const string& extension, const string &version) {
++	auto &x = extensionVersions;
++	if (version.empty()) {
++		x.erase(extension);
++		return;
++	}
++	auto it = x.find(extension);
++	if (it != x.end()) {
++		it->second = version;
++	} else {
++		x.emplace(extension, version);
++	}
++}
++
++string DatabaseInstance::GetPreferredVersion(const string& extension) {
++	const auto &x = extensionVersions;
 +	auto it = x.find(extension);
 +	if (it != x.end()) {
 +		return it->second;
@@ -351,23 +379,25 @@ diff --git a/src/main/extension/extension_install.cpp b/src/main/extension/exten
 index 11b887670b..3b5186379d 100644
 --- a/src/main/extension/extension_install.cpp
 +++ b/src/main/extension/extension_install.cpp
-@@ -190,6 +190,9 @@ bool ExtensionHelper::CreateSuggestions(const string &extension_name, string &me
+@@ -190,6 +190,10 @@ bool ExtensionHelper::CreateSuggestions(const string &extension_name, string &me
  unique_ptr<ExtensionInstallInfo> ExtensionHelper::InstallExtension(DatabaseInstance &db, FileSystem &fs,
                                                                     const string &extension,
                                                                     ExtensionInstallOptions &options) {
 +	if (options.repository) {
 +		DatabaseInstance::SetPreferredRepository(extension, options.repository->path);
 +	}
++	DatabaseInstance::SetPreferredVersion(extension, options.version);
  #ifdef WASM_LOADABLE_EXTENSIONS
  	// Install is currently a no-op
  	return nullptr;
-@@ -200,6 +203,9 @@ unique_ptr<ExtensionInstallInfo> ExtensionHelper::InstallExtension(DatabaseInsta
+@@ -200,6 +204,10 @@ unique_ptr<ExtensionInstallInfo> ExtensionHelper::InstallExtension(DatabaseInsta
  
  unique_ptr<ExtensionInstallInfo> ExtensionHelper::InstallExtension(ClientContext &context, const string &extension,
                                                                     ExtensionInstallOptions &options) {
 +	if (options.repository) {
 +		DatabaseInstance::SetPreferredRepository(extension, options.repository->path);
 +	}
++	DatabaseInstance::SetPreferredVersion(extension, options.version);
  #ifdef WASM_LOADABLE_EXTENSIONS
  	// Install is currently a no-op
  	return nullptr;
@@ -416,7 +446,7 @@ index 50f95a2bb4..8f5ef30624 100644
  #ifndef DUCKDB_NO_THREADS
  #include <thread>
  #endif // DUCKDB_NO_THREADS
-@@ -371,13 +374,30 @@ bool ExtensionHelper::TryInitialLoad(DatabaseInstance &db, FileSystem &fs, const
+@@ -371,13 +374,31 @@ bool ExtensionHelper::TryInitialLoad(DatabaseInstance &db, FileSystem &fs, const
  	auto filename = fs.ConvertSeparators(extension);
  
  	bool direct_load;
@@ -442,9 +472,10 @@ index 50f95a2bb4..8f5ef30624 100644
 +                               repository = ExtensionRepository("x", preferredRepo);
 +                       }
 +               }
++		auto preferredVersion = DatabaseInstance::GetPreferredVersion(extension);
 +		install_mode = ExtensionInstallMode::REPOSITORY;
 +
-+		string url_template = ExtensionUrlTemplate(db, repository, "");
++		string url_template = ExtensionUrlTemplate(db, repository, preferredVersion);
  		string url = ExtensionFinalizeUrlTemplate(url_template, extension_name);
  
  		char *str = (char *)EM_ASM_PTR(
@@ -792,4 +823,3 @@ index ea179bc1af..e5c1c07ca7 100644
  		// file does not exist and we are in read-write mode
  		// create a new file
  
-
