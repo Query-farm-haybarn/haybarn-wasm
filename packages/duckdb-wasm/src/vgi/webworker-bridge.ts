@@ -19,6 +19,20 @@
 // Security: SQL must not be able to spawn arbitrary code. `resolveWorkerUrl`
 // gates which worker URLs are allowed (default: same-origin only). A rejected
 // location fails the ATTACH with a clear error rather than launching anything.
+//
+// Multi-target adapters opt into an additive handshake: the first target arrives
+// in `vgi-init`; later targets use `vgi-register-target` and must answer with
+// `vgi-target-ready`/`vgi-target-error` carrying the requestId. Reclamation sends
+// `vgi-unregister-target` first and is allowed only when every slot STATE is free.
+
+export interface VgiAdapterTarget {
+    /** Worker script that hosts the transport adapter. */
+    adapterUrl: string;
+    /** Stable identity used to share one adapter worker across many targets. */
+    adapterKey: string;
+    /** Stable, canonical target identity understood by the adapter. */
+    canonicalTarget: string;
+}
 
 export interface VgiWebWorkerBridgeOptions {
     /**
@@ -26,6 +40,14 @@ export interface VgiWebWorkerBridgeOptions {
      * URL to allow, or null to reject. Default: allow same-origin URLs only.
      */
     resolveWorkerUrl?: (location: string) => string | null;
+    /**
+     * Optional multi-target adapter resolver. Unlike `resolveWorkerUrl`, this
+     * separates the worker script identity from the canonical transport target,
+     * allowing one adapter worker to register several independent ABI-v1 regions.
+     */
+    resolveAdapterTarget?: (location: string) => VgiAdapterTarget | null;
+    /** Maximum registered target regions per adapter worker. Default: 32. */
+    maxTargetsPerAdapter?: number;
     /**
      * Origins (beyond this page's own) whose worker scripts may be spawned, or
      * `'*'` for any. A worker script cannot be handed to `new Worker()`
@@ -73,10 +95,13 @@ function makeResolveWorkerUrl(allow: string[] | '*' | undefined) {
  * `<DuckDBProvider onWorkerCreated={...}>`. Safe no-op when SharedArrayBuffer is
  * unavailable (page not cross-origin isolated — the transport can't work anyway).
  */
-export function installVgiWebWorkerBridge(
-    opts: VgiWebWorkerBridgeOptions = {},
-): (worker: Worker) => void {
+export function installVgiWebWorkerBridge(opts: VgiWebWorkerBridgeOptions = {}): (worker: Worker) => void {
     const resolveWorkerUrl = opts.resolveWorkerUrl ?? makeResolveWorkerUrl(opts.allowRemoteOrigins);
+    const resolveAdapterTarget = opts.resolveAdapterTarget;
+    const maxTargetsPerAdapter = opts.maxTargetsPerAdapter ?? 32;
+    if (!Number.isSafeInteger(maxTargetsPerAdapter) || maxTargetsPerAdapter <= 0) {
+        throw new Error('maxTargetsPerAdapter must be a positive integer');
+    }
     const onVgiWorkerMessage = opts.onVgiWorkerMessage;
     // location(resolved URL) -> the spawned VGI worker. Shared across every ATTACH
     // that targets the same URL (the engine stub also de-dupes per realm, so this
@@ -89,6 +114,120 @@ export function installVgiWebWorkerBridge(
     // same channel.
     const pending = new Map<string, Promise<Worker>>();
 
+    interface TargetRegion {
+        target: string;
+        offset: number;
+        buffer: SharedArrayBuffer;
+        lastUsed: number;
+    }
+    interface AdapterEntry {
+        key: string;
+        url: string;
+        worker: Worker;
+        regions: Map<string, TargetRegion>;
+        registrationQueue: Promise<void>;
+    }
+    const adapters = new Map<string, AdapterEntry>();
+    const pendingAdapters = new Map<string, Promise<AdapterEntry>>();
+    let touch = 0;
+
+    const validName = (value: string): boolean =>
+        value.length > 0 && value.length <= 4096 && !/[\u0000-\u001f\u007f]/.test(value);
+
+    const regionIsIdle = (region: TargetRegion): boolean => {
+        try {
+            if (!Number.isSafeInteger(region.offset) || region.offset < 0 || (region.offset & 3) !== 0) return false;
+            const i32 = new Int32Array(region.buffer);
+            const h = region.offset >> 2;
+            const nSlots = Atomics.load(i32, h + 2);
+            const stride = Atomics.load(i32, h + 4);
+            const slotsOff = Atomics.load(i32, h + 5);
+            if (nSlots <= 0 || nSlots > 1024 || stride < 64 || slotsOff < 64) return false;
+            for (let slot = 0; slot < nSlots; slot++) {
+                const state = (region.offset + slotsOff + slot * stride) >> 2;
+                if (state < 0 || state >= i32.length || Atomics.load(i32, state) !== 0) return false;
+            }
+            return true;
+        } catch {
+            return false;
+        }
+    };
+
+    let registrationSequence = 0;
+    const registerTarget = (entry: AdapterEntry, region: TargetRegion, baseUrl: string): Promise<void> =>
+        new Promise<void>((resolve, reject) => {
+            const requestId = `vgi-target-${++registrationSequence}`;
+            const timer = setTimeout(() => {
+                entry.worker.removeEventListener('message', onMessage);
+                reject(new Error(`adapter target registration timed out: ${region.target}`));
+            }, 30000);
+            const onMessage = (ev: MessageEvent) => {
+                const m = ev.data as { type?: string; requestId?: string; error?: string } | undefined;
+                if (!m || m.requestId !== requestId) return;
+                if (m.type !== 'vgi-target-ready' && m.type !== 'vgi-target-error') return;
+                clearTimeout(timer);
+                entry.worker.removeEventListener('message', onMessage);
+                if (m.type === 'vgi-target-ready') resolve();
+                else reject(new Error(m.error ?? `adapter rejected target ${region.target}`));
+            };
+            entry.worker.addEventListener('message', onMessage);
+            entry.worker.postMessage({
+                type: 'vgi-register-target',
+                requestId,
+                target: region.target,
+                buffer: region.buffer,
+                offset: region.offset,
+                baseUrl,
+            });
+        });
+
+    const ensureAdapterRegion = (
+        entry: AdapterEntry,
+        target: string,
+        offset: number,
+        buffer: SharedArrayBuffer,
+    ): Promise<void> => {
+        const operation = entry.registrationQueue.then(async () => {
+            const current = entry.regions.get(target);
+            if (current && current.offset === offset && current.buffer === buffer) {
+                current.lastUsed = ++touch;
+                return;
+            }
+
+            const conflicts: TargetRegion[] = [];
+            if (current) conflicts.push(current);
+            for (const region of entry.regions.values()) {
+                if (region !== current && region.offset === offset && region.buffer === buffer) conflicts.push(region);
+            }
+
+            let victim: TargetRegion | undefined;
+            if (!current && conflicts.length === 0 && entry.regions.size >= maxTargetsPerAdapter) {
+                victim = [...entry.regions.values()].filter(regionIsIdle).sort((a, b) => a.lastUsed - b.lastUsed)[0];
+                if (!victim) {
+                    throw new Error(`adapter ${entry.key} reached ${maxTargetsPerAdapter} active target regions`);
+                }
+                conflicts.push(victim);
+            }
+            if (conflicts.some(region => !regionIsIdle(region))) {
+                throw new Error(`cannot rebind active SAB target region for ${target}`);
+            }
+
+            const next: TargetRegion = { target, offset, buffer, lastUsed: ++touch };
+            for (const region of conflicts) {
+                entry.regions.delete(region.target);
+                entry.worker.postMessage({
+                    type: 'vgi-unregister-target',
+                    target: region.target,
+                    offset: region.offset,
+                });
+            }
+            await registerTarget(entry, next, entry.url);
+            entry.regions.set(target, next);
+        });
+        entry.registrationQueue = operation.catch(() => undefined);
+        return operation;
+    };
+
     return (duckdbWorker: Worker): void => {
         if (typeof SharedArrayBuffer === 'undefined') {
             console.warn(
@@ -98,7 +237,13 @@ export function installVgiWebWorkerBridge(
         }
         duckdbWorker.addEventListener('message', (e: MessageEvent) => {
             const d = e.data as
-                | { type?: string; location?: string; offset?: number; buffer?: SharedArrayBuffer; readySab?: SharedArrayBuffer }
+                | {
+                      type?: string;
+                      location?: string;
+                      offset?: number;
+                      buffer?: SharedArrayBuffer;
+                      readySab?: SharedArrayBuffer;
+                  }
                 | undefined;
             if (!d || d.type !== 'vgi-ensure-worker' || !d.readySab) return;
             const readyI32 = new Int32Array(d.readySab);
@@ -106,6 +251,127 @@ export function installVgiWebWorkerBridge(
                 Atomics.store(readyI32, 0, v);
                 Atomics.notify(readyI32, 0);
             };
+
+            if (resolveAdapterTarget) {
+                if (!(d.buffer instanceof SharedArrayBuffer) || !Number.isSafeInteger(d.offset)) {
+                    console.error('[vgi] adapter request has an invalid SAB region');
+                    signal(-1);
+                    return;
+                }
+                const requested = resolveAdapterTarget(String(d.location));
+                if (!requested || !validName(requested.adapterKey) || !validName(requested.canonicalTarget)) {
+                    console.error('[vgi] adapter target rejected:', d.location);
+                    signal(-1);
+                    return;
+                }
+                const adapterUrl = resolveWorkerUrl(requested.adapterUrl);
+                if (!adapterUrl) {
+                    console.error('[vgi] adapter worker URL rejected:', requested.adapterUrl);
+                    signal(-1);
+                    return;
+                }
+
+                const finish = (entry: AdapterEntry) => {
+                    if (entry.url !== adapterUrl) {
+                        throw new Error(`adapter key ${entry.key} resolved to multiple worker URLs`);
+                    }
+                    return ensureAdapterRegion(
+                        entry,
+                        requested.canonicalTarget,
+                        d.offset as number,
+                        d.buffer as SharedArrayBuffer,
+                    );
+                };
+
+                const existing = adapters.get(requested.adapterKey);
+                if (existing) {
+                    Promise.resolve()
+                        .then(() => finish(existing))
+                        .then(
+                            () => signal(1),
+                            err => {
+                                console.error('[vgi] adapter target registration failed:', err);
+                                signal(-1);
+                            },
+                        );
+                    return;
+                }
+                const inflightAdapter = pendingAdapters.get(requested.adapterKey);
+                if (inflightAdapter) {
+                    inflightAdapter.then(finish).then(
+                        () => signal(1),
+                        err => {
+                            console.error('[vgi] adapter target registration failed:', err);
+                            signal(-1);
+                        },
+                    );
+                    return;
+                }
+
+                const firstRegion: TargetRegion = {
+                    target: requested.canonicalTarget,
+                    offset: d.offset as number,
+                    buffer: d.buffer as SharedArrayBuffer,
+                    lastUsed: ++touch,
+                };
+                const boot = spawnWorker(adapterUrl)
+                    .then(
+                        w =>
+                            new Promise<AdapterEntry>((resolve, reject) => {
+                                const onBootMessage = (ev: MessageEvent) => {
+                                    const m = ev.data as { type?: string; error?: string } | undefined;
+                                    if (!m) return;
+                                    if (m.type === 'vgi-ready') {
+                                        w.removeEventListener('message', onBootMessage);
+                                        const entry: AdapterEntry = {
+                                            key: requested.adapterKey,
+                                            url: adapterUrl,
+                                            worker: w,
+                                            regions: new Map([[requested.canonicalTarget, firstRegion]]),
+                                            registrationQueue: Promise.resolve(),
+                                        };
+                                        w.addEventListener('message', (other: MessageEvent) => {
+                                            const data = other.data as { type?: string } | undefined;
+                                            if (data?.type === 'vgi-target-ready' || data?.type === 'vgi-target-error')
+                                                return;
+                                            onVgiWorkerMessage?.(w, other.data);
+                                        });
+                                        adapters.set(requested.adapterKey, entry);
+                                        resolve(entry);
+                                    } else if (m.type === 'vgi-error') {
+                                        w.removeEventListener('message', onBootMessage);
+                                        try {
+                                            w.terminate();
+                                        } catch {
+                                            /* ignore */
+                                        }
+                                        reject(new Error(m.error ?? 'vgi-error'));
+                                    } else {
+                                        onVgiWorkerMessage?.(w, m);
+                                    }
+                                };
+                                w.addEventListener('message', onBootMessage);
+                                w.postMessage({
+                                    type: 'vgi-init',
+                                    adapterKey: requested.adapterKey,
+                                    target: requested.canonicalTarget,
+                                    buffer: firstRegion.buffer,
+                                    offset: firstRegion.offset,
+                                    baseUrl: adapterUrl,
+                                });
+                            }),
+                    )
+                    .finally(() => pendingAdapters.delete(requested.adapterKey));
+                pendingAdapters.set(requested.adapterKey, boot);
+                boot.then(
+                    () => signal(1),
+                    err => {
+                        console.error('[vgi] adapter worker boot failed:', err);
+                        signal(-1);
+                    },
+                );
+                return;
+            }
 
             const url = resolveWorkerUrl(String(d.location));
             if (!url) {
@@ -132,7 +398,7 @@ export function installVgiWebWorkerBridge(
 
             const boot = spawnWorker(url)
                 .then(
-                    (w) =>
+                    w =>
                         new Promise<Worker>((resolve, reject) => {
                             const onMsg = (ev: MessageEvent) => {
                                 const m = ev.data as { type?: string; error?: string } | undefined;
@@ -175,7 +441,7 @@ export function installVgiWebWorkerBridge(
             pending.set(url, boot);
             boot.then(
                 () => signal(1),
-                (err) => {
+                err => {
                     console.error('[vgi] worker: spawn failed:', err);
                     signal(-1);
                 },
@@ -230,9 +496,7 @@ async function spawnWorker(url: string): Promise<Worker> {
  * Compose several `onWorkerCreated` handlers into one (e.g. the OAuth bridge and
  * the worker: bridge), since `<DuckDBProvider>` takes a single callback.
  */
-export function composeWorkerBridges(
-    ...handlers: Array<(worker: Worker) => void>
-): (worker: Worker) => void {
+export function composeWorkerBridges(...handlers: Array<(worker: Worker) => void>): (worker: Worker) => void {
     return (worker: Worker) => {
         for (const h of handlers) h(worker);
     };

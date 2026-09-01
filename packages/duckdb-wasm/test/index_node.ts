@@ -80,6 +80,7 @@ import { longQueries } from './long_queries.test';
 import { testRegressionAsync } from './regression';
 import { testFTS } from './fts.test';
 import { testPivot } from './pivot.test';
+import { testVgiWebWorkerBridge } from './vgi_webworker_bridge.test';
 
 testUDF(() => db!);
 longQueries(() => adb!);
@@ -103,3 +104,4 @@ testTokenization(() => db!);
 testTokenizationAsync(() => adb!);
 testFTS(() => db!);
 testPivot(() => db!, { skipValuesCheck: true });
+testVgiWebWorkerBridge();

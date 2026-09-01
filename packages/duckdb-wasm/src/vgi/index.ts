@@ -8,6 +8,7 @@
 export {
     installVgiWebWorkerBridge,
     composeWorkerBridges,
+    type VgiAdapterTarget,
     type VgiWebWorkerBridgeOptions,
 } from './webworker-bridge';
 export { installVgiOAuthBridge } from './oauth-bridge';
