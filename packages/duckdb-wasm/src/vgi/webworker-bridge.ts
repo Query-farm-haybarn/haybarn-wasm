@@ -48,15 +48,15 @@ export interface VgiWebWorkerBridgeOptions {
     resolveAdapterTarget?: (location: string) => VgiAdapterTarget | null;
     /**
      * The application's single Iroh transport-adapter Worker. Every strict
-     * `iroh://<EndpointId>` target is registered as a separate SAB region on
-     * this Worker, so the adapter keeps one local Iroh endpoint identity.
+     * `iroh://<EndpointId>` and `httpi://<EndpointId>[/base-path]` target is
+     * registered as a separate SAB region on this Worker, so the adapter keeps
+     * one local Iroh endpoint identity across both protocols.
      * Haybarn never constructs or terminates this application-owned Worker.
      */
     irohAdapterWorker?: Worker;
     /**
-     * Optional Iroh target resolver/authorizer. Return a canonical Iroh target
-     * to allow (normally the input unchanged), or null to deny it. Both the SQL
-     * target and the returned target must use a 64-character lowercase-hex ID.
+     * Optional Iroh target resolver/authorizer. Return a canonical target of
+     * the same scheme to allow (normally unchanged), or null to deny it.
      */
     resolveIrohTarget?: (canonicalTarget: string) => string | null;
     /** Maximum registered target regions per adapter worker. Default: 32. */
@@ -156,6 +156,14 @@ export function installVgiWebWorkerBridge(opts: VgiWebWorkerBridgeOptions = {}):
     };
     const canonicalIrohTarget = (value: string): string | null =>
         /^iroh:\/\/[0-9a-f]{64}$/.test(value) ? value : null;
+    const canonicalHttpiTarget = (value: string): string | null =>
+        /^httpi:\/\/[0-9a-f]{64}(?:\/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]+(?:\/[A-Za-z0-9._~!$&'()*+,;=:@-]+)*))?$/.test(
+            value,
+        )
+            ? value
+            : null;
+    const canonicalBuiltInIrohTarget = (value: string): string | null =>
+        canonicalIrohTarget(value) ?? canonicalHttpiTarget(value);
 
     const regionIsIdle = (region: TargetRegion): boolean => {
         try {
@@ -277,7 +285,8 @@ export function installVgiWebWorkerBridge(opts: VgiWebWorkerBridgeOptions = {}):
 
             const location = String(d.location);
             const isIrohRequest = location.toLowerCase().startsWith('iroh://');
-            if (isIrohRequest || resolveAdapterTarget) {
+            const isHttpiRequest = location.toLowerCase().startsWith('httpi://');
+            if (isIrohRequest || isHttpiRequest || resolveAdapterTarget) {
                 if (!(d.buffer instanceof SharedArrayBuffer) || !Number.isSafeInteger(d.offset)) {
                     console.error('[vgi] adapter request has an invalid SAB region');
                     signal(-1);
@@ -285,15 +294,15 @@ export function installVgiWebWorkerBridge(opts: VgiWebWorkerBridgeOptions = {}):
                 }
                 let requested: VgiAdapterTarget | null;
                 let applicationWorker: Worker | undefined;
-                if (isIrohRequest) {
-                    const canonical = canonicalIrohTarget(location);
+                if (isIrohRequest || isHttpiRequest) {
+                    const canonical = canonicalBuiltInIrohTarget(location);
                     if (!canonical) {
-                        console.error('[vgi] malformed iroh:// EndpointId:', d.location);
+                        console.error('[vgi] malformed Iroh transport target:', d.location);
                         signal(-1);
                         return;
                     }
                     if (!irohAdapterWorker) {
-                        console.error('[vgi] iroh:// target requires an application-owned irohAdapterWorker');
+                        console.error('[vgi] Iroh transport target requires an application-owned irohAdapterWorker');
                         signal(-1);
                         return;
                     }
@@ -305,8 +314,9 @@ export function installVgiWebWorkerBridge(opts: VgiWebWorkerBridgeOptions = {}):
                         signal(-1);
                         return;
                     }
-                    const resolvedCanonical = resolved === null ? null : canonicalIrohTarget(resolved);
-                    if (!resolvedCanonical) {
+                    const resolvedCanonical = resolved === null ? null : canonicalBuiltInIrohTarget(resolved);
+                    const sameScheme = resolvedCanonical?.split(':', 1)[0] === canonical.split(':', 1)[0];
+                    if (!resolvedCanonical || !sameScheme) {
                         console.error('[vgi] Iroh target rejected by application resolver:', d.location);
                         signal(-1);
                         return;

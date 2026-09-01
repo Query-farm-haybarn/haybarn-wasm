@@ -134,6 +134,46 @@ export function testVgiWebWorkerBridge(): void {
             expect(adapter.messages.map(m => m.target)).toEqual([firstTarget, secondTarget]);
         });
 
+        it('routes raw and HTTP Iroh targets through one worker with distinct target regions', async () => {
+            const adapter = new FakeWorker('application-owned');
+            const allowed: string[] = [];
+            const install = installVgiWebWorkerBridge({
+                irohAdapterWorker: adapter as unknown as Worker,
+                resolveIrohTarget: target => {
+                    allowed.push(target);
+                    return target;
+                },
+            });
+            const duck = new FakeDuckDbWorker();
+            install(duck as unknown as Worker);
+            const endpoint = '34'.repeat(32);
+            const rawTarget = `iroh://${endpoint}`;
+            const httpTarget = `httpi://${endpoint}/vgi/api`;
+
+            expect(await readyValue(duck.ensure(rawTarget, region()))).toBe(1);
+            expect(await readyValue(duck.ensure(httpTarget, region()))).toBe(1);
+
+            expect(FakeWorker.instances).toEqual([adapter]);
+            expect(allowed).toEqual([rawTarget, httpTarget]);
+            expect(adapter.messages.map(m => m.target)).toEqual([rawTarget, httpTarget]);
+        });
+
+        it('rejects malformed HTTP Iroh paths and cross-scheme resolver rewrites', async () => {
+            const adapter = new FakeWorker('application-owned');
+            const endpoint = '56'.repeat(32);
+            const install = installVgiWebWorkerBridge({
+                irohAdapterWorker: adapter as unknown as Worker,
+                resolveIrohTarget: target => (target.endsWith('/rewrite') ? `iroh://${endpoint}` : target),
+            });
+            const duck = new FakeDuckDbWorker();
+            install(duck as unknown as Worker);
+
+            expect(await readyValue(duck.ensure(`httpi://${endpoint}/a//b`, region()))).toBe(-1);
+            expect(await readyValue(duck.ensure(`httpi://${endpoint}/a?x=1`, region()))).toBe(-1);
+            expect(await readyValue(duck.ensure(`httpi://${endpoint}/rewrite`, region()))).toBe(-1);
+            expect(adapter.messages).toEqual([]);
+        });
+
         it('rejects malformed or unauthorized Iroh targets before touching the adapter', async () => {
             const adapter = new FakeWorker('application-owned');
             const install = installVgiWebWorkerBridge({
