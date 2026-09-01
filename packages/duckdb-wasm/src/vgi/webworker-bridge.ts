@@ -46,6 +46,19 @@ export interface VgiWebWorkerBridgeOptions {
      * allowing one adapter worker to register several independent ABI-v1 regions.
      */
     resolveAdapterTarget?: (location: string) => VgiAdapterTarget | null;
+    /**
+     * The application's single Iroh transport-adapter Worker. Every strict
+     * `iroh://<EndpointId>` target is registered as a separate SAB region on
+     * this Worker, so the adapter keeps one local Iroh endpoint identity.
+     * Haybarn never constructs or terminates this application-owned Worker.
+     */
+    irohAdapterWorker?: Worker;
+    /**
+     * Optional Iroh target resolver/authorizer. Return a canonical Iroh target
+     * to allow (normally the input unchanged), or null to deny it. Both the SQL
+     * target and the returned target must use a 64-character lowercase-hex ID.
+     */
+    resolveIrohTarget?: (canonicalTarget: string) => string | null;
     /** Maximum registered target regions per adapter worker. Default: 32. */
     maxTargetsPerAdapter?: number;
     /**
@@ -98,6 +111,8 @@ function makeResolveWorkerUrl(allow: string[] | '*' | undefined) {
 export function installVgiWebWorkerBridge(opts: VgiWebWorkerBridgeOptions = {}): (worker: Worker) => void {
     const resolveWorkerUrl = opts.resolveWorkerUrl ?? makeResolveWorkerUrl(opts.allowRemoteOrigins);
     const resolveAdapterTarget = opts.resolveAdapterTarget;
+    const irohAdapterWorker = opts.irohAdapterWorker;
+    const resolveIrohTarget = opts.resolveIrohTarget;
     const maxTargetsPerAdapter = opts.maxTargetsPerAdapter ?? 32;
     if (!Number.isSafeInteger(maxTargetsPerAdapter) || maxTargetsPerAdapter <= 0) {
         throw new Error('maxTargetsPerAdapter must be a positive integer');
@@ -131,8 +146,16 @@ export function installVgiWebWorkerBridge(opts: VgiWebWorkerBridgeOptions = {}):
     const pendingAdapters = new Map<string, Promise<AdapterEntry>>();
     let touch = 0;
 
-    const validName = (value: string): boolean =>
-        value.length > 0 && value.length <= 4096 && !/[\u0000-\u001f\u007f]/.test(value);
+    const validName = (value: string): boolean => {
+        if (value.length === 0 || value.length > 4096) return false;
+        for (let i = 0; i < value.length; i++) {
+            const code = value.charCodeAt(i);
+            if (code < 0x20 || code === 0x7f) return false;
+        }
+        return true;
+    };
+    const canonicalIrohTarget = (value: string): string | null =>
+        /^iroh:\/\/[0-9a-f]{64}$/.test(value) ? value : null;
 
     const regionIsIdle = (region: TargetRegion): boolean => {
         try {
@@ -252,21 +275,62 @@ export function installVgiWebWorkerBridge(opts: VgiWebWorkerBridgeOptions = {}):
                 Atomics.notify(readyI32, 0);
             };
 
-            if (resolveAdapterTarget) {
+            const location = String(d.location);
+            const isIrohRequest = location.toLowerCase().startsWith('iroh://');
+            if (isIrohRequest || resolveAdapterTarget) {
                 if (!(d.buffer instanceof SharedArrayBuffer) || !Number.isSafeInteger(d.offset)) {
                     console.error('[vgi] adapter request has an invalid SAB region');
                     signal(-1);
                     return;
                 }
-                const requested = resolveAdapterTarget(String(d.location));
+                let requested: VgiAdapterTarget | null;
+                let applicationWorker: Worker | undefined;
+                if (isIrohRequest) {
+                    const canonical = canonicalIrohTarget(location);
+                    if (!canonical) {
+                        console.error('[vgi] malformed iroh:// EndpointId:', d.location);
+                        signal(-1);
+                        return;
+                    }
+                    if (!irohAdapterWorker) {
+                        console.error('[vgi] iroh:// target requires an application-owned irohAdapterWorker');
+                        signal(-1);
+                        return;
+                    }
+                    let resolved: string | null;
+                    try {
+                        resolved = resolveIrohTarget ? resolveIrohTarget(canonical) : canonical;
+                    } catch (error) {
+                        console.error('[vgi] Iroh target resolver failed:', error);
+                        signal(-1);
+                        return;
+                    }
+                    const resolvedCanonical = resolved === null ? null : canonicalIrohTarget(resolved);
+                    if (!resolvedCanonical) {
+                        console.error('[vgi] Iroh target rejected by application resolver:', d.location);
+                        signal(-1);
+                        return;
+                    }
+                    requested = {
+                        adapterUrl: self.location.href,
+                        adapterKey: '__vgi_application_iroh_adapter_v1__',
+                        canonicalTarget: resolvedCanonical,
+                    };
+                    applicationWorker = irohAdapterWorker;
+                } else {
+                    requested = resolveAdapterTarget?.(location) ?? null;
+                }
                 if (!requested || !validName(requested.adapterKey) || !validName(requested.canonicalTarget)) {
                     console.error('[vgi] adapter target rejected:', d.location);
                     signal(-1);
                     return;
                 }
-                const adapterUrl = resolveWorkerUrl(requested.adapterUrl);
+                const adapterTarget = requested;
+                const adapterUrl = applicationWorker
+                    ? adapterTarget.adapterUrl
+                    : resolveWorkerUrl(adapterTarget.adapterUrl);
                 if (!adapterUrl) {
-                    console.error('[vgi] adapter worker URL rejected:', requested.adapterUrl);
+                    console.error('[vgi] adapter worker URL rejected:', adapterTarget.adapterUrl);
                     signal(-1);
                     return;
                 }
@@ -277,13 +341,13 @@ export function installVgiWebWorkerBridge(opts: VgiWebWorkerBridgeOptions = {}):
                     }
                     return ensureAdapterRegion(
                         entry,
-                        requested.canonicalTarget,
+                        adapterTarget.canonicalTarget,
                         d.offset as number,
                         d.buffer as SharedArrayBuffer,
                     );
                 };
 
-                const existing = adapters.get(requested.adapterKey);
+                const existing = adapters.get(adapterTarget.adapterKey);
                 if (existing) {
                     Promise.resolve()
                         .then(() => finish(existing))
@@ -296,7 +360,7 @@ export function installVgiWebWorkerBridge(opts: VgiWebWorkerBridgeOptions = {}):
                         );
                     return;
                 }
-                const inflightAdapter = pendingAdapters.get(requested.adapterKey);
+                const inflightAdapter = pendingAdapters.get(adapterTarget.adapterKey);
                 if (inflightAdapter) {
                     inflightAdapter.then(finish).then(
                         () => signal(1),
@@ -309,12 +373,12 @@ export function installVgiWebWorkerBridge(opts: VgiWebWorkerBridgeOptions = {}):
                 }
 
                 const firstRegion: TargetRegion = {
-                    target: requested.canonicalTarget,
+                    target: adapterTarget.canonicalTarget,
                     offset: d.offset as number,
                     buffer: d.buffer as SharedArrayBuffer,
                     lastUsed: ++touch,
                 };
-                const boot = spawnWorker(adapterUrl)
+                const boot = (applicationWorker ? Promise.resolve(applicationWorker) : spawnWorker(adapterUrl))
                     .then(
                         w =>
                             new Promise<AdapterEntry>((resolve, reject) => {
@@ -324,10 +388,10 @@ export function installVgiWebWorkerBridge(opts: VgiWebWorkerBridgeOptions = {}):
                                     if (m.type === 'vgi-ready') {
                                         w.removeEventListener('message', onBootMessage);
                                         const entry: AdapterEntry = {
-                                            key: requested.adapterKey,
+                                            key: adapterTarget.adapterKey,
                                             url: adapterUrl,
                                             worker: w,
-                                            regions: new Map([[requested.canonicalTarget, firstRegion]]),
+                                            regions: new Map([[adapterTarget.canonicalTarget, firstRegion]]),
                                             registrationQueue: Promise.resolve(),
                                         };
                                         w.addEventListener('message', (other: MessageEvent) => {
@@ -336,14 +400,16 @@ export function installVgiWebWorkerBridge(opts: VgiWebWorkerBridgeOptions = {}):
                                                 return;
                                             onVgiWorkerMessage?.(w, other.data);
                                         });
-                                        adapters.set(requested.adapterKey, entry);
+                                        adapters.set(adapterTarget.adapterKey, entry);
                                         resolve(entry);
                                     } else if (m.type === 'vgi-error') {
                                         w.removeEventListener('message', onBootMessage);
-                                        try {
-                                            w.terminate();
-                                        } catch {
-                                            /* ignore */
+                                        if (!applicationWorker) {
+                                            try {
+                                                w.terminate();
+                                            } catch {
+                                                /* ignore */
+                                            }
                                         }
                                         reject(new Error(m.error ?? 'vgi-error'));
                                     } else {
@@ -353,16 +419,16 @@ export function installVgiWebWorkerBridge(opts: VgiWebWorkerBridgeOptions = {}):
                                 w.addEventListener('message', onBootMessage);
                                 w.postMessage({
                                     type: 'vgi-init',
-                                    adapterKey: requested.adapterKey,
-                                    target: requested.canonicalTarget,
+                                    adapterKey: adapterTarget.adapterKey,
+                                    target: adapterTarget.canonicalTarget,
                                     buffer: firstRegion.buffer,
                                     offset: firstRegion.offset,
                                     baseUrl: adapterUrl,
                                 });
                             }),
                     )
-                    .finally(() => pendingAdapters.delete(requested.adapterKey));
-                pendingAdapters.set(requested.adapterKey, boot);
+                    .finally(() => pendingAdapters.delete(adapterTarget.adapterKey));
+                pendingAdapters.set(adapterTarget.adapterKey, boot);
                 boot.then(
                     () => signal(1),
                     err => {

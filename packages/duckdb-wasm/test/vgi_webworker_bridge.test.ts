@@ -110,6 +110,72 @@ export function testVgiWebWorkerBridge(): void {
             expect(FakeWorker.instances[0].messages.map(m => m.type)).toEqual(['vgi-init', 'vgi-register-target']);
         });
 
+        it('routes every canonical Iroh target through one application-owned worker', async () => {
+            const adapter = new FakeWorker('application-owned');
+            const allowed: string[] = [];
+            const install = installVgiWebWorkerBridge({
+                irohAdapterWorker: adapter as unknown as Worker,
+                resolveIrohTarget: target => {
+                    allowed.push(target);
+                    return target;
+                },
+            });
+            const duck = new FakeDuckDbWorker();
+            install(duck as unknown as Worker);
+            const firstTarget = `iroh://${'01'.repeat(32)}`;
+            const secondTarget = `iroh://${'ab'.repeat(32)}`;
+
+            expect(await readyValue(duck.ensure(firstTarget, region()))).toBe(1);
+            expect(await readyValue(duck.ensure(secondTarget, region()))).toBe(1);
+
+            expect(FakeWorker.instances).toEqual([adapter]);
+            expect(allowed).toEqual([firstTarget, secondTarget]);
+            expect(adapter.messages.map(m => m.type)).toEqual(['vgi-init', 'vgi-register-target']);
+            expect(adapter.messages.map(m => m.target)).toEqual([firstTarget, secondTarget]);
+        });
+
+        it('rejects malformed or unauthorized Iroh targets before touching the adapter', async () => {
+            const adapter = new FakeWorker('application-owned');
+            const install = installVgiWebWorkerBridge({
+                irohAdapterWorker: adapter as unknown as Worker,
+                resolveIrohTarget: target => (target.endsWith('00') ? null : target),
+            });
+            const duck = new FakeDuckDbWorker();
+            install(duck as unknown as Worker);
+
+            expect(await readyValue(duck.ensure(`iroh://${'A0'.repeat(32)}`, region()))).toBe(-1);
+            expect(await readyValue(duck.ensure(`iroh://${'ab'.repeat(31)}`, region()))).toBe(-1);
+            expect(await readyValue(duck.ensure(`iroh://${'ab'.repeat(32)}?query=1`, region()))).toBe(-1);
+            expect(await readyValue(duck.ensure(`iroh://${'00'.repeat(32)}`, region()))).toBe(-1);
+            expect(adapter.messages).toEqual([]);
+        });
+
+        it('does not fall back to URL spawning when no Iroh adapter was supplied', async () => {
+            const install = installVgiWebWorkerBridge({
+                resolveWorkerUrl: () => 'https://example.test/must-not-spawn.js',
+            });
+            const duck = new FakeDuckDbWorker();
+            install(duck as unknown as Worker);
+
+            expect(await readyValue(duck.ensure(`iroh://${'12'.repeat(32)}`, region()))).toBe(-1);
+            expect(FakeWorker.instances).toEqual([]);
+        });
+
+        it('fails closed when the application Iroh resolver throws', async () => {
+            const adapter = new FakeWorker('application-owned');
+            const install = installVgiWebWorkerBridge({
+                irohAdapterWorker: adapter as unknown as Worker,
+                resolveIrohTarget: () => {
+                    throw new Error('policy unavailable');
+                },
+            });
+            const duck = new FakeDuckDbWorker();
+            install(duck as unknown as Worker);
+
+            expect(await readyValue(duck.ensure(`iroh://${'12'.repeat(32)}`, region()))).toBe(-1);
+            expect(adapter.messages).toEqual([]);
+        });
+
         it('preserves resolveWorkerUrl as a one-worker legacy path', async () => {
             const install = installVgiWebWorkerBridge({ resolveWorkerUrl: () => 'https://example.test/worker.js' });
             const duck = new FakeDuckDbWorker();
