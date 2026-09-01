@@ -11,9 +11,15 @@ const irohAdapter = new Worker(new URL('./iroh-vgi-adapter.js', import.meta.url)
     type: 'module',
 });
 
+const endpointIdFromTarget = (target: string): string | null =>
+    /^(?:iroh|httpi):\/\/([0-9a-f]{64})(?:\/.*)?$/.exec(target)?.[1] ?? null;
+
 const onWorkerCreated = installVgiWebWorkerBridge({
     irohAdapterWorker: irohAdapter,
-    resolveIrohTarget: target => (allowedEndpointIds.has(target.slice('iroh://'.length)) ? target : null),
+    resolveIrohTarget: target => {
+        const endpointId = endpointIdFromTarget(target);
+        return endpointId !== null && allowedEndpointIds.has(endpointId) ? target : null;
+    },
 });
 ```
 
