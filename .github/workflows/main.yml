@@ -92,6 +92,11 @@ jobs:
               with:
                   submodules: 'recursive'
 
+            - name: Test VGI shared-memory host ABI
+              run: |
+                  node lib/vgi-sab-ring.test.js
+                  node lib/vgi-sab-publication.test.js
+
             - name: Cache node_modules
               uses: actions/cache@v6
               with:
