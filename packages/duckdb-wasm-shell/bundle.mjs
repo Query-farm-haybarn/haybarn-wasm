@@ -8,7 +8,10 @@ import { execSync } from 'child_process';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const TARGET_BROWSER = ['chrome64', 'edge79', 'firefox62', 'safari11.1'];
+// Safari before 14.1 implements destructuring incorrectly. Newer esbuild
+// versions reject those targets instead of emitting code with broken runtime
+// semantics, so 14.1 is the earliest Safari version we can advertise here.
+const TARGET_BROWSER = ['chrome64', 'edge79', 'firefox62', 'safari14.1'];
 const EXTERNALS_BROWSER = [
     '@haybarn/haybarn-wasm',
     'xterm',
