@@ -642,7 +642,7 @@
     "@shikijs/vscode-textmate" "^10.0.2"
 
 "@haybarn/haybarn-wasm-shell@file:packages/duckdb-wasm-shell":
-  version "1.5.5-rc5"
+  version "1.5.5-rc6"
   dependencies:
     "@haybarn/haybarn-wasm" "file:packages/duckdb-wasm"
     qs "^6.14.1"
@@ -652,7 +652,7 @@
     xterm-addon-webgl "^0.16.0"
 
 "@haybarn/haybarn-wasm@file:packages/duckdb-wasm":
-  version "1.5.5-rc5"
+  version "1.5.5-rc6"
   dependencies:
     apache-arrow "^17.0.0"
     qs "^6.14.1"
