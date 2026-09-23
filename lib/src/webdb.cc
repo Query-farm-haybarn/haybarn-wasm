@@ -78,6 +78,13 @@
 namespace duckdb {
 
 namespace {
+// `duckdb::preloaded_httpfs` is an upstream duckdb-wasm patch symbol that the
+// haybarn engine does not carry (it has never existed in its history), so this
+// translation unit owns the flag. That makes the SET callback below a no-op
+// rather than something the engine reads — enough to build and to keep the
+// option accepted, but the real fix is deciding whether haybarn wants the
+// concept at all, and dropping this block if not.
+bool preloaded_httpfs = false;
 struct PreloadedHttpfsInit {
     PreloadedHttpfsInit() { preloaded_httpfs = true; }
 } _preloaded_httpfs_init;
@@ -1035,8 +1042,10 @@ arrow::Status WebDB::Open(std::string_view args_json) {
         RegisterCustomExtensionOptions(db);
 
         auto& config = duckdb::DBConfig::GetConfig(*db->instance);
-        if (!config.http_util || config.http_util->GetName() != string("WasmHTTPUtils")) {
-            config.http_util = make_shared_ptr<HTTPWasmUtil>();
+        // `http_util` became a private member of DBConfig; go through the
+        // accessors instead of touching the field directly.
+        if (config.GetHTTPUtil().GetName() != string("WasmHTTPUtils")) {
+            config.SetHTTPUtil(make_shared_ptr<HTTPWasmUtil>());
         }
 
         if (!config.encryption_util) {
