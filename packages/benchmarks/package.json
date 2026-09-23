@@ -1,6 +1,6 @@
 {
     "name": "@haybarn/benchmarks",
-    "version": "1.5.5-rc4",
+    "version": "1.5.5-rc5",
     "license": "MIT",
     "private": true,
     "dependencies": {
