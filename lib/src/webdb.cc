@@ -78,13 +78,6 @@
 namespace duckdb {
 
 namespace {
-// `duckdb::preloaded_httpfs` is an upstream duckdb-wasm patch symbol that the
-// haybarn engine does not carry (it has never existed in its history), so this
-// translation unit owns the flag. That makes the SET callback below a no-op
-// rather than something the engine reads — enough to build and to keep the
-// option accepted, but the real fix is deciding whether haybarn wants the
-// concept at all, and dropping this block if not.
-bool preloaded_httpfs = false;
 struct PreloadedHttpfsInit {
     PreloadedHttpfsInit() { preloaded_httpfs = true; }
 } _preloaded_httpfs_init;
