@@ -196,9 +196,16 @@ EM_JS(char*, wasm_xhr_no_body, (const char *url_ptr, int header_count, char **he
     xhr.open(UTF8ToString(method_ptr), url, false);
     xhr.responseType = 'arraybuffer';
     var i = 0;
+    // Pointers cross the wasm boundary as SIGNED i32, so once the heap grows
+    // past 2 GiB every address arrives negative. Coerce before use: a negative
+    // base sends the index arithmetic out of range, and an out-of-bounds
+    // TypedArray read yields `undefined`, which quietly becomes a null pointer
+    // (the symptom was `setRequestHeader('')` throwing). emscripten emits
+    // `>>> 0` for the code it generates; EM_JS bodies are ours to get right.
+    var header_base = (header_array >>> 0) / 4;
     while (i < header_count * 2) {
-        var p1 = HEAP32[(header_array) / 4 + i];
-        var p2 = HEAP32[(header_array) / 4 + i + 1];
+        var p1 = HEAP32[header_base + i] >>> 0;
+        var p2 = HEAP32[header_base + i + 1] >>> 0;
         var name = UTF8ToString(p1);
         if (name === 'User-Agent') { i += 2; continue; }
         if (name === 'Host') name = 'X-Host-Override';
@@ -238,9 +245,12 @@ EM_JS(char*, wasm_xhr_with_body,
     xhr.open(UTF8ToString(method_ptr), url, false);
     xhr.responseType = 'arraybuffer';
     var i = 0;
+    // See the note in wasm_xhr_no_body: pointers arrive as signed i32, so past
+    // 2 GiB of heap they are negative and must be coerced before use.
+    var header_base = (header_array >>> 0) / 4;
     while (i < header_count * 2) {
-        var p1 = HEAP32[(header_array) / 4 + i];
-        var p2 = HEAP32[(header_array) / 4 + i + 1];
+        var p1 = HEAP32[header_base + i] >>> 0;
+        var p2 = HEAP32[header_base + i + 1] >>> 0;
         var name = UTF8ToString(p1);
         if (name === 'User-Agent') { i += 2; continue; }
         if (name === 'Host') name = 'X-Host-Override';
@@ -250,7 +260,14 @@ EM_JS(char*, wasm_xhr_with_body,
         i += 2;
     }
     try {
-        xhr.send(HEAPU8.slice(payload_ptr, payload_ptr + payload_len));
+        // `payload_ptr` is a signed i32 and goes negative once the heap passes
+        // 2 GiB. TypedArray.slice() reads a negative index as an offset from
+        // the END of the array, so without this coercion the request body is
+        // silently taken from an unrelated region of the heap — at exactly the
+        // right LENGTH, which is what made it so hard to attribute: the server
+        // received a correctly-sized body whose bytes were someone else's data.
+        var payload_start = payload_ptr >>> 0;
+        xhr.send(HEAPU8.slice(payload_start, payload_start + payload_len));
     } catch (e) { console.error('XHR send failed:', e); return 0; }
     var resp = xhr.response;
     var bodyLen = resp ? resp.byteLength : 0;
