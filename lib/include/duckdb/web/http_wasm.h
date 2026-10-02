@@ -33,6 +33,16 @@ struct HTTPFSParams : public HTTPParams {
 
     // Additional fields needs to be appended at the end and need to be propagated from duckdb-httpfs
     // TODO: make this unnecessary
+    //
+    // Mirrors haybarn-httpfs's src/include/httpfs_client.hpp field for field. httpfs
+    // reads its own definition from the object HTTPWasmUtil::InitializeParameters
+    // allocates here, so a field missing at the end is read past the allocation:
+    // `interrupt_flag` became a garbage cancellation pointer for every request, and
+    // S3's Clone() copied `http_version` from unowned memory.
+    string http_version{"auto"};
+    bool curl_verbose{false};
+    bool http2_multiplex{true};
+    optional_ptr<const atomic<bool>> interrupt_flag;
 };
 
 static string TryGetPrefix(const string &url) {
