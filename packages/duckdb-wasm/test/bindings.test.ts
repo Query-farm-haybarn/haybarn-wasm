@@ -383,6 +383,28 @@ export function testAsyncBindings(
                 expect(table.schema.fields.length).toEqual(1);
             });
 
+            it('cancel invalidates the explicit transaction it ran in', async () => {
+                await adb().open({
+                    path: ':memory:',
+                    query: {
+                        queryPollingInterval: 0,
+                    },
+                });
+                const conn = await adb().connect();
+                await conn.query('BEGIN');
+                await conn.query('CREATE TABLE t (i BIGINT)');
+                // Long enough that running it to completion would take minutes.
+                const insert = 'INSERT INTO t SELECT i FROM range(100000000000) tbl(i);';
+                expect(await conn.useUnsafe((db, id) => db.startPendingQuery(id, insert))).toBeNull();
+                expect(await conn.useUnsafe((db, id) => db.pollPendingQuery(id))).toBeNull();
+                expect(await conn.useUnsafe((db, id) => db.cancelPendingQuery(id))).toBeTrue();
+                // A half-run INSERT must not be committable, as with a native interrupt.
+                await expectAsync(conn.query('SELECT count(*) FROM t')).toBeRejectedWithError(/aborted/i);
+                await conn.query('ROLLBACK');
+                const table = await conn.query('select 42::integer as answer;');
+                expect(table.getChildAt(0)?.get(0)).toEqual(42);
+            });
+
             it('noop cancel', async () => {
                 await adb().open({
                     path: ':memory:',

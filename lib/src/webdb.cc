@@ -3,6 +3,9 @@
 #include "duckdb/web/webdb.h"
 
 #include <emscripten/val.h>
+#if defined(__EMSCRIPTEN_PTHREADS__)
+#include <emscripten/threading.h>
+#endif
 
 #include <chrono>
 #include <cstddef>
@@ -295,6 +298,49 @@ arrow::Result<std::shared_ptr<arrow::Buffer>> WebDB::Connection::PollPendingQuer
 bool WebDB::Connection::CancelPendingQuery() {
     // Only reset the pending query if it hasn't completed yet
     if (current_pending_query_result_ != nullptr && current_query_result_ == nullptr) {
+        // Interrupt the query and run it forward to its interrupt error, so it
+        // ends the way a native interrupt ends one: the statement fails, and an
+        // explicit transaction it ran in is invalidated.
+        //
+        // Dropping the pending result alone leaves the query active in the
+        // ClientContext. The next query's cleanup (Executor::CancelTasks) then
+        // runs every remaining task to completion on this thread, because
+        // nothing has set `interrupted`, so "cancel" meant finishing the scan
+        // before anything else could run. Background threads stop at their next
+        // chunk boundary once the flag is set.
+        connection_.Interrupt();
+        bool ended = false, blocked = false;
+        try {
+            while (!ended && !blocked) {
+                switch (current_pending_query_result_->ExecuteTask()) {
+                    case PendingExecutionResult::RESULT_NOT_READY:
+                        break;
+                    case PendingExecutionResult::NO_TASKS_AVAILABLE:
+#if defined(__EMSCRIPTEN_PTHREADS__)
+                        // The remaining tasks run on pthreads, which may be blocked on
+                        // a call proxied to this, the main runtime thread (creating a
+                        // thread, a file system call). Emscripten services those only
+                        // in futex waits and the event loop, so a spin that doesn't
+                        // run them can wait on such a task forever.
+                        emscripten_main_thread_process_queued_calls();
+#endif
+                        break;
+                    case PendingExecutionResult::BLOCKED:
+                        // A task waits on a callback the interrupt won't deliver;
+                        // the next query's cleanup drains it, with the flag still set.
+                        blocked = true;
+                        break;
+                    default:
+                        ended = true;
+                }
+            }
+        } catch (...) {
+            // The result is unusable either way; dropping it below is the fallback.
+        }
+        if (ended) {
+            // The query has ended; don't leave the flag set for the next one.
+            connection_.context->ClearInterrupt();
+        }
         current_pending_query_was_canceled_ = true;
         current_pending_query_result_.reset();
         current_pending_statements_.clear();
