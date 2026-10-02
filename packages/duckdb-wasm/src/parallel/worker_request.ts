@@ -6,6 +6,7 @@ import { DuckDBConfig } from '../bindings/config';
 import { WebFile } from '../bindings/web_file';
 import { InstantiationProgress } from '../bindings/progress';
 import { DuckDBDataProtocol } from '../bindings';
+import { InterruptHandle } from '../bindings/interrupt';
 
 export type ConnectionID = number;
 export type StatementID = number;
@@ -26,6 +27,7 @@ export enum WorkerRequestType {
     FETCH_QUERY_RESULTS = 'FETCH_QUERY_RESULTS',
     FLUSH_FILES = 'FLUSH_FILES',
     GET_FEATURE_FLAGS = 'GET_FEATURE_FLAGS',
+    GET_INTERRUPT_HANDLE = 'GET_INTERRUPT_HANDLE',
     GET_TABLE_NAMES = 'GET_TABLE_NAMES',
     GET_VERSION = 'GET_VERSION',
     GLOB_FILE_INFOS = 'GLOB_FILE_INFOS',
@@ -56,6 +58,7 @@ export enum WorkerResponseType {
     FILE_SIZE = 'FILE_SIZE',
     FILE_STATISTICS = 'FILE_STATISTICS',
     INSTANTIATE_PROGRESS = 'INSTANTIATE_PROGRESS',
+    INTERRUPT_HANDLE = 'INTERRUPT_HANDLE',
     LOG = 'LOG',
     PROGRESS_UPDATE = 'PROGRESS_UPDATE',
     OK = 'OK',
@@ -109,6 +112,7 @@ export class WorkerTask<T, D, P> {
 export type WorkerRequestVariant =
     | WorkerRequest<WorkerRequestType.CLOSE_PREPARED, [ConnectionID, StatementID]>
     | WorkerRequest<WorkerRequestType.CANCEL_PENDING_QUERY, number>
+    | WorkerRequest<WorkerRequestType.GET_INTERRUPT_HANDLE, number>
     | WorkerRequest<WorkerRequestType.COLLECT_FILE_STATISTICS, [string, boolean]>
     | WorkerRequest<WorkerRequestType.REGISTER_OPFS_FILE_NAME, [string]>
     | WorkerRequest<WorkerRequestType.CONNECT, null>
@@ -154,6 +158,7 @@ export type WorkerResponseVariant =
     | WorkerResponse<WorkerResponseType.FILE_SIZE, number>
     | WorkerResponse<WorkerResponseType.FILE_STATISTICS, FileStatistics>
     | WorkerResponse<WorkerResponseType.INSTANTIATE_PROGRESS, InstantiationProgress>
+    | WorkerResponse<WorkerResponseType.INTERRUPT_HANDLE, InterruptHandle | null>
     | WorkerResponse<WorkerResponseType.LOG, LogEntryVariant>
     | WorkerResponse<WorkerResponseType.PROGRESS_UPDATE, ProgressEntry>
     | WorkerResponse<WorkerResponseType.OK, null>
@@ -206,4 +211,5 @@ export type WorkerTaskVariant =
     | WorkerTask<WorkerRequestType.START_PENDING_QUERY, [ConnectionID, string, boolean], Uint8Array | null>
     | WorkerTask<WorkerRequestType.POLL_PENDING_QUERY, ConnectionID, Uint8Array | null>
     | WorkerTask<WorkerRequestType.CANCEL_PENDING_QUERY, ConnectionID, boolean>
+    | WorkerTask<WorkerRequestType.GET_INTERRUPT_HANDLE, ConnectionID, InterruptHandle | null>
     | WorkerTask<WorkerRequestType.TOKENIZE, string, ScriptTokens>;

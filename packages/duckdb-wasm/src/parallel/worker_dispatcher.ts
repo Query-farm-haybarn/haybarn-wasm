@@ -388,6 +388,19 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                     );
                     break;
                 }
+                case WorkerRequestType.GET_INTERRUPT_HANDLE: {
+                    // The SharedArrayBuffer is shared by postMessage, not copied.
+                    this.postMessage(
+                        {
+                            messageId: this._nextMessageId++,
+                            requestId: request.messageId,
+                            type: WorkerResponseType.INTERRUPT_HANDLE,
+                            data: this._bindings.getInterruptHandle(request.data),
+                        },
+                        [],
+                    );
+                    break;
+                }
                 case WorkerRequestType.CANCEL_PENDING_QUERY: {
                     this._stopCancelWatch();
                     const result = this._bindings.cancelPendingQuery(request.data);

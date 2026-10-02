@@ -8,6 +8,7 @@ import { StatusCode, IsArrowBuffer, IsDuckDBWasmRetry } from '../status';
 import { dropResponseBuffers, DuckDBRuntime, readString, callSRet, copyBuffer, DuckDBDataProtocol } from './runtime';
 import { CSVInsertOptions, JSONInsertOptions, ArrowInsertOptions } from './insert_options';
 import { ScriptTokens } from './tokens';
+import { InterruptHandle } from './interrupt';
 import { FileStatistics } from './file_stats';
 import { arrowToSQLField, arrowToSQLType } from '../json_typedef';
 import { WebFile } from './web_file';
@@ -304,6 +305,14 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
     /** Cancel a pending query */
     public cancelPendingQuery(conn: number): boolean {
         return this.mod.ccall('duckdb_web_pending_query_cancel', 'boolean', ['number'], [conn]);
+    }
+    /** The connection's interrupt flag, when the wasm memory is shared (threads builds). */
+    public getInterruptHandle(conn: number): InterruptHandle | null {
+        const memory = this.mod.HEAPU8.buffer;
+        if (typeof SharedArrayBuffer === 'undefined' || !(memory instanceof SharedArrayBuffer)) return null;
+        // An unsigned wasm32 address; ccall hands it back as a signed i32.
+        const offset = this.mod.ccall('duckdb_web_connection_interrupt_flag', 'number', ['number'], [conn]) >>> 0;
+        return { memory, offset };
     }
     /** Fetch query results */
     public fetchQueryResults(conn: number): Uint8Array | null {

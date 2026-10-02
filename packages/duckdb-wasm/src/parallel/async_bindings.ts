@@ -17,6 +17,7 @@ import { DuckDBConfig } from '../bindings/config';
 import { InstantiationProgress } from '../bindings/progress';
 import { arrowToSQLField } from '../json_typedef';
 import { WebFile } from '../bindings/web_file';
+import { InterruptHandle } from '../bindings/interrupt';
 import { DuckDBDataProtocol } from '../bindings';
 import { searchOPFSFiles, isOPFSProtocol } from "../utils/opfs_util";
 import { ProgressEntry } from '../log';
@@ -327,6 +328,12 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
                     return;
                 }
                 break;
+            case WorkerRequestType.GET_INTERRUPT_HANDLE:
+                if (response.type == WorkerResponseType.INTERRUPT_HANDLE) {
+                    task.promiseResolver(response.data);
+                    return;
+                }
+                break;
             case WorkerRequestType.CANCEL_PENDING_QUERY:
                 this._onInstantiationProgress = [];
                 if (response.type == WorkerResponseType.SUCCESS) {
@@ -534,6 +541,20 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
     public async cancelPendingQuery(conn: ConnectionID): Promise<boolean> {
         const task = new WorkerTask<WorkerRequestType.CANCEL_PENDING_QUERY, ConnectionID, boolean>(
             WorkerRequestType.CANCEL_PENDING_QUERY,
+            conn,
+        );
+        return await this.postTask(task);
+    }
+
+    /**
+     * The connection's interrupt flag, or null when the wasm memory is not shared
+     * (builds without threads). Fetch it once per connection; then
+     * `interruptConnection(handle)` interrupts what runs on it, even while the
+     * worker is busy inside a query and no message can reach it.
+     */
+    public async getInterruptHandle(conn: ConnectionID): Promise<InterruptHandle | null> {
+        const task = new WorkerTask<WorkerRequestType.GET_INTERRUPT_HANDLE, ConnectionID, InterruptHandle | null>(
+            WorkerRequestType.GET_INTERRUPT_HANDLE,
             conn,
         );
         return await this.postTask(task);

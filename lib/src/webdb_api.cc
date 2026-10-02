@@ -254,6 +254,15 @@ bool duckdb_web_pending_query_cancel(ConnectionHdl connHdl, const char* script) 
     auto c = reinterpret_cast<WebDB::Connection*>(connHdl);
     return c->CancelPendingQuery();
 }
+/// Address of the connection's interrupt flag (`ClientContext::interrupted`, a
+/// one-byte atomic<bool>) in wasm memory. On a threads build that memory is a
+/// SharedArrayBuffer, so another thread can set the flag with `Atomics.store`
+/// while this one is busy inside a query, which no message can reach. Stable for
+/// the connection's lifetime. Every statement clears the flag before it starts.
+uint32_t duckdb_web_connection_interrupt_flag(ConnectionHdl connHdl) {
+    auto c = reinterpret_cast<WebDB::Connection*>(connHdl);
+    return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&c->connection().context->interrupted));
+}
 /// Get query progress as a fraction in [0, 1]; -1 if not available.
 double duckdb_web_get_query_progress(ConnectionHdl connHdl) {
     auto c = reinterpret_cast<WebDB::Connection*>(connHdl);
