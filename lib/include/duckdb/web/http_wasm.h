@@ -68,6 +68,16 @@ class HTTPWasmUtil : public HTTPUtil {
             return std::move(result);
         }
 
+        // As haybarn-httpfs's own InitializeParameters does: capture the opening query's
+        // interrupt flag, which httpfs copies onto each request's cancellation. On wasm
+        // these params come from here, not from httpfs, so without it no httpfs request
+        // could be cancelled. Only a ClientContextFileOpener yields a context; an open at
+        // database-instance level leaves it unset, which keeps the pointer from outliving
+        // the context it points into.
+        if (auto context = FileOpener::TryGetClientContext(opener)) {
+            result->interrupt_flag = &context->interrupted;
+        }
+
         Value value;
 
         // Setting lookups
