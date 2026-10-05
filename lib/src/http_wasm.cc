@@ -4,6 +4,7 @@
 
 #include "duckdb/common/http_util.hpp"
 #include "duckdb/web/config.h"
+#include "duckdb/web/http_fetch.h"
 // DuckDB's bundled MbedTLS wrapper — full include path because it's in third_party
 // and we don't want a public re-export.
 #include "../../submodules/duckdb/third_party/mbedtls/include/mbedtls_wrapper.hpp"
@@ -308,9 +309,7 @@ class HTTPWasmClient : public HTTPClient {
     string host_port;
 
     unique_ptr<HTTPResponse> Get(GetRequestInfo &info) override {
-        auto path = NormalizeUrl(info.url, host_port);
-        WasmHeaderArray h(info.headers, info.params);
-        auto res = ParseWasmResponse(wasm_xhr_no_body(path.c_str(), h.count, h.ptrs, "GET"));
+        auto res = Perform(info, "GET");
         // Range-read responses come back as 206 Partial Content. Both 200 and 206
         // are successful body deliveries — without the 206 case parquet footer/range
         // reads surface as "No magic bytes found at end of file".
@@ -323,29 +322,11 @@ class HTTPWasmClient : public HTTPClient {
     }
 
     unique_ptr<HTTPResponse> Head(HeadRequestInfo &info) override {
-        auto path = NormalizeUrl(info.url, host_port);
-        WasmHeaderArray h(info.headers, info.params);
-        return ParseWasmResponse(wasm_xhr_no_body(path.c_str(), h.count, h.ptrs, "HEAD"));
+        return Perform(info, "HEAD");
     }
 
     unique_ptr<HTTPResponse> Post(PostRequestInfo &info) override {
-        // Boundary check only: honor an already-set cancellation flag before we start. The XHR
-        // below is synchronous (xhr.open(..., false)), so once send() is entered the JS event
-        // loop is blocked and the request cannot be aborted mid-flight.
-        // TODO(cancellation): real mid-flight cancellation needs an async XHR (xhr.open(..., true))
-        // driven by Asyncify, with a JS poller reading the flag from WASM memory and calling
-        // xhr.abort() — which also means changing the synchronous HTTPClient::Post contract.
-        if (info.cancellation && info.cancellation->load(std::memory_order_relaxed)) {
-            auto res = make_uniq<HTTPResponse>(HTTPStatusCode::INVALID);
-            res->cancelled = true;
-            res->request_error = "HTTP POST request was cancelled";
-            return res;
-        }
-        auto path = NormalizeUrl(info.url, host_port);
-        WasmHeaderArray h(info.headers, info.params);
-        auto res = ParseWasmResponse(wasm_xhr_with_body(path.c_str(), h.count, h.ptrs, "POST",
-                                                        reinterpret_cast<const char *>(info.buffer_in),
-                                                        info.buffer_in_len));
+        auto res = Perform(info, "POST", reinterpret_cast<const char *>(info.buffer_in), info.buffer_in_len);
         if (!res->body.empty()) {
             info.buffer_out += res->body;
         }
@@ -353,20 +334,60 @@ class HTTPWasmClient : public HTTPClient {
     }
 
     unique_ptr<HTTPResponse> Put(PutRequestInfo &info) override {
-        auto path = NormalizeUrl(info.url, host_port);
-        WasmHeaderArray h(info.headers, info.params);
-        return ParseWasmResponse(wasm_xhr_with_body(path.c_str(), h.count, h.ptrs, "PUT",
-                                                    reinterpret_cast<const char *>(info.buffer_in),
-                                                    info.buffer_in_len));
+        return Perform(info, "PUT", reinterpret_cast<const char *>(info.buffer_in), info.buffer_in_len);
     }
 
     unique_ptr<HTTPResponse> Delete(DeleteRequestInfo &info) override {
-        auto path = NormalizeUrl(info.url, host_port);
-        WasmHeaderArray h(info.headers, info.params);
-        return ParseWasmResponse(wasm_xhr_no_body(path.c_str(), h.count, h.ptrs, "DELETE"));
+        return Perform(info, "DELETE");
     }
 
    private:
+    // Every method goes through here. A request whose cancellation flag is already
+    // set is not sent. On threads builds the helper performs it with fetch(), which
+    // an interrupt or the request timeout can abort mid-flight; a cancelled response
+    // is terminal, so RunRequestWithRetry doesn't retry it. Otherwise (no shared
+    // memory, helper not running, or every mailbox slot busy) it is a synchronous
+    // XHR, which nothing can end early.
+    unique_ptr<HTTPResponse> Perform(BaseRequest &info, const char *method, const char *body = nullptr,
+                                     idx_t body_len = 0) {
+        auto cancellation = info.cancellation.get();
+        if (cancellation && cancellation->load(std::memory_order_relaxed)) {
+            return Cancelled(method);
+        }
+        auto path = NormalizeUrl(info.url, host_port);
+        WasmHeaderArray h(info.headers, info.params);
+        auto fetched = web::FetchViaHelper(path, method, h.ptrs, h.count, body, static_cast<int>(body_len),
+                                           cancellation, info.params.timeout);
+        switch (fetched.outcome) {
+        case web::FetchOutcome::OK:
+            return ParseWasmResponse(fetched.buffer);
+        case web::FetchOutcome::FAILED:
+            return ParseWasmResponse(nullptr);
+        case web::FetchOutcome::CANCELLED:
+            return Cancelled(method);
+        case web::FetchOutcome::TIMED_OUT: {
+            auto res = make_uniq<HTTPResponse>(HTTPStatusCode::INVALID);
+            res->request_error = StringUtil::Format("HTTP %s request timed out after %llu seconds", method,
+                                                    static_cast<unsigned long long>(info.params.timeout));
+            return res;
+        }
+        case web::FetchOutcome::UNAVAILABLE:
+            break;
+        }
+        if (body) {
+            return ParseWasmResponse(wasm_xhr_with_body(path.c_str(), h.count, h.ptrs, method, body,
+                                                        static_cast<int>(body_len)));
+        }
+        return ParseWasmResponse(wasm_xhr_no_body(path.c_str(), h.count, h.ptrs, method));
+    }
+
+    static unique_ptr<HTTPResponse> Cancelled(const char *method) {
+        auto res = make_uniq<HTTPResponse>(HTTPStatusCode::INVALID);
+        res->cancelled = true;
+        res->request_error = StringUtil::Format("HTTP %s request was cancelled", method);
+        return res;
+    }
+
     optional_ptr<HTTPState> state;
 };
 

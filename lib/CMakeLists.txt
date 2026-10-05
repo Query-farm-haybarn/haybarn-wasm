@@ -231,6 +231,7 @@ add_library(
   ${CMAKE_SOURCE_DIR}/src/arrow_insert_options.cc
   ${CMAKE_SOURCE_DIR}/src/arrow_stream_buffer.cc
   ${CMAKE_SOURCE_DIR}/src/http_wasm.cc
+  ${CMAKE_SOURCE_DIR}/src/http_fetch.cc
   ${CMAKE_SOURCE_DIR}/src/arrow_type_mapping.cc
   ${CMAKE_SOURCE_DIR}/src/config.cc
   ${CMAKE_SOURCE_DIR}/src/csv_insert_options.cc
@@ -309,7 +310,7 @@ if(EMSCRIPTEN)
       -s MAXIMUM_MEMORY=4GB \
       -s MODULARIZE=1 \
       -s EXPORT_NAME='DuckDB' \
-      -s EXPORTED_RUNTIME_METHODS='[\"ccall\", \"stackSave\", \"stackAlloc\", \"stackRestore\", \"HEAP8\", \"HEAPU8\", \"HEAP16\", \"HEAPU16\", \"HEAP32\", \"HEAPU32\", \"HEAPF32\", \"HEAPF64\"]' \
+      -s EXPORTED_RUNTIME_METHODS='[\"ccall\", \"stackSave\", \"stackAlloc\", \"stackRestore\", \"HEAP8\", \"HEAPU8\", \"HEAP16\", \"HEAPU16\", \"HEAP32\", \"HEAPU32\", \"HEAPF32\", \"HEAPF64\", \"wasmMemory\"]' \
       --js-library=${CMAKE_SOURCE_DIR}/js-stubs.js")
   # --js-library is a bare link flag, so ninja/make don't otherwise treat js-stubs.js
   # as a relink trigger — editing it would silently ship a stale glue. Track it.

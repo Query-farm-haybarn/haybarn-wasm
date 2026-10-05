@@ -9,6 +9,7 @@ import { dropResponseBuffers, DuckDBRuntime, readString, callSRet, copyBuffer, D
 import { CSVInsertOptions, JSONInsertOptions, ArrowInsertOptions } from './insert_options';
 import { ScriptTokens } from './tokens';
 import { InterruptHandle } from './interrupt';
+import { startHttpFetchHelper } from './http_fetch_helper';
 import { FileStatistics } from './file_stats';
 import { arrowToSQLField, arrowToSQLType } from '../json_typedef';
 import { WebFile } from './web_file';
@@ -97,6 +98,12 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
         // Wait for onRuntimeInitialized
         await this._initPromise;
         this._initPromise = null;
+        // Before any query can block a thread on HTTP; never fails instantiate.
+        try {
+            await startHttpFetchHelper(this._instance);
+        } catch (e) {
+            console.warn('[http] fetch helper unavailable, using synchronous XHR:', e);
+        }
         // Remove own progress callback
         this.onInstantiationProgress = this.onInstantiationProgress.filter(x => x != onProgress);
         (globalThis as any).DUCKDB_BINDINGS = this;
