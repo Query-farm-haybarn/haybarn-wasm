@@ -55,7 +55,7 @@ upstream is a future rebase tax.
 Workspace versions match the embedded engine version:
 `<duckdb-major>.<duckdb-minor>.<duckdb-patch>-rc<N>` while we're in rc,
 dropping the `-rc<N>` suffix when the engine cuts a stable tag.
-Currently `1.5.5-rc8`.
+Currently `1.5.6-rc1`.
 
 Cutting an rc: bump the same ~12 files an existing `release: bump workspace
 to <rc>` commit touched (`grep -rl <old-rc>` finds them: 9 `package.json`
@@ -70,9 +70,9 @@ release resolves its own path.
 ## Local smoke-build setup
 
 ```bash
-# 1. Install pinned emsdk (CI uses 5.0.7):
+# 1. Install pinned emsdk (CI uses 6.0.12):
 git clone --depth=1 https://github.com/emscripten-core/emsdk.git /tmp/emsdk
-cd /tmp/emsdk && ./emsdk install 5.0.7 && ./emsdk activate 5.0.7
+cd /tmp/emsdk && ./emsdk install 6.0.12 && ./emsdk activate 6.0.12
 
 # 2. From haybarn-wasm root, smoke build (one variant is enough):
 cd /path/to/haybarn-wasm
@@ -93,7 +93,7 @@ Gotchas to know:
   without a reachable tag.
 - `CMAKE_POLICY_VERSION_MINIMUM=3.5` is needed because rapidjson's
   CMakeLists declares a pre-3.5 minimum, which modern CMake 4.x rejects.
-- Homebrew's emscripten works on 5.x but is HEAD — pin to emsdk 5.0.7
+- Homebrew's emscripten is HEAD — pin to emsdk 6.0.12
   to match what CI uses. Older emsdk (≤ 3.1.x) won't work: the wasm-side
   preprocessor checks were updated to use `__EMSCRIPTEN__` (the standard
   reserved-namespace form), which is what 4.x+ defines.
