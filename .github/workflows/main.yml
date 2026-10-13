@@ -39,8 +39,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  EMSCRIPTEN_VERSION: '5.0.7'
-  EMSCRIPTEN_VERSION_COI: '5.0.7'
+  EMSCRIPTEN_VERSION: '6.0.12'
+  EMSCRIPTEN_VERSION_COI: '6.0.12'
   DEFAULT_USE_GENERATED_EXPORTED_LIST: 'no'
   # Placeholder npm token. `actions/setup-node` with `registry-url:` writes
   # an .npmrc (pointed at by NPM_CONFIG_USERCONFIG) containing a literal

@@ -1,4 +1,4 @@
-import { DuckDBModule, PThread } from './duckdb_module';
+import { DuckDBModule, PThread, runningWorkers } from './duckdb_module';
 import { DuckDBConfig } from './config';
 import { Logger } from '../log';
 import { InstantiationProgress } from './progress';
@@ -173,7 +173,7 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
     public disconnect(conn: number): void {
         this.mod.ccall('duckdb_web_disconnect', null, ['number'], [conn]);
         if (this.pthread) {
-            for (const worker of [...this.pthread.runningWorkers, ...this.pthread.unusedWorkers]) {
+            for (const worker of [...runningWorkers(this.pthread), ...this.pthread.unusedWorkers]) {
                 worker.postMessage({
                     cmd: 'dropUDFFunctions',
                     connectionId: conn,
@@ -401,7 +401,7 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
             def,
         );
         if (this.pthread) {
-            for (const worker of [...this.pthread.runningWorkers, ...this.pthread.unusedWorkers]) {
+            for (const worker of [...runningWorkers(this.pthread), ...this.pthread.unusedWorkers]) {
                 worker.postMessage({
                     cmd: 'registerUDFFunction',
                     udf: def,
@@ -686,7 +686,7 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
             delete globalThis.DUCKDB_RUNTIME._preparedHandles[name];
         }
         if (this.pthread) {
-            for (const worker of this.pthread.runningWorkers) {
+            for (const worker of runningWorkers(this.pthread)) {
                 worker.postMessage({
                     cmd: 'registerFileHandle',
                     fileName: name,

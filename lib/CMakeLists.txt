@@ -141,21 +141,30 @@ if(EMSCRIPTEN)
   endif()
 
   if(WITH_WASM_THREADS)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -sUSE_PTHREADS=1 -DWEBDB_THREADS=1")
-    set(DUCKDB_CXX_FLAGS "${CMAKE_CXX_FLAGS} -sUSE_PTHREADS=1")
+    # -pthread, not -sUSE_PTHREADS: emscripten 6.0.1 deprecated the setting in
+    # favour of the standard flag.
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -DWEBDB_THREADS=1")
+    set(DUCKDB_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
     # Pool sized for the DuckDB task scheduler (up to hardware-concurrency, ~4)
     # *plus* headroom for threads that loaded extensions spin up themselves
     # (e.g. vgi's background workers). At =4 the scheduler alone exhausts the
     # pool, so any extension thread forces dynamic (proxied) thread creation,
     # which makes blocking joins/fetches deadlock-prone. 8 gives that headroom.
-    set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -sUSE_PTHREADS=1 -sPTHREAD_POOL_SIZE=8 -pthread")
+    set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -sPTHREAD_POOL_SIZE=8 -pthread")
+    # emscripten 6.0.2 dropped `mainScriptUrlOrBlob` from the default
+    # INCOMING_MODULE_JS_API, and the glue only emits the code that reads a
+    # Module option when it is listed. bindings_browser_coi.ts relies on it to
+    # start pthread workers from our wrapper bundle, so without this the option
+    # is silently ignored and workers boot the raw glue instead. The setting
+    # replaces the default list rather than extending it, hence the full list
+    # (emscripten 6.0.12's defaults + mainScriptUrlOrBlob).
+    set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -sINCOMING_MODULE_JS_API=ENVIRONMENT,arguments,canvas,dynamicLibraries,elementPointerLock,instantiateWasm,locateFile,monitorRunDependencies,noExitRuntime,noInitialRun,onAbort,onExit,onRuntimeInitialized,postRun,preInit,preRun,print,printErr,setStatus,statusMessage,stderr,stdin,stdout,thisProgram,wasm,websocket,mainScriptUrlOrBlob")
     set(DUCKDB_PLATFORM "wasm_threads")
   else()
     set(CMAKE_CXX_FLAGS
-        "${CMAKE_CXX_FLAGS} -sUSE_PTHREADS=0 -DDUCKDB_NO_THREADS=1")
+        "${CMAKE_CXX_FLAGS} -DDUCKDB_NO_THREADS=1")
     set(DUCKDB_CXX_FLAGS
-        "${CMAKE_CXX_FLAGS} -sUSE_PTHREADS=0 -DDUCKDB_NO_THREADS=1")
-    set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -sUSE_PTHREADS=0")
+        "${CMAKE_CXX_FLAGS} -DDUCKDB_NO_THREADS=1")
     set(THREAD_LIBS)
   endif()
   set(DUCKDB_CXX_FLAGS "${DUCKDB_CXX_FLAGS} -DDUCKDB_CUSTOM_PLATFORM=${DUCKDB_PLATFORM}")

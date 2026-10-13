@@ -37,14 +37,14 @@ import { execSync } from 'child_process';
 // We should upgrade all CommonJS bundles to ESM as soon as the dynamic requires are resolved.
 
 // Browser targets bumped from chrome64/firefox62/safari11.1 to support
-// BigInt literal syntax (Chrome 67, Firefox 68, Safari 14) — emsdk 5.0.7
+// BigInt literal syntax (Chrome 67, Firefox 68, Safari 14) — emsdk 5.x+
 // emits BigInt literals in its runtime under WASM_BIGINT=1. Safari before
 // 14.1 also implements destructuring incorrectly, so newer esbuild versions
 // correctly reject it as a target for this source.
 const TARGET_BROWSER = ['chrome67', 'edge79', 'firefox68', 'safari14.1'];
 const TARGET_BROWSER_TEST = ['es2020'];
 const TARGET_NODE = ['node14.6'];
-// emsdk 5.0.7's runtime imports node builtins via the `node:` URL scheme
+// emsdk 5.x+'s runtime imports node builtins via the `node:` URL scheme
 // (e.g. `node:fs`, `node:crypto`, `node:worker_threads`, `node:util`,
 // `node:os`) inside an `ENVIRONMENT_IS_NODE`-gated branch. esbuild can't
 // statically resolve these for browser bundles; mark them external (via the

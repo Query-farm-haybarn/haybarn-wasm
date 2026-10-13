@@ -1,6 +1,17 @@
 export interface PThread {
+    /** Idle pool workers, not currently hosting a pthread. */
     unusedWorkers: Worker[];
-    runningWorkers: Worker[];
+    /**
+     * Workers currently hosting a pthread, keyed by `pthread_t` pointer.
+     * emscripten 6.0.0 removed the parallel `runningWorkers` array; this map is
+     * the only record of running workers now.
+     */
+    pthreads: Record<number, Worker>;
+}
+
+/** The workers currently hosting a pthread. */
+export function runningWorkers(pthread: PThread): Worker[] {
+    return Object.values(pthread.pthreads);
 }
 
 export interface DuckDBModule extends EmscriptenModule {
