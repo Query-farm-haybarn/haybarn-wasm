@@ -243,7 +243,6 @@ add_library(
   ${CMAKE_SOURCE_DIR}/src/arrow_stream_buffer.cc
   ${CMAKE_SOURCE_DIR}/src/http_wasm.cc
   ${CMAKE_SOURCE_DIR}/src/http_fetch.cc
-  ${CMAKE_SOURCE_DIR}/src/arrow_type_mapping.cc
   ${CMAKE_SOURCE_DIR}/src/config.cc
   ${CMAKE_SOURCE_DIR}/src/csv_insert_options.cc
   ${CMAKE_SOURCE_DIR}/src/functions/table_function_relation.cc

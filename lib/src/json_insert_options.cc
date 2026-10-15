@@ -88,7 +88,7 @@ arrow::Status JSONInsertOptions::ReadFrom(const rapidjson::Document& doc) {
             case FieldTag::COLUMNS: {
                 ARROW_RETURN_NOT_OK(RequireFieldType(iter->value, rapidjson::Type::kArrayType, name));
                 const auto columns_array = iter->value.GetArray();
-                ARROW_ASSIGN_OR_RAISE(columns, SQLToArrowFields(columns_array));
+                ARROW_ASSIGN_OR_RAISE(columns, SQLToDuckDBFields(columns_array));
                 continue;
             }
         }

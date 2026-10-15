@@ -50,7 +50,6 @@
 #include "duckdb/web/arrow_insert_options.h"
 #include "duckdb/web/arrow_ipc_writer.h"
 #include "duckdb/web/arrow_stream_buffer.h"
-#include "duckdb/web/arrow_type_mapping.h"
 #include "duckdb/web/config.h"
 #include "duckdb/web/csv_insert_options.h"
 #include "duckdb/web/environment.h"
@@ -507,7 +506,7 @@ arrow::Status WebDB::Connection::CreateScalarFunction(std::string_view def_json)
 
     // Read return type
     auto name = def->name;
-    ARROW_ASSIGN_OR_RAISE(auto ret_type, mapArrowTypeToDuckDB(*def->return_type));
+    auto ret_type = def->return_type;
 
     // UDF lambda
     auto udf = [&, udf = std::move(def)](DataChunk& chunk, ExpressionState& state, Vector& vec) {
@@ -726,9 +725,8 @@ arrow::Status WebDB::Connection::InsertCSVFromPath(std::string_view path, std::s
         if (options.columns.has_value()) {
             child_list_t<Value> columns;
             columns.reserve(options.columns.value().size());
-            for (auto& col : options.columns.value()) {
-                ARROW_ASSIGN_OR_RAISE(auto type, mapArrowTypeToDuckDB(*col->type()));
-                columns.push_back(make_pair(col->name(), Value(type.ToString())));
+            for (auto& [name, type] : options.columns.value()) {
+                columns.push_back(make_pair(name, Value(type.ToString())));
             }
             named_params.insert({"columns", Value::STRUCT(std::move(columns))});
         }
@@ -800,10 +798,7 @@ arrow::Status WebDB::Connection::InsertJSONFromPath(std::string_view path, std::
         /// Map explicitly specified column types
         child_list_t<LogicalType> column_types;
         if (options.columns.has_value() && !auto_detect) {
-            for (auto& col : *options.columns) {
-                ARROW_ASSIGN_OR_RAISE(auto type, mapArrowTypeToDuckDB(*col->type()));
-                column_types.emplace_back(col->name(), std::move(type));
-            }
+            column_types = *options.columns;
         }
 
         /// Both shapes are read as a single JSON document, so the object size limit must cover the whole file.
