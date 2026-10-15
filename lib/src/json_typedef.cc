@@ -1,6 +1,6 @@
 #include "duckdb/web/json_typedef.h"
 
-#include <arrow/result.h>
+#include "duckdb/web/utils/status.h"
 
 #include <algorithm>
 #include <duckdb/common/types.hpp>
@@ -15,13 +15,11 @@
 #include <variant>
 #include <vector>
 
-#include "arrow/status.h"
 #include "rapidjson/document.h"
 #include "rapidjson/istreamwrapper.h"
 #include "rapidjson/rapidjson.h"
 #include "rapidjson/writer.h"
 
-using namespace arrow;
 
 namespace duckdb {
 namespace web {
@@ -74,38 +72,38 @@ Result<const rapidjson::Value::ConstObject> GetMemberObject(const rapidjson::Val
 }
 
 Result<duckdb::LogicalType> ReadMemberType(const rapidjson::Value::ConstObject& obj, std::string_view key) {
-    ARROW_ASSIGN_OR_RAISE(const auto member, GetMemberObject(obj, key));
+    WEBDB_ASSIGN_OR_RAISE(const auto member, GetMemberObject(obj, key));
     return SQLToDuckDBType(member);
 }
 
 Result<duckdb::LogicalType> ReadMapType(const rapidjson::Value::ConstObject& obj) {
-    ARROW_ASSIGN_OR_RAISE(auto key_type, ReadMemberType(obj, "keyType"));
-    ARROW_ASSIGN_OR_RAISE(auto value_type, ReadMemberType(obj, "valueType"));
+    WEBDB_ASSIGN_OR_RAISE(auto key_type, ReadMemberType(obj, "keyType"));
+    WEBDB_ASSIGN_OR_RAISE(auto value_type, ReadMemberType(obj, "valueType"));
     return duckdb::LogicalType::MAP(std::move(key_type), std::move(value_type));
 }
 
 Result<duckdb::LogicalType> ReadFixedSizeBinaryType(const rapidjson::Value::ConstObject& obj) {
-    ARROW_ASSIGN_OR_RAISE(const int32_t byte_width, GetIntField<int32_t>(obj, "byteWidth", 0));
+    WEBDB_ASSIGN_OR_RAISE(const int32_t byte_width, GetIntField<int32_t>(obj, "byteWidth", 0));
     if (byte_width <= 0) return Status::Invalid("FixedSizeBinary byteWidth must be > 0");
     return duckdb::LogicalType::BLOB;
 }
 
 Result<duckdb::LogicalType> ReadFixedSizeListType(const rapidjson::Value::ConstObject& obj) {
-    ARROW_ASSIGN_OR_RAISE(auto value_type, ReadMemberType(obj, "valueType"));
-    ARROW_ASSIGN_OR_RAISE(const int32_t list_size, GetIntField<int32_t>(obj, "listSize"));
+    WEBDB_ASSIGN_OR_RAISE(auto value_type, ReadMemberType(obj, "valueType"));
+    WEBDB_ASSIGN_OR_RAISE(const int32_t list_size, GetIntField<int32_t>(obj, "listSize"));
     if (list_size <= 0) return Status::Invalid("FixedSizeList listSize must be > 0");
     return duckdb::LogicalType::LIST(std::move(value_type));
 }
 
 Result<duckdb::LogicalType> ReadListType(const rapidjson::Value::ConstObject& obj) {
-    ARROW_ASSIGN_OR_RAISE(auto value_type, ReadMemberType(obj, "valueType"));
+    WEBDB_ASSIGN_OR_RAISE(auto value_type, ReadMemberType(obj, "valueType"));
     return duckdb::LogicalType::LIST(std::move(value_type));
 }
 
 Result<duckdb::LogicalType> ReadDecimalType(const rapidjson::Value::ConstObject& obj, int32_t default_precision = 0,
                                             int32_t default_scale = 0) {
-    ARROW_ASSIGN_OR_RAISE(const int32_t precision, GetIntField<int32_t>(obj, "precision", default_precision));
-    ARROW_ASSIGN_OR_RAISE(const int32_t scale, GetIntField<int32_t>(obj, "scale", default_scale));
+    WEBDB_ASSIGN_OR_RAISE(const int32_t precision, GetIntField<int32_t>(obj, "precision", default_precision));
+    WEBDB_ASSIGN_OR_RAISE(const int32_t scale, GetIntField<int32_t>(obj, "scale", default_scale));
     if (precision <= 0 || precision > duckdb::Decimal::MAX_WIDTH_DECIMAL) {
         return Status::Invalid("Decimal precision must be between 1 and ", duckdb::Decimal::MAX_WIDTH_DECIMAL);
     }
@@ -120,18 +118,18 @@ Result<duckdb::LogicalType> ReadTimestampType(const rapidjson::Value::ConstObjec
 }
 
 Result<duckdb::LogicalType> ReadStructType(const rapidjson::Value::ConstObject& obj) {
-    ARROW_ASSIGN_OR_RAISE(const auto children, GetArrayField(obj, "fields"));
-    ARROW_ASSIGN_OR_RAISE(auto child_types, SQLToDuckDBFields(children));
+    WEBDB_ASSIGN_OR_RAISE(const auto children, GetArrayField(obj, "fields"));
+    WEBDB_ASSIGN_OR_RAISE(auto child_types, SQLToDuckDBFields(children));
     return duckdb::LogicalType::STRUCT(std::move(child_types));
 }
 
 }  // namespace
 
 /// Read a type
-arrow::Result<duckdb::LogicalType> SQLToDuckDBType(const rapidjson::Value::ConstObject& type) {
-    ARROW_ASSIGN_OR_RAISE(const auto obj, GetStringField(type, "sqlType", ""));
-    using TypeResolver = std::function<arrow::Result<duckdb::LogicalType>(const rapidjson::Value::ConstObject&)>;
-    auto fixed = [](duckdb::LogicalType t) { return [t](auto&) -> arrow::Result<duckdb::LogicalType> { return t; }; };
+Result<duckdb::LogicalType> SQLToDuckDBType(const rapidjson::Value::ConstObject& type) {
+    WEBDB_ASSIGN_OR_RAISE(const auto obj, GetStringField(type, "sqlType", ""));
+    using TypeResolver = std::function<Result<duckdb::LogicalType>(const rapidjson::Value::ConstObject&)>;
+    auto fixed = [](duckdb::LogicalType t) { return [t](auto&) -> Result<duckdb::LogicalType> { return t; }; };
     using duckdb::LogicalType;
     static std::unordered_map<std::string_view, TypeResolver> TYPE_MAPPING{
         {"binary", fixed(LogicalType::BLOB)},
@@ -204,30 +202,30 @@ arrow::Result<duckdb::LogicalType> SQLToDuckDBType(const rapidjson::Value::Const
 }
 
 /// Read a field
-arrow::Result<std::pair<std::string, duckdb::LogicalType>> SQLToDuckDBField(const rapidjson::Value& field) {
+Result<std::pair<std::string, duckdb::LogicalType>> SQLToDuckDBField(const rapidjson::Value& field) {
     if (!field.IsObject()) {
         return Status::Invalid("Field was not a JSON object");
     }
     const auto& field_obj = field.GetObject();
-    ARROW_ASSIGN_OR_RAISE(auto name, GetStringField(field_obj, "name", ""));
+    WEBDB_ASSIGN_OR_RAISE(auto name, GetStringField(field_obj, "name", ""));
     if (name == "") return Status::Invalid("invalid field name");
-    ARROW_ASSIGN_OR_RAISE(auto type, SQLToDuckDBType(field_obj));
+    WEBDB_ASSIGN_OR_RAISE(auto type, SQLToDuckDBType(field_obj));
     return std::make_pair(std::string{name}, std::move(type));
 }
 
 /// Read fields from an array
-arrow::Result<duckdb::child_list_t<duckdb::LogicalType>> SQLToDuckDBFields(const rapidjson::Value::ConstArray& fields) {
+Result<duckdb::child_list_t<duckdb::LogicalType>> SQLToDuckDBFields(const rapidjson::Value::ConstArray& fields) {
     duckdb::child_list_t<duckdb::LogicalType> out;
     out.reserve(fields.Size());
     for (rapidjson::SizeType i = 0; i < fields.Size(); ++i) {
-        ARROW_ASSIGN_OR_RAISE(auto field, SQLToDuckDBField(fields[i]));
+        WEBDB_ASSIGN_OR_RAISE(auto field, SQLToDuckDBField(fields[i]));
         out.push_back(std::move(field));
     }
     return out;
 }
 
 /// Serialize a SQL type as string
-arrow::Result<rapidjson::Value> WriteSQLType(rapidjson::Document& doc, const duckdb::LogicalType& type) {
+Result<rapidjson::Value> WriteSQLType(rapidjson::Document& doc, const duckdb::LogicalType& type) {
     auto& alloc = doc.GetAllocator();
     rapidjson::Value out(rapidjson::kObjectType);
     switch (type.id()) {
@@ -293,7 +291,7 @@ arrow::Result<rapidjson::Value> WriteSQLType(rapidjson::Document& doc, const duc
             out.AddMember("sqlType", "struct", alloc);
             rapidjson::Value children(rapidjson::kArrayType);
             for (auto& child : duckdb::StructType::GetChildTypes(type)) {
-                ARROW_ASSIGN_OR_RAISE(auto field, WriteSQLField(doc, child.first, child.second, true));
+                WEBDB_ASSIGN_OR_RAISE(auto field, WriteSQLField(doc, child.first, child.second, true));
                 children.PushBack(field, alloc);
             }
             out.AddMember("fields", children, alloc);
@@ -302,15 +300,15 @@ arrow::Result<rapidjson::Value> WriteSQLType(rapidjson::Document& doc, const duc
         case duckdb::LogicalTypeId::LIST: {
             out.AddMember("sqlType", "list", alloc);
             rapidjson::Value children(rapidjson::kArrayType);
-            ARROW_ASSIGN_OR_RAISE(auto value, WriteSQLType(doc, duckdb::ListType::GetChildType(type)));
+            WEBDB_ASSIGN_OR_RAISE(auto value, WriteSQLType(doc, duckdb::ListType::GetChildType(type)));
             out.AddMember("valueType", value, alloc);
             break;
         }
         case duckdb::LogicalTypeId::MAP: {
             out.AddMember("sqlType", "map", alloc);
             rapidjson::Value children(rapidjson::kArrayType);
-            ARROW_ASSIGN_OR_RAISE(auto key, WriteSQLType(doc, duckdb::MapType::KeyType(type)));
-            ARROW_ASSIGN_OR_RAISE(auto value, WriteSQLType(doc, duckdb::MapType::ValueType(type)));
+            WEBDB_ASSIGN_OR_RAISE(auto key, WriteSQLType(doc, duckdb::MapType::KeyType(type)));
+            WEBDB_ASSIGN_OR_RAISE(auto value, WriteSQLType(doc, duckdb::MapType::ValueType(type)));
             out.AddMember("keyType", key, alloc);
             out.AddMember("valueType", value, alloc);
             break;
@@ -348,10 +346,10 @@ arrow::Result<rapidjson::Value> WriteSQLType(rapidjson::Document& doc, const duc
     return out;
 }
 
-arrow::Result<rapidjson::Value> WriteSQLField(rapidjson::Document& doc, std::string_view name,
+Result<rapidjson::Value> WriteSQLField(rapidjson::Document& doc, std::string_view name,
                                               const duckdb::LogicalType& type, bool nullable) {
     auto& alloc = doc.GetAllocator();
-    ARROW_ASSIGN_OR_RAISE(auto out, WriteSQLType(doc, type));
+    WEBDB_ASSIGN_OR_RAISE(auto out, WriteSQLType(doc, type));
     out.AddMember("name", rapidjson::StringRef(name.data(), name.length()), alloc);
     return out;
 }

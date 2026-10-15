@@ -56,13 +56,13 @@ BufferingArrowIPCStreamDecoder::BufferingArrowIPCStreamDecoder(std::shared_ptr<A
     ArrowIpcDecoderInit(decoder_.get());
 }
 
-arrow::Status BufferingArrowIPCStreamDecoder::Consume(const uint8_t* data, size_t size) {
+Status BufferingArrowIPCStreamDecoder::Consume(const uint8_t* data, size_t size) {
     if (buffer_->is_eos_) {
-        return arrow::Status::Invalid("Arrow IPC stream continues after its end-of-stream marker");
+        return Status::Invalid("Arrow IPC stream continues after its end-of-stream marker");
     }
     auto& bytes = *buffer_->bytes_.get();
     if (ArrowBufferAppend(&bytes, data, static_cast<int64_t>(size)) != NANOARROW_OK) {
-        return arrow::Status::OutOfMemory("failed to buffer Arrow IPC stream");
+        return Status::OutOfMemory("failed to buffer Arrow IPC stream");
     }
 
     // Skip over every complete message to see whether the end-of-stream marker has arrived
@@ -76,17 +76,17 @@ arrow::Status BufferingArrowIPCStreamDecoder::Consume(const uint8_t* data, size_
                 break;
             case ENODATA:
                 buffer_->is_eos_ = true;
-                return arrow::Status::OK();
+                return Status::OK();
             case ESPIPE:
                 // The header is incomplete
-                return arrow::Status::OK();
+                return Status::OK();
             default:
-                return arrow::Status::Invalid("Invalid Arrow IPC stream: ", error.message);
+                return Status::Invalid("Invalid Arrow IPC stream: ", error.message);
         }
         auto message_size = static_cast<int64_t>(decoder_->header_size_bytes) + decoder_->body_size_bytes;
         if (remaining.size_bytes < message_size) {
             // The body is incomplete
-            return arrow::Status::OK();
+            return Status::OK();
         }
         next_message_offset_ += message_size;
     }

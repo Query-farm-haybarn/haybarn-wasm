@@ -1,9 +1,8 @@
 #ifndef INCLUDE_DUCKDB_WEB_UTILS_WASM_RESPONSE_H_
 #define INCLUDE_DUCKDB_WEB_UTILS_WASM_RESPONSE_H_
 
-#include "arrow/io/buffered.h"
-#include "arrow/io/interfaces.h"
-#include "arrow/ipc/writer.h"
+#include "duckdb/web/utils/status.h"
+#include "duckdb/web/utils/buffer.h"
 
 namespace duckdb {
 namespace web {
@@ -26,7 +25,7 @@ class WASMResponseBuffer {
     /// The string result buffer (if any)
     std::string result_str_;
     /// The arrow result buffer (if any)
-    std::shared_ptr<arrow::Buffer> result_arrow_;
+    std::shared_ptr<Buffer> result_arrow_;
 
    public:
     /// Constructor
@@ -36,7 +35,7 @@ class WASMResponseBuffer {
     void Clear();
     /// Store the arrow status.
     /// Returns wheather the result was OK
-    bool Store(WASMResponse& response, arrow::Status status);
+    bool Store(WASMResponse& response, Status status);
     /// Store a DuckDBWasmResultsWrapper
     void Store(WASMResponse& response, DuckDBWasmResultsWrapper& value);
     /// Store a string
@@ -44,13 +43,13 @@ class WASMResponseBuffer {
     /// Store a string view
     void Store(WASMResponse& response, std::string_view value);
     /// Store the result buffer
-    void Store(WASMResponse& response, arrow::Result<std::shared_ptr<arrow::Buffer>> result);
+    void Store(WASMResponse& response, Result<std::shared_ptr<Buffer>> result);
     /// Store the result string
-    void Store(WASMResponse& response, arrow::Result<std::string> result);
+    void Store(WASMResponse& response, Result<std::string> result);
     /// Store the result double
-    void Store(WASMResponse& response, arrow::Result<double> result);
+    void Store(WASMResponse& response, Result<double> result);
     /// Store the result size_t
-    void Store(WASMResponse& response, arrow::Result<size_t> result);
+    void Store(WASMResponse& response, Result<size_t> result);
 
     /// Get the instance
     static WASMResponseBuffer& Get();

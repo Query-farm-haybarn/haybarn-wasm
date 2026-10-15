@@ -6,7 +6,7 @@
 #include <string>
 #include <string_view>
 
-#include "arrow/type_fwd.h"
+#include "duckdb/web/utils/status.h"
 #include "duckdb/common/types.hpp"
 #include "rapidjson/document.h"
 
@@ -24,7 +24,7 @@ struct UDFFunctionDeclaration {
     duckdb::LogicalType return_type = duckdb::LogicalType::INVALID;
 
     /// Read from a document
-    arrow::Status ReadFrom(const rapidjson::Document& doc);
+    Status ReadFrom(const rapidjson::Document& doc);
 };
 
 }  // namespace web

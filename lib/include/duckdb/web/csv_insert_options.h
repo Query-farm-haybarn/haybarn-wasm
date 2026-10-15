@@ -6,7 +6,7 @@
 #include <optional>
 #include <string>
 
-#include "arrow/type_fwd.h"
+#include "duckdb/web/utils/status.h"
 #include "duckdb/common/types.hpp"
 #include "rapidjson/document.h"
 
@@ -42,7 +42,7 @@ struct CSVInsertOptions {
     std::optional<duckdb::child_list_t<duckdb::LogicalType>> columns = std::nullopt;
 
     /// Read from input stream
-    arrow::Status ReadFrom(const rapidjson::Document& doc);
+    Status ReadFrom(const rapidjson::Document& doc);
 };
 
 }  // namespace csv

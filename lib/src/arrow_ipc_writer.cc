@@ -11,22 +11,9 @@ namespace web {
 
 namespace {
 
-/// An arrow::Buffer that owns the memory of a nanoarrow buffer without copying it
-class NanoarrowBuffer : public arrow::Buffer {
-   public:
-    explicit NanoarrowBuffer(nanoarrow::UniqueBuffer buffer) : arrow::Buffer(nullptr, 0), buffer_(std::move(buffer)) {
-        data_ = buffer_->data;
-        size_ = buffer_->size_bytes;
-        capacity_ = buffer_->capacity_bytes;
-    }
-
-   private:
-    nanoarrow::UniqueBuffer buffer_;
-};
-
-arrow::Status ToStatus(ArrowErrorCode code, const ArrowError& error) {
-    if (code == NANOARROW_OK) return arrow::Status::OK();
-    return arrow::Status::IOError("Arrow IPC serialization failed: ", error.message[0] ? error.message : strerror(code));
+Status ToStatus(ArrowErrorCode code, const ArrowError& error) {
+    if (code == NANOARROW_OK) return Status::OK();
+    return Status::IOError("Arrow IPC serialization failed: ", error.message[0] ? error.message : strerror(code));
 }
 
 }  // namespace
@@ -55,7 +42,7 @@ struct ArrowIPCWriter::State {
 ArrowIPCWriter::ArrowIPCWriter(std::unique_ptr<State> state) : state_(std::move(state)) {}
 ArrowIPCWriter::~ArrowIPCWriter() = default;
 
-arrow::Result<std::unique_ptr<ArrowIPCWriter>> ArrowIPCWriter::Create(ArrowSchema* schema, const QueryConfig& config,
+Result<std::unique_ptr<ArrowIPCWriter>> ArrowIPCWriter::Create(ArrowSchema* schema, const QueryConfig& config,
                                                                       Format format) {
     auto state = std::make_unique<State>();
     state->format = format;
@@ -81,29 +68,31 @@ arrow::Result<std::unique_ptr<ArrowIPCWriter>> ArrowIPCWriter::Create(ArrowSchem
     return std::unique_ptr<ArrowIPCWriter>(new ArrowIPCWriter(std::move(state)));
 }
 
-arrow::Status ArrowIPCWriter::Write(ArrowArray* array) {
+Status ArrowIPCWriter::Write(ArrowArray* array) {
     auto& error = state_->error;
     nanoarrow::UniqueArray batch{array};
     RETURN_NANOARROW_NOT_OK(state_->casts.Apply(batch.get(), &error), error);
     RETURN_NANOARROW_NOT_OK(ArrowArrayViewSetArray(state_->array_view.get(), batch.get(), &error), error);
     RETURN_NANOARROW_NOT_OK(
         ArrowIpcWriterWriteArrayViewWithDictionaries(state_->writer.get(), state_->array_view.get(), &error), error);
-    return arrow::Status::OK();
+    return Status::OK();
 }
 
-arrow::Status ArrowIPCWriter::Finish() {
+Status ArrowIPCWriter::Finish() {
     auto& error = state_->error;
     if (state_->format == Format::FILE) {
         RETURN_NANOARROW_NOT_OK(ArrowIpcWriterFinalizeFile(state_->writer.get(), &error), error);
     }
-    return arrow::Status::OK();
+    return Status::OK();
 }
 
-std::shared_ptr<arrow::Buffer> ArrowIPCWriter::TakeBytes() {
+std::shared_ptr<Buffer> ArrowIPCWriter::TakeBytes() {
     // Moving the buffer out leaves an empty one in place for the output stream to keep appending to
-    nanoarrow::UniqueBuffer bytes;
-    ArrowBufferMove(state_->output.get(), bytes.get());
-    return std::make_shared<NanoarrowBuffer>(std::move(bytes));
+    auto bytes = std::make_shared<nanoarrow::UniqueBuffer>();
+    ArrowBufferMove(state_->output.get(), bytes->get());
+    auto data = (*bytes)->data;
+    auto size = (*bytes)->size_bytes;
+    return std::make_shared<Buffer>(data, size, std::move(bytes));
 }
 
 }  // namespace web

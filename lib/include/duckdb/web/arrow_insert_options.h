@@ -6,7 +6,7 @@
 #include <optional>
 #include <string>
 
-#include "arrow/type_fwd.h"
+#include "duckdb/web/utils/status.h"
 #include "rapidjson/document.h"
 
 namespace duckdb {
@@ -22,7 +22,7 @@ struct ArrowInsertOptions {
     bool create_new = true;
 
     /// Read from input stream
-    arrow::Status ReadFrom(const rapidjson::Document& doc);
+    Status ReadFrom(const rapidjson::Document& doc);
 };
 
 }  // namespace web

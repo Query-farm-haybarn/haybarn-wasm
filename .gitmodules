@@ -1,11 +1,6 @@
 [submodule "submodules/duckdb"]
 	path = submodules/duckdb
 	url = https://github.com/Query-farm-haybarn/haybarn
-[submodule "submodules/arrow"]
-	path = submodules/arrow
-	url = https://github.com/apache/arrow
-	shallow = true
-	ignore = dirty
 [submodule "submodules/gflags"]
 	path = submodules/gflags
 	url = https://github.com/gflags/gflags.git

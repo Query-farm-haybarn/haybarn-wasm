@@ -3,9 +3,8 @@
 
 #include <memory>
 
-#include "arrow/buffer.h"
-#include "arrow/result.h"
-#include "arrow/status.h"
+#include "duckdb/web/utils/status.h"
+#include "duckdb/web/utils/buffer.h"
 #include "duckdb/common/arrow/arrow.hpp"
 #include "duckdb/web/config.h"
 
@@ -25,14 +24,14 @@ class ArrowIPCWriter {
     ~ArrowIPCWriter();
 
     /// Create a writer and write the schema, taking ownership of `schema`
-    static arrow::Result<std::unique_ptr<ArrowIPCWriter>> Create(ArrowSchema* schema, const QueryConfig& config,
+    static Result<std::unique_ptr<ArrowIPCWriter>> Create(ArrowSchema* schema, const QueryConfig& config,
                                                                  Format format);
     /// Write a batch, taking ownership of `array`
-    arrow::Status Write(ArrowArray* array);
+    Status Write(ArrowArray* array);
     /// Finish the output (writes the footer in file mode)
-    arrow::Status Finish();
+    Status Finish();
     /// Take the bytes written so far
-    std::shared_ptr<arrow::Buffer> TakeBytes();
+    std::shared_ptr<Buffer> TakeBytes();
 
    private:
     struct State;

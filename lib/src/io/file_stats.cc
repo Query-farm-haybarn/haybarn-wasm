@@ -5,8 +5,8 @@
 #include <limits>
 #include <mutex>
 
-#include "arrow/buffer.h"
-#include "arrow/result.h"
+#include "duckdb/web/utils/status.h"
+#include "duckdb/web/utils/buffer.h"
 #include "duckdb/web/utils/parallel.h"
 
 namespace duckdb {
@@ -43,10 +43,10 @@ void FileStatisticsCollector::Resize(uint64_t n) {
 }
 
 /// Encode the block statistics
-arrow::Result<std::shared_ptr<arrow::Buffer>> FileStatisticsCollector::ExportStatistics() const {
-    auto buffer = arrow::AllocateBuffer(sizeof(FileStatisticsCollector::ExportFileStatistics) +
-                                        block_count_ * sizeof(ExportedBlockStats));
-    auto writer = buffer.ValueOrDie()->mutable_data();
+Result<std::shared_ptr<Buffer>> FileStatisticsCollector::ExportStatistics() const {
+    auto buffer = Buffer::Allocate(sizeof(FileStatisticsCollector::ExportFileStatistics) +
+                                   block_count_ * sizeof(ExportedBlockStats));
+    auto writer = buffer->mutable_data();
     auto* out = reinterpret_cast<ExportFileStatistics*>(writer);
     out->bytes_file_cold = bytes_file_read_cold_;
     out->bytes_file_ahead = bytes_file_read_ahead_;
@@ -96,7 +96,7 @@ std::shared_ptr<FileStatisticsCollector> FileStatisticsRegistry::EnableCollector
 }
 
 /// Export block statistics
-arrow::Result<std::shared_ptr<arrow::Buffer>> FileStatisticsRegistry::ExportStatistics(std::string_view path) {
+Result<std::shared_ptr<Buffer>> FileStatisticsRegistry::ExportStatistics(std::string_view path) {
     std::unique_lock<LightMutex> reg_guard{registry_mutex_};
     auto iter = collectors_.find(std::string{path});
     if (iter != collectors_.end()) {

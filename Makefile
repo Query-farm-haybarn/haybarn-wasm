@@ -435,7 +435,6 @@ build/docker_ci_image:
 
 patch_duckdb:
 	@for p in $$(ls patches/duckdb/*.patch 2>/dev/null | sort); do echo "Applying $$p"; patch -p1 --forward -d submodules/duckdb < $$p || true; done
-	@for p in $$(ls patches/arrow/*.patch 2>/dev/null | sort); do echo "Applying $$p"; patch -p1 --forward -d submodules/arrow < $$p || true; done
 	@for p in $$(ls patches/rapidjson/*.patch 2>/dev/null | sort); do echo "Applying $$p"; patch -p1 --forward -d submodules/rapidjson < $$p || true; done
 
 apply_patches: patch_duckdb

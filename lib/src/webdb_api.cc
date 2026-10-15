@@ -3,8 +3,7 @@
 #include <iostream>
 #include <stdexcept>
 
-#include "arrow/buffer.h"
-#include "arrow/status.h"
+#include "duckdb/web/utils/status.h"
 #include "duckdb/web/config.h"
 #include "duckdb/web/io/web_filesystem.h"
 #include "duckdb/web/utils/wasm_response.h"
@@ -166,14 +165,14 @@ uint32_t duckdb_web_get_feature_flags() { return ResolveFeatureFlags(); }
 void duckdb_web_tokenize(WASMResponse* packed, const char* query) {
     GET_WEBDB(*packed);
     auto tokens = webdb.Tokenize(query);
-    WASMResponseBuffer::Get().Store(*packed, arrow::Result(std::move(tokens)));
+    WASMResponseBuffer::Get().Store(*packed, Result(std::move(tokens)));
 }
 /// Tokenize a query
 void duckdb_web_tokenize_buffer(WASMResponse* packed, const uint8_t* buffer, size_t buffer_length) {
     GET_WEBDB(*packed);
     std::string_view query(reinterpret_cast<const char*>(buffer), buffer_length);
     auto tokens = webdb.Tokenize(query);
-    WASMResponseBuffer::Get().Store(*packed, arrow::Result(std::move(tokens)));
+    WASMResponseBuffer::Get().Store(*packed, Result(std::move(tokens)));
 }
 /// Create scalar UDF queries
 void duckdb_web_udf_scalar_create(WASMResponse* packed, ConnectionHdl connHdl, const char* args) {
@@ -312,6 +311,6 @@ void duckdb_web_insert_json_from_path(WASMResponse* packed, ConnectionHdl connHd
 
 static void RaiseExtensionNotLoaded(WASMResponse* packed, std::string_view ext) {
     WASMResponseBuffer::Get().Store(
-        *packed, arrow::Status(arrow::StatusCode::NotImplemented, "Extension is not loaded: " + std::string{ext}));
+        *packed, Status(StatusCode::NotImplemented, "Extension is not loaded: " + std::string{ext}));
 }
 }

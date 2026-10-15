@@ -76,7 +76,7 @@ cd /tmp/emsdk && ./emsdk install 6.0.12 && ./emsdk activate 6.0.12
 
 # 2. From haybarn-wasm root, smoke build (one variant is enough):
 cd /path/to/haybarn-wasm
-git submodule update --init --recursive    # fetches duckdb + arrow + rapidjson + …
+git submodule update --init --recursive    # fetches duckdb + rapidjson + …
 cd submodules/duckdb && git fetch --depth 1 origin tag haybarn-v1.5.2-rc13 && cd ../..
 make apply_patches                          # applies patches/duckdb/* to the engine
 bash -c 'source /tmp/emsdk/emsdk_env.sh && \
@@ -141,7 +141,7 @@ trap/abort/uncaught-`RuntimeError` backtraces show function names instead of
 anonymous `wasm-function[N]`. The names are **mangled** — pipe traces through
 `llvm-cxxfilt` (Rust: `rustfilt`), or use Chrome's "C/C++ DevTools Support
 (DWARF)" extension which demangles automatically. This does **not** add stacks
-to ordinary SQL errors (those surface as Arrow status `e.what()` strings via
+to ordinary SQL errors (those surface as status `e.what()` strings via
 `lib/src/webdb.cc` → `wasm_response.cc`), and `-Oz`/`-O3` inlining means fewer,
 larger frames than source.
 

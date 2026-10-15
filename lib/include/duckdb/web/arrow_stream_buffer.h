@@ -3,7 +3,7 @@
 
 #include <memory>
 
-#include "arrow/status.h"
+#include "duckdb/web/utils/status.h"
 #include "duckdb/common/arrow/arrow.hpp"
 #include "duckdb/common/arrow/arrow_wrapper.hpp"
 #include "duckdb/function/table_function.hpp"
@@ -52,7 +52,7 @@ struct BufferingArrowIPCStreamDecoder {
     /// Constructor
     BufferingArrowIPCStreamDecoder(std::shared_ptr<ArrowIPCStreamBuffer> buffer = std::make_shared<ArrowIPCStreamBuffer>());
     /// Consume stream bytes
-    arrow::Status Consume(const uint8_t* data, size_t size);
+    Status Consume(const uint8_t* data, size_t size);
     /// Get the buffer
     auto& buffer() const { return buffer_; }
 };

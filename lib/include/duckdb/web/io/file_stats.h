@@ -10,8 +10,8 @@
 #include <unordered_map>
 #include <vector>
 
-#include "arrow/buffer.h"
-#include "arrow/status.h"
+#include "duckdb/web/utils/status.h"
+#include "duckdb/web/utils/buffer.h"
 #include "duckdb/web/io/file_page_defaults.h"
 #include "duckdb/web/utils/parallel.h"
 
@@ -142,7 +142,7 @@ class FileStatisticsCollector {
     /// fwrite fcold | fahead fcached | paccess pload
     ///
     /// Encoding: at least ((1 << nibble) - 1) times
-    arrow::Result<std::shared_ptr<arrow::Buffer>> ExportStatistics() const;
+    Result<std::shared_ptr<Buffer>> ExportStatistics() const;
 };
 
 class FileStatisticsRegistry {
@@ -159,7 +159,7 @@ class FileStatisticsRegistry {
     /// Enable a collector (if exists)
     std::shared_ptr<FileStatisticsCollector> EnableCollector(std::string_view file_name, bool enable = true);
     /// Export statistics
-    arrow::Result<std::shared_ptr<arrow::Buffer>> ExportStatistics(std::string_view path);
+    Result<std::shared_ptr<Buffer>> ExportStatistics(std::string_view path);
 };
 
 }  // namespace io

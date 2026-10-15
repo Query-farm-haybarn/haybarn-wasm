@@ -5,10 +5,7 @@
 #include <sstream>
 #include <string>
 
-#include "arrow/result.h"
-#include "arrow/status.h"
-#include "arrow/type.h"
-#include "arrow/type_fwd.h"
+#include "duckdb/web/utils/status.h"
 #include "duckdb/web/insert_options.h"
 #include "duckdb/web/json_typedef.h"
 #include "rapidjson/document.h"
@@ -32,8 +29,8 @@ static std::unordered_map<std::string_view, FieldTag> FIELD_TAGS{
 }  // namespace
 
 /// Read from document
-arrow::Status UDFFunctionDeclaration::ReadFrom(const rapidjson::Document& doc) {
-    if (!doc.IsObject()) return arrow::Status::OK();
+Status UDFFunctionDeclaration::ReadFrom(const rapidjson::Document& doc) {
+    if (!doc.IsObject()) return Status::OK();
     for (auto iter = doc.MemberBegin(); iter != doc.MemberEnd(); ++iter) {
         std::string_view field{iter->name.GetString(), iter->name.GetStringLength()};
 
@@ -42,24 +39,24 @@ arrow::Status UDFFunctionDeclaration::ReadFrom(const rapidjson::Document& doc) {
 
         switch (tag_iter->second) {
             case FieldTag::NAME:
-                ARROW_RETURN_NOT_OK(RequireFieldType(iter->value, rapidjson::Type::kStringType, name));
+                WEBDB_RETURN_NOT_OK(RequireFieldType(iter->value, rapidjson::Type::kStringType, name));
                 name = {iter->value.GetString(), iter->value.GetStringLength()};
                 break;
 
             case FieldTag::RETURN_TYPE: {
-                ARROW_RETURN_NOT_OK(RequireFieldType(iter->value, rapidjson::Type::kObjectType, name));
+                WEBDB_RETURN_NOT_OK(RequireFieldType(iter->value, rapidjson::Type::kObjectType, name));
                 const auto& type_obj = iter->value.GetObject();
-                ARROW_ASSIGN_OR_RAISE(return_type, json::SQLToDuckDBType(type_obj));
+                WEBDB_ASSIGN_OR_RAISE(return_type, json::SQLToDuckDBType(type_obj));
                 break;
             }
 
             case FieldTag::FUNCTION_ID:
-                ARROW_RETURN_NOT_OK(RequireFieldType(iter->value, rapidjson::Type::kNumberType, name));
+                WEBDB_RETURN_NOT_OK(RequireFieldType(iter->value, rapidjson::Type::kNumberType, name));
                 function_id = iter->value.GetInt();
                 break;
         }
     }
-    return arrow::Status::OK();
+    return Status::OK();
 }
 
 }  // namespace web

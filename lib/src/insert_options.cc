@@ -5,10 +5,7 @@
 #include <sstream>
 #include <string>
 
-#include "arrow/result.h"
-#include "arrow/status.h"
-#include "arrow/type.h"
-#include "arrow/type_fwd.h"
+#include "duckdb/web/utils/status.h"
 #include "duckdb/web/json_typedef.h"
 #include "rapidjson/document.h"
 #include "rapidjson/error/en.h"
@@ -39,24 +36,24 @@ std::string_view GetTypeName(rapidjson::Type type) {
 }
 
 /// Require a boolean field
-arrow::Status RequireBoolField(const rapidjson::Value& value, std::string_view name) {
+Status RequireBoolField(const rapidjson::Value& value, std::string_view name) {
     if (!value.IsBool()) {
         std::stringstream msg;
         msg << "type mismatch for field '" << name << "': expected bool, received " << GetTypeName(value.GetType());
-        return arrow::Status(arrow::StatusCode::Invalid, msg.str());
+        return Status(StatusCode::Invalid, msg.str());
     }
-    return arrow::Status::OK();
+    return Status::OK();
 }
 
 /// Require a certain field type
-arrow::Status RequireFieldType(const rapidjson::Value& value, rapidjson::Type type, std::string_view field) {
+Status RequireFieldType(const rapidjson::Value& value, rapidjson::Type type, std::string_view field) {
     if (value.GetType() != type) {
         std::stringstream msg;
         msg << "type mismatch for field '" << field << "': expected " << GetTypeName(type) << ", received "
             << GetTypeName(value.GetType());
-        return arrow::Status(arrow::StatusCode::Invalid, msg.str());
+        return Status(StatusCode::Invalid, msg.str());
     }
-    return arrow::Status::OK();
+    return Status::OK();
 };
 
 }  // namespace web

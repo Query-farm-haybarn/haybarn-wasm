@@ -1,6 +1,6 @@
 #include "duckdb/web/json_dataview.h"
 
-#include <arrow/result.h>
+#include "duckdb/web/utils/status.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -15,11 +15,6 @@
 #include <variant>
 #include <vector>
 
-#include "arrow/status.h"
-#include "arrow/type.h"
-#include "arrow/type_fwd.h"
-#include "arrow/type_traits.h"
-#include "arrow/util/value_parsing.h"
 #include "duckdb/common/string_util.hpp"
 #include "duckdb/web/json_typedef.h"
 #include "rapidjson/document.h"
@@ -27,7 +22,6 @@
 #include "rapidjson/rapidjson.h"
 #include "rapidjson/writer.h"
 
-using namespace arrow;
 
 namespace duckdb {
 namespace web {
@@ -47,7 +41,7 @@ std::pair<T*, size_t> create_additional_buffer(std::vector<double>& data_ptrs, a
 }  // namespace
 
 /// Serialize a DuckDB Vector as JSON data view
-arrow::Result<rapidjson::Value> CreateDataView(rapidjson::Document& doc, duckdb::DataChunk& chunk,
+Result<rapidjson::Value> CreateDataView(rapidjson::Document& doc, duckdb::DataChunk& chunk,
                                                std::vector<double>& data_ptrs,
                                                additional_buffers_t& additional_buffers) {
     auto allocator = doc.GetAllocator();
@@ -138,7 +132,7 @@ arrow::Result<rapidjson::Value> CreateDataView(rapidjson::Document& doc, duckdb:
                     break;
                 }
                 default:
-                    return arrow::Status::ExecutionError("Unsupported UDF argument type " + vec->GetType().ToString());
+                    return Status::ExecutionError("Unsupported UDF argument type " + vec->GetType().ToString());
             }
         }
         col_descs.PushBack(std::move(col_desc), allocator);

@@ -7,9 +7,7 @@
 #include <shared_mutex>
 #include <stack>
 
-#include "arrow/io/buffered.h"
-#include "arrow/result.h"
-#include "arrow/status.h"
+#include "duckdb/web/utils/status.h"
 #include "duckdb/common/constants.hpp"
 #include "duckdb/common/file_system.hpp"
 #include "duckdb/common/vector.hpp"
@@ -210,10 +208,10 @@ class WebFileSystem : public duckdb::FileSystem {
     /// Write the file info as JSON
     rapidjson::Value WriteFileInfo(rapidjson::Document &doc, std::string_view file_name, uint32_t cache_epoch);
     /// Register a file URL
-    arrow::Result<std::unique_ptr<WebFileHandle>> RegisterFileURL(std::string_view file_name, std::string_view file_url,
+    Result<std::unique_ptr<WebFileHandle>> RegisterFileURL(std::string_view file_name, std::string_view file_url,
                                                                   DataProtocol protocol);
     /// Register a file buffer
-    arrow::Result<std::unique_ptr<WebFileHandle>> RegisterFileBuffer(std::string_view file_name,
+    Result<std::unique_ptr<WebFileHandle>> RegisterFileBuffer(std::string_view file_name,
                                                                      DataBuffer file_buffer);
     /// Try to drop a specific file
     bool TryDropFile(std::string_view file_name);
