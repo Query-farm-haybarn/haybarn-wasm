@@ -248,7 +248,6 @@ add_library(
   ${CMAKE_SOURCE_DIR}/src/csv_insert_options.cc
   ${CMAKE_SOURCE_DIR}/src/functions/table_function_relation.cc
   ${CMAKE_SOURCE_DIR}/src/insert_options.cc
-  ${CMAKE_SOURCE_DIR}/src/io/arrow_ifstream.cc
   ${CMAKE_SOURCE_DIR}/src/io/buffered_filesystem.cc
   ${CMAKE_SOURCE_DIR}/src/io/file_page_buffer.cc
   ${CMAKE_SOURCE_DIR}/src/io/file_stats.cc
@@ -332,17 +331,12 @@ endif()
 if(NOT EMSCRIPTEN)
   set(TEST_CC
 #      ${CMAKE_SOURCE_DIR}/test/ast_test.cc
-      ${CMAKE_SOURCE_DIR}/test/all_types_test.cc
-      ${CMAKE_SOURCE_DIR}/test/arrow_casts_test.cc
       ${CMAKE_SOURCE_DIR}/test/bugs_test.cc
       ${CMAKE_SOURCE_DIR}/test/file_page_buffer_test.cc
       ${CMAKE_SOURCE_DIR}/test/glob_test.cc
       ${CMAKE_SOURCE_DIR}/test/ifstream_test.cc
-      ${CMAKE_SOURCE_DIR}/test/insert_arrow_test.cc
       ${CMAKE_SOURCE_DIR}/test/insert_csv_test.cc
       ${CMAKE_SOURCE_DIR}/test/insert_json_test.cc
-      ${CMAKE_SOURCE_DIR}/test/json_parser.cc
-#      ${CMAKE_SOURCE_DIR}/test/json_typedef_test.cc
       ${CMAKE_SOURCE_DIR}/test/json_dataview_test.cc
       ${CMAKE_SOURCE_DIR}/test/memory_filesystem_test.cc
       ${CMAKE_SOURCE_DIR}/test/parquet_test.cc
