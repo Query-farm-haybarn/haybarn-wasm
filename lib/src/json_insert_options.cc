@@ -10,7 +10,6 @@
 #include "arrow/type.h"
 #include "arrow/type_fwd.h"
 #include "duckdb/web/insert_options.h"
-#include "duckdb/web/json_analyzer.h"
 #include "duckdb/web/json_typedef.h"
 #include "rapidjson/document.h"
 #include "rapidjson/error/en.h"

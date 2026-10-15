@@ -254,11 +254,8 @@ add_library(
   ${CMAKE_SOURCE_DIR}/src/io/ifstream.cc
   ${CMAKE_SOURCE_DIR}/src/io/memory_filesystem.cc
   ${CMAKE_SOURCE_DIR}/src/io/web_filesystem.cc
-  ${CMAKE_SOURCE_DIR}/src/json_analyzer.cc
   ${CMAKE_SOURCE_DIR}/src/json_dataview.cc
   ${CMAKE_SOURCE_DIR}/src/json_insert_options.cc
-  ${CMAKE_SOURCE_DIR}/src/json_parser.cc
-  ${CMAKE_SOURCE_DIR}/src/json_table.cc
   ${CMAKE_SOURCE_DIR}/src/json_typedef.cc
   ${CMAKE_SOURCE_DIR}/src/udf.cc
   ${CMAKE_SOURCE_DIR}/src/utils/parking_lot.cc
@@ -342,8 +339,7 @@ if(NOT EMSCRIPTEN)
       ${CMAKE_SOURCE_DIR}/test/insert_arrow_test.cc
       ${CMAKE_SOURCE_DIR}/test/insert_csv_test.cc
       ${CMAKE_SOURCE_DIR}/test/insert_json_test.cc
-      ${CMAKE_SOURCE_DIR}/test/json_analyzer_test.cc
-      ${CMAKE_SOURCE_DIR}/test/json_table_test.cc
+      ${CMAKE_SOURCE_DIR}/test/json_parser.cc
 #      ${CMAKE_SOURCE_DIR}/test/json_typedef_test.cc
       ${CMAKE_SOURCE_DIR}/test/json_dataview_test.cc
       ${CMAKE_SOURCE_DIR}/test/memory_filesystem_test.cc
