@@ -1076,11 +1076,9 @@ Status WebDB::Open(std::string_view args_json) {
         db_config.options.custom_user_agent = config_->custom_user_agent;
         db_config.options.use_direct_io = config_->use_direct_io;
         auto db = make_shared_ptr<duckdb::DuckDB>(config_->path, &db_config);
+        duckdb_web_json_init(db.get());
 #ifndef WASM_LOADABLE_EXTENSIONS
         duckdb_web_parquet_init(db.get());
-#if defined(DUCKDB_JSON_EXTENSION)
-        duckdb_web_json_init(db.get());
-#endif
 #endif  // WASM_LOADABLE_EXTENSIONS
         RegisterCustomExtensionOptions(db);
 
