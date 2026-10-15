@@ -1,4 +1,9 @@
-<img src="https://raw.githubusercontent.com/Query-farm-haybarn/haybarn-org-profile/main/profile/assets/haybarn-banner.png" height="64">
+<p align="center">
+  <a href="https://query.farm/products/haybarn/"><img src="https://raw.githubusercontent.com/Query-farm-haybarn/.github/haybarn/profile/assets/haybarn-icon.png" alt="Haybarn" width="120" height="120"></a>
+</p>
+<p align="center">
+  <a href="https://query.farm"><img src="https://query.farm/media-kit/logo/wordmark-light.png" alt="Query.Farm" height="28"></a>
+</p>
 
 [![npm](https://img.shields.io/npm/v/@haybarn/haybarn-wasm?logo=npm)](https://www.npmjs.com/package/@haybarn/haybarn-wasm/v/latest)
 [![Main](https://github.com/Query-farm-haybarn/haybarn-wasm/actions/workflows/main.yml/badge.svg?branch=haybarn)](https://github.com/Query-farm-haybarn/haybarn-wasm/actions/workflows/main.yml)
@@ -6,7 +11,7 @@
 
 **Haybarn-Wasm**
 
-Haybarn-Wasm is Query Farm LLC's WebAssembly distribution of [Haybarn](https://github.com/Query-farm-haybarn/haybarn) — a derived distribution of [DuckDB](https://duckdb.org) ("Haybarn, powered by DuckDB"). The wasm binary is built against the Haybarn engine fork, so `INSTALL <extension>` resolves to the Haybarn extension repository at [`haybarn-extensions.query.farm`](https://haybarn-status.query.farm) and validates against the Haybarn signing trust root.
+Haybarn-Wasm is Query Farm LLC's WebAssembly distribution of [Haybarn](https://query.farm/products/haybarn/) — a derived distribution of [DuckDB](https://duckdb.org) ("Haybarn, powered by DuckDB"). The wasm binary is built against the Haybarn engine fork, so `INSTALL <extension>` resolves to the Haybarn extension repository at [`haybarn-extensions.query.farm`](https://haybarn-status.query.farm) and validates against the Haybarn signing trust root.
 
 The public API mirrors `@duckdb/duckdb-wasm` exactly. Existing duckdb-wasm code ports by rewriting the import:
 
