@@ -30,7 +30,7 @@ export function test477(db: () => duckdb.AsyncDuckDB): void {
             // Arrow JS now handles negative decimals, but not the fractional part.
             expect(resultWithoutCast.toArray()[0]?.decimal == -19).toBe(true);
 
-            // Using castDecimalToDouble we force decimals to be cast to doubles, note the inevitable imprecision.
+            // Using castDecimalToDouble we force decimals to be cast to the nearest doubles.
             await db().open({
                 path: ':memory:',
                 query: {
@@ -41,7 +41,7 @@ export function test477(db: () => duckdb.AsyncDuckDB): void {
             const resultWithCast = await conn.query<{
                 decimal: arrow.Float64;
             }>(`SELECT (-1.9)::DECIMAL(2,1) as decimal`);
-            expect(resultWithCast.toArray()[0]?.decimal).toEqual(-1.9000000000000001);
+            expect(resultWithCast.toArray()[0]?.decimal).toEqual(-1.9);
         });
     });
 }

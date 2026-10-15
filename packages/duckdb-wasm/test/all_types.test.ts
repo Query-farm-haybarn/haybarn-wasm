@@ -178,8 +178,8 @@ const ALL_TYPES_TEST: AllTypesTest[] = [
         query: `SELECT ${TYPES_REQUIRING_CUSTOM_CONFIG.join(',')} FROM test_all_types()`,
         skip: [],
         answerMap: {
-            dec_4_1: [-999.9000000000001, 999.9000000000001, null],
-            dec_9_4: [-99999.99990000001, 99999.99990000001, null],
+            dec_4_1: [-999.9, 999.9, null],
+            dec_9_4: [-99999.9999, 99999.9999, null],
         },
         answerCount: TYPES_REQUIRING_CUSTOM_CONFIG.length,
         queryConfig: {
