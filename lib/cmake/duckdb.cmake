@@ -25,6 +25,17 @@ endif()
 set(DUCKDB_CXX_FLAGS "${DUCKDB_CXX_FLAGS} -Wno-unqualified-std-cast-call -DDUCKDB_DEBUG_NO_SAFETY -DDUCKDB_FROM_DUCKDB_WASM -DDUCKDB_WASM_VERSION=${DUCKDB_WASM_VERSION}")
 message("DUCKDB_CXX_FLAGS=${DUCKDB_CXX_FLAGS}")
 
+# Haybarn: pin the engine's reported version (version(), pragma_version) to
+# the same release as DUCKDB_WASM_VERSION. Left to `git describe`, the engine
+# finds upstream's vX.Y.Z tag N commits back (Haybarn carries its own commits
+# on top) and reports v<X.Y.Z+1>-devN: 1.5.6-rc1 shipped as v1.5.7-dev154.
+# The native haybarn-release workflow pins OVERRIDE_GIT_DESCRIBE the same way;
+# the source id still comes from the submodule's commit.
+set(DUCKDB_OVERRIDE_GIT_DESCRIBE_ARG "")
+if(DUCKDB_WASM_VERSION MATCHES "^v[0-9]+\\.[0-9]+\\.[0-9]+$")
+  set(DUCKDB_OVERRIDE_GIT_DESCRIBE_ARG "-DOVERRIDE_GIT_DESCRIBE=${DUCKDB_WASM_VERSION}")
+endif()
+
 set(DUCKDB_EXTENSIONS "json;core_functions")
 # Escape semicolons in DUCKDB_EXTENSIONS before passing to ExternalProject_Add
 string(REPLACE ";" "$<SEMICOLON>" DUCKDB_EXTENSIONS_PACKED "${DUCKDB_EXTENSIONS}")
@@ -56,6 +67,7 @@ ExternalProject_Add(
              -DDISABLE_BUILTIN_EXTENSIONS=TRUE
              -DUSE_WASM_THREADS=${USE_WASM_THREADS}
              -DDUCKDB_EXPLICIT_PLATFORM=${DUCKDB_EXPLICIT_PLATFORM}
+             ${DUCKDB_OVERRIDE_GIT_DESCRIBE_ARG}
              -DSMALLER_BINARY=1
   BUILD_BYPRODUCTS
     <INSTALL_DIR>/lib/libhaybarn_static.a
