@@ -47,7 +47,6 @@
 #include "duckdb/parser/expression/constant_expression.hpp"
 #include "duckdb/parser/parser.hpp"
 #include "duckdb/web/arrow_bridge.h"
-#include "duckdb/web/arrow_casts.h"
 #include "duckdb/web/arrow_insert_options.h"
 #include "duckdb/web/arrow_ipc_writer.h"
 #include "duckdb/web/arrow_stream_buffer.h"

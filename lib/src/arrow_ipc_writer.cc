@@ -2,8 +2,6 @@
 
 #include <cstring>
 
-#include "arrow/c/bridge.h"
-#include "arrow/record_batch.h"
 #include "duckdb/web/arrow_casts.h"
 #include "nanoarrow/nanoarrow.hpp"
 #include "nanoarrow/nanoarrow_ipc.hpp"
@@ -42,7 +40,6 @@ arrow::Status ToStatus(ArrowErrorCode code, const ArrowError& error) {
     } while (0)
 
 struct ArrowIPCWriter::State {
-    QueryConfig config;
     Format format;
     /// The bytes written and not yet taken. The writer's output stream points at this buffer.
     nanoarrow::UniqueBuffer output;
@@ -50,9 +47,8 @@ struct ArrowIPCWriter::State {
     /// The schema as written, after any casts
     nanoarrow::UniqueSchema schema;
     nanoarrow::UniqueArrayView array_view;
-    /// The schemas used to cast batches with Arrow C++, if any casts are configured
-    std::shared_ptr<arrow::Schema> cast_input_schema;
-    std::shared_ptr<arrow::Schema> cast_output_schema;
+    /// The configured result casts
+    ArrowResultCasts casts;
     ArrowError error = {};
 };
 
@@ -62,18 +58,14 @@ ArrowIPCWriter::~ArrowIPCWriter() = default;
 arrow::Result<std::unique_ptr<ArrowIPCWriter>> ArrowIPCWriter::Create(ArrowSchema* schema, const QueryConfig& config,
                                                                       Format format) {
     auto state = std::make_unique<State>();
-    state->config = config;
     state->format = format;
     auto& error = state->error;
     nanoarrow::UniqueSchema input_schema{schema};
 
-    // Casts still go through Arrow C++ for now
+    // Casting changes the schema's types, so cast a copy owned by nanoarrow rather than DuckDB's schema
     if (config.hasAnyCast()) {
-        nanoarrow::UniqueSchema import_schema;
-        RETURN_NANOARROW_NOT_OK(ArrowSchemaDeepCopy(input_schema.get(), import_schema.get()), error);
-        ARROW_ASSIGN_OR_RAISE(state->cast_input_schema, arrow::ImportSchema(import_schema.get()));
-        state->cast_output_schema = patchSchema(state->cast_input_schema, config);
-        ARROW_RETURN_NOT_OK(arrow::ExportSchema(*state->cast_output_schema, state->schema.get()));
+        RETURN_NANOARROW_NOT_OK(ArrowSchemaDeepCopy(input_schema.get(), state->schema.get()), error);
+        RETURN_NANOARROW_NOT_OK(state->casts.Plan(state->schema.get(), config, &error), error);
     } else {
         state->schema = std::move(input_schema);
     }
@@ -92,12 +84,7 @@ arrow::Result<std::unique_ptr<ArrowIPCWriter>> ArrowIPCWriter::Create(ArrowSchem
 arrow::Status ArrowIPCWriter::Write(ArrowArray* array) {
     auto& error = state_->error;
     nanoarrow::UniqueArray batch{array};
-    if (state_->cast_output_schema) {
-        ARROW_ASSIGN_OR_RAISE(auto record_batch, arrow::ImportRecordBatch(batch.get(), state_->cast_input_schema));
-        ARROW_ASSIGN_OR_RAISE(record_batch,
-                              patchRecordBatch(record_batch, state_->cast_output_schema, state_->config));
-        ARROW_RETURN_NOT_OK(arrow::ExportRecordBatch(*record_batch, batch.get()));
-    }
+    RETURN_NANOARROW_NOT_OK(state_->casts.Apply(batch.get(), &error), error);
     RETURN_NANOARROW_NOT_OK(ArrowArrayViewSetArray(state_->array_view.get(), batch.get(), &error), error);
     RETURN_NANOARROW_NOT_OK(
         ArrowIpcWriterWriteArrayViewWithDictionaries(state_->writer.get(), state_->array_view.get(), &error), error);

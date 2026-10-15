@@ -1,207 +1,183 @@
 #include "duckdb/web/arrow_casts.h"
 
-#include <arrow/array/array_decimal.h>
-#include <arrow/buffer.h>
-#include <arrow/result.h>
-#include <arrow/type_fwd.h>
-#include <arrow/util/decimal.h>
+#include <cmath>
 
-#include <chrono>
-#include <iomanip>
-
-#include "duckdb/web/config.h"
-#include "duckdb/web/webdb.h"
+#include "nanoarrow/nanoarrow.hpp"
 
 namespace duckdb {
 namespace web {
 
-/// Helper to cast scalar types in arrow schema and return the same schema if nothing changes
-std::shared_ptr<arrow::Schema> patchSchema(const std::shared_ptr<arrow::Schema>& schema, const QueryConfig& config) {
-    // Has no cast?
-    if (!config.hasAnyCast()) return schema;
+ArrowErrorCode ArrowResultCasts::Plan(ArrowSchema* schema, const QueryConfig& config, ArrowError* error) {
+    root_ = Node{};
+    if (!config.hasAnyCast()) return NANOARROW_OK;
+    return PlanNode(schema, config, root_, error);
+}
 
-    // Cast all bigints to floats (if needed
-    // We might need to cast more in the future...
-    std::shared_ptr<arrow::Schema> casted_schema = nullptr;
-    auto umbrella_type = arrow::struct_(schema->fields());
-    auto casted_type = castScalarTypes(umbrella_type, [config](const std::shared_ptr<arrow::DataType>& type) {
-        switch (type->id()) {
-            case arrow::Type::TIMESTAMP:
-                return config.cast_timestamp_to_date.value_or(false) ? arrow::date64() : type;
-            case arrow::Type::INT64:
-            case arrow::Type::UINT64:
-                return config.cast_bigint_to_double.value_or(false) ? arrow::float64() : type;
-            case arrow::Type::DURATION:
-                return config.cast_duration_to_time64.value_or(false) ? arrow::time64(arrow::TimeUnit::MICRO) : type;
-            case arrow::Type::DECIMAL:
-                return config.cast_decimal_to_double.value_or(false) ? arrow::float64() : type;
-            default:
-                return type;
-        }
-    });
-    auto casted_umbrella_type = std::dynamic_pointer_cast<arrow::StructType>(casted_type);
-    if (casted_umbrella_type != umbrella_type) {
-        return std::make_shared<arrow::Schema>(casted_umbrella_type->fields(), schema->endianness(),
-                                               schema->metadata());
-    } else {
-        return schema;
+ArrowErrorCode ArrowResultCasts::PlanNode(ArrowSchema* schema, const QueryConfig& config, Node& node,
+                                          ArrowError* error) {
+    ArrowSchemaView view;
+    NANOARROW_RETURN_NOT_OK(ArrowSchemaViewInit(&view, schema, error));
+    switch (view.type) {
+        case NANOARROW_TYPE_STRUCT:
+        case NANOARROW_TYPE_LIST:
+        case NANOARROW_TYPE_LARGE_LIST:
+        case NANOARROW_TYPE_FIXED_SIZE_LIST:
+            node.children.resize(schema->n_children);
+            for (int64_t i = 0; i < schema->n_children; ++i) {
+                NANOARROW_RETURN_NOT_OK(PlanNode(schema->children[i], config, node.children[i], error));
+                node.any |= node.children[i].any;
+            }
+            return NANOARROW_OK;
+        case NANOARROW_TYPE_INT64:
+            if (config.cast_bigint_to_double.value_or(false)) node.cast = Cast::INT64_TO_DOUBLE;
+            break;
+        case NANOARROW_TYPE_UINT64:
+            if (config.cast_bigint_to_double.value_or(false)) node.cast = Cast::UINT64_TO_DOUBLE;
+            break;
+        case NANOARROW_TYPE_DECIMAL128:
+            if (config.cast_decimal_to_double.value_or(false)) node.cast = Cast::DECIMAL128_TO_DOUBLE;
+            break;
+        case NANOARROW_TYPE_TIMESTAMP:
+            if (config.cast_timestamp_to_date.value_or(false)) node.cast = Cast::TIMESTAMP_TO_DATE64;
+            break;
+        case NANOARROW_TYPE_DURATION:
+            if (config.cast_duration_to_time64.value_or(false)) node.cast = Cast::DURATION_TO_TIME64;
+            break;
+        default:
+            break;
+    }
+    node.time_unit = view.time_unit;
+    node.decimal_scale = view.decimal_scale;
+    node.any = node.cast != Cast::NONE;
+
+    switch (node.cast) {
+        case Cast::NONE:
+            break;
+        case Cast::INT64_TO_DOUBLE:
+        case Cast::UINT64_TO_DOUBLE:
+        case Cast::DECIMAL128_TO_DOUBLE:
+            NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema, NANOARROW_TYPE_DOUBLE));
+            break;
+        case Cast::TIMESTAMP_TO_DATE64:
+            NANOARROW_RETURN_NOT_OK(ArrowSchemaSetType(schema, NANOARROW_TYPE_DATE64));
+            break;
+        case Cast::DURATION_TO_TIME64:
+            // Nanosecond durations stay in nanoseconds, coarser units are converted to microseconds
+            NANOARROW_RETURN_NOT_OK(ArrowSchemaSetTypeDateTime(
+                schema, NANOARROW_TYPE_TIME64,
+                view.time_unit == NANOARROW_TIME_UNIT_NANO ? NANOARROW_TIME_UNIT_NANO : NANOARROW_TIME_UNIT_MICRO,
+                nullptr));
+            break;
+    }
+    return NANOARROW_OK;
+}
+
+ArrowErrorCode ArrowResultCasts::Apply(ArrowArray* array, ArrowError* error) const {
+    if (empty()) return NANOARROW_OK;
+    return ApplyNode(root_, array, error);
+}
+
+ArrowErrorCode ArrowResultCasts::ApplyNode(const Node& node, ArrowArray* array, ArrowError* error) {
+    if (!node.any) return NANOARROW_OK;
+    if (node.cast != Cast::NONE) return CastArray(node, array, error);
+    for (size_t i = 0; i < node.children.size(); ++i) {
+        NANOARROW_RETURN_NOT_OK(ApplyNode(node.children[i], array->children[i], error));
+    }
+    return NANOARROW_OK;
+}
+
+namespace {
+
+template <typename In, typename Out, typename Fn>
+void CastValues(const ArrowArray* array, ArrowBuffer* out, Fn fn) {
+    auto in = static_cast<const In*>(array->buffers[1]);
+    auto values = reinterpret_cast<Out*>(out->data);
+    for (int64_t i = 0; i < array->offset + array->length; ++i) {
+        values[i] = fn(in[i]);
     }
 }
 
-/// Helper to cast a record batch
-arrow::Result<std::shared_ptr<arrow::RecordBatch>> patchRecordBatch(const std::shared_ptr<arrow::RecordBatch>& batch,
-                                                                    const std::shared_ptr<arrow::Schema>& schema,
-                                                                    const QueryConfig& config) {
-    // Schema the same?
-    if (batch->schema() == schema) return batch;
+double Decimal128ToDouble(const uint64_t* words, double divisor) {
+    auto value = static_cast<__int128>(static_cast<unsigned __int128>(words[1]) << 64 | words[0]);
+    return static_cast<double>(value) / divisor;
+}
 
-    // Patch all columns
-    std::vector<std::shared_ptr<arrow::Array>> arrays;
-    for (auto& column : batch->columns()) {
-        std::shared_ptr<arrow::Array> out = column;
-        switch (out->type_id()) {
-            case arrow::Type::INT64: {
-                if (config.cast_bigint_to_double.value_or(false)) {
-                    auto array = std::dynamic_pointer_cast<arrow::Int64Array>(out);
-                    auto in = reinterpret_cast<const arrow::Int64Type::c_type*>(array->values()->data());
-                    ARROW_ASSIGN_OR_RAISE(auto buffer,
-                                          arrow::AllocateBuffer(array->length() * sizeof(arrow::DoubleType::c_type)));
-                    auto writer = reinterpret_cast<arrow::DoubleType::c_type*>(buffer->mutable_data());
-                    for (auto i = 0; i < array->length(); ++i) {
-                        writer[i] = in[i];
-                    }
-                    out = std::make_shared<arrow::DoubleArray>(
-                        array->length(), std::shared_ptr<arrow::Buffer>(buffer.release()), array->null_bitmap(),
-                        array->null_count(), array->offset());
-                }
-                break;
+}  // namespace
+
+ArrowErrorCode ArrowResultCasts::CastArray(const Node& node, ArrowArray* array, ArrowError* error) {
+    // Build the cast array with the same length, offset and validity
+    nanoarrow::UniqueArray out;
+    auto out_type = node.cast == Cast::TIMESTAMP_TO_DATE64  ? NANOARROW_TYPE_DATE64
+                    : node.cast == Cast::DURATION_TO_TIME64 ? NANOARROW_TYPE_TIME64
+                                                            : NANOARROW_TYPE_DOUBLE;
+    NANOARROW_RETURN_NOT_OK(ArrowArrayInitFromType(out.get(), out_type));
+    auto n = array->offset + array->length;
+    if (array->null_count != 0 && array->buffers[0] != nullptr) {
+        NANOARROW_RETURN_NOT_OK(ArrowBufferAppend(ArrowArrayBuffer(out.get(), 0), array->buffers[0], (n + 7) / 8));
+    }
+    auto data = ArrowArrayBuffer(out.get(), 1);
+    NANOARROW_RETURN_NOT_OK(ArrowBufferResize(data, n * 8, 0));
+
+    switch (node.cast) {
+        case Cast::NONE:
+            break;
+        case Cast::INT64_TO_DOUBLE:
+            CastValues<int64_t, double>(array, data, [](int64_t v) { return static_cast<double>(v); });
+            break;
+        case Cast::UINT64_TO_DOUBLE:
+            CastValues<uint64_t, double>(array, data, [](uint64_t v) { return static_cast<double>(v); });
+            break;
+        case Cast::DECIMAL128_TO_DOUBLE: {
+            auto in = static_cast<const uint64_t*>(array->buffers[1]);
+            auto values = reinterpret_cast<double*>(data->data);
+            auto divisor = std::pow(10.0, node.decimal_scale);
+            for (int64_t i = 0; i < n; ++i) {
+                values[i] = Decimal128ToDouble(in + 2 * i, divisor);
             }
-            case arrow::Type::UINT64: {
-                if (config.cast_bigint_to_double.value_or(false)) {
-                    auto array = std::dynamic_pointer_cast<arrow::UInt64Array>(out);
-                    auto in = reinterpret_cast<const arrow::UInt64Type::c_type*>(array->values()->data());
-                    ARROW_ASSIGN_OR_RAISE(auto buffer,
-                                          arrow::AllocateBuffer(array->length() * sizeof(arrow::DoubleType::c_type)));
-                    auto writer = reinterpret_cast<arrow::DoubleType::c_type*>(buffer->mutable_data());
-                    for (auto i = 0; i < array->length(); ++i) {
-                        writer[i] = in[i];
-                    }
-                    out = std::make_shared<arrow::DoubleArray>(
-                        array->length(), std::shared_ptr<arrow::Buffer>(buffer.release()), array->null_bitmap(),
-                        array->null_count(), array->offset());
-                }
-                break;
-            }
-            case arrow::Type::TIMESTAMP: {
-                if (config.cast_timestamp_to_date.value_or(false)) {
-                    static_assert(std::is_same<arrow::TimestampType::c_type, int64_t>::value);
-                    static_assert(std::is_same<arrow::Date64Type::c_type, int64_t>::value);
-                    auto array = std::dynamic_pointer_cast<arrow::TimestampArray>(out);
-                    auto type = reinterpret_cast<const arrow::TimestampType*>(array->type().get());
-                    auto in = reinterpret_cast<const arrow::TimestampType::c_type*>(array->values()->data());
-                    ARROW_ASSIGN_OR_RAISE(auto buffer,
-                                          arrow::AllocateBuffer(array->length() * sizeof(arrow::Date64Type::c_type)));
-                    auto writer = reinterpret_cast<arrow::Date64Type::c_type*>(buffer->mutable_data());
-                    switch (type->unit()) {
-                        case arrow::TimeUnit::SECOND:
-                            for (auto i = 0; i < array->length(); ++i) {
-                                writer[i] = in[i] * 1000;
-                            }
-                            break;
-                        case arrow::TimeUnit::MILLI:
-                            for (auto i = 0; i < array->length(); ++i) {
-                                writer[i] = in[i];
-                            }
-                            break;
-                        case arrow::TimeUnit::MICRO:
-                            for (auto i = 0; i < array->length(); ++i) {
-                                writer[i] = in[i] / 1000;
-                            }
-                            break;
-                        case arrow::TimeUnit::NANO:
-                            for (auto i = 0; i < array->length(); ++i) {
-                                writer[i] = in[i] / (1000 * 1000);
-                            }
-                            break;
-                    }
-                    out = std::make_shared<arrow::Date64Array>(
-                        array->length(), std::shared_ptr<arrow::Buffer>(buffer.release()), array->null_bitmap(),
-                        array->null_count(), array->offset());
-                }
-                break;
-            }
-            case arrow::Type::DURATION: {
-                if (config.cast_duration_to_time64.value_or(false)) {
-                    static_assert(std::is_same<arrow::DurationType::c_type, int64_t>::value);
-                    static_assert(std::is_same<arrow::Time64Type::c_type, int64_t>::value);
-                    auto array = std::dynamic_pointer_cast<arrow::DurationArray>(out);
-                    auto type = reinterpret_cast<const arrow::DurationType*>(array->type().get());
-                    auto in = reinterpret_cast<const arrow::Time64Type::c_type*>(array->values()->data());
-                    ARROW_ASSIGN_OR_RAISE(auto buffer,
-                                          arrow::AllocateBuffer(array->length() * sizeof(arrow::Time64Type::c_type)));
-                    auto writer = reinterpret_cast<arrow::Time64Type::c_type*>(buffer->mutable_data());
-
-                    auto cast_to_type = type->unit() == arrow::TimeUnit::NANO ? arrow::time64(arrow::TimeUnit::NANO)
-                                                                              : arrow::time64(arrow::TimeUnit::MICRO);
-                    switch (type->unit()) {
-                        case arrow::TimeUnit::SECOND:
-                            for (auto i = 0; i < array->length(); ++i) {
-                                writer[i] = in[i] * 1000 * 1000;  // Converted to Micro
-                            }
-                            break;
-                        case arrow::TimeUnit::MILLI:
-                            for (auto i = 0; i < array->length(); ++i) {
-                                writer[i] = in[i] * 1000;  // Converted to Micro
-                            }
-                            break;
-                        case arrow::TimeUnit::MICRO:
-                            for (auto i = 0; i < array->length(); ++i) {
-                                writer[i] = in[i];
-                            }
-                            break;
-                        case arrow::TimeUnit::NANO:
-                            for (auto i = 0; i < array->length(); ++i) {
-                                writer[i] = in[i];
-                            }
-                            break;
-                    }
-
-                    out = std::make_shared<arrow::Time64Array>(
-                        cast_to_type, array->length(), std::shared_ptr<arrow::Buffer>(buffer.release()),
-                        array->null_bitmap(), array->null_count(), array->offset());
-                }
-                break;
-            }
-            case arrow::Type::DECIMAL128: {
-                if (config.cast_decimal_to_double.value_or(false)) {
-                    auto type = reinterpret_cast<const arrow::Decimal128Type*>(out->type().get());
-                    auto scale = type->scale();
-                    auto array = std::dynamic_pointer_cast<arrow::Decimal128Array>(out);
-
-                    ARROW_ASSIGN_OR_RAISE(auto buffer,
-                                          arrow::AllocateBuffer(array->length() * sizeof(arrow::DoubleType::c_type)));
-
-                    auto writer = reinterpret_cast<arrow::DoubleType::c_type*>(buffer->mutable_data());
-
-                    for (auto i = 0; i < array->length(); ++i) {
-                        const arrow::Decimal128 out_value(array->GetValue(i));
-                        writer[i] = out_value.ToDouble(scale);
-                    }
-
-                    out = std::make_shared<arrow::DoubleArray>(
-                        array->length(), std::shared_ptr<arrow::Buffer>(buffer.release()), array->null_bitmap(),
-                        array->null_count(), array->offset());
-                }
-                break;
-            }
-            default:
-                break;
+            break;
         }
-        arrays.push_back(std::move(out));
+        case Cast::TIMESTAMP_TO_DATE64:
+            // date64 counts milliseconds
+            switch (node.time_unit) {
+                case NANOARROW_TIME_UNIT_SECOND:
+                    CastValues<int64_t, int64_t>(array, data, [](int64_t v) { return v * 1000; });
+                    break;
+                case NANOARROW_TIME_UNIT_MILLI:
+                    CastValues<int64_t, int64_t>(array, data, [](int64_t v) { return v; });
+                    break;
+                case NANOARROW_TIME_UNIT_MICRO:
+                    CastValues<int64_t, int64_t>(array, data, [](int64_t v) { return v / 1000; });
+                    break;
+                case NANOARROW_TIME_UNIT_NANO:
+                    CastValues<int64_t, int64_t>(array, data, [](int64_t v) { return v / (1000 * 1000); });
+                    break;
+            }
+            break;
+        case Cast::DURATION_TO_TIME64:
+            switch (node.time_unit) {
+                case NANOARROW_TIME_UNIT_SECOND:
+                    CastValues<int64_t, int64_t>(array, data, [](int64_t v) { return v * 1000 * 1000; });
+                    break;
+                case NANOARROW_TIME_UNIT_MILLI:
+                    CastValues<int64_t, int64_t>(array, data, [](int64_t v) { return v * 1000; });
+                    break;
+                case NANOARROW_TIME_UNIT_MICRO:
+                case NANOARROW_TIME_UNIT_NANO:
+                    CastValues<int64_t, int64_t>(array, data, [](int64_t v) { return v; });
+                    break;
+            }
+            break;
     }
 
-    // Create a record batch
-    return arrow::RecordBatch::Make(schema, batch->num_rows(), arrays);
+    out->length = array->length;
+    out->offset = array->offset;
+    out->null_count = array->null_count;
+    NANOARROW_RETURN_NOT_OK(ArrowArrayFinishBuilding(out.get(), NANOARROW_VALIDATION_LEVEL_NONE, error));
+
+    // Swap the cast array into place. DuckDB's parent arrays release children through their callbacks.
+    array->release(array);
+    out.move(array);
+    return NANOARROW_OK;
 }
 
 }  // namespace web
