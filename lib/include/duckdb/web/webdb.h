@@ -29,6 +29,7 @@ namespace duckdb {
 namespace web {
 
 struct BufferingArrowIPCStreamDecoder;
+class ArrowIPCWriter;
 
 struct DuckDBWasmResultsWrapper {
     // Additional ResponseStatuses to be >= 256, and mirrored to packages/duckdb-wasm/src/status.ts
@@ -70,10 +71,8 @@ class WebDB {
         bool current_pending_query_was_canceled_ = false;
         /// The current query result (if any)
         duckdb::unique_ptr<duckdb::QueryResult> current_query_result_ = nullptr;
-        /// The current arrow schema (if any)
-        std::shared_ptr<arrow::Schema> current_schema_ = nullptr;
-        /// The current patched arrow schema (if any)
-        std::shared_ptr<arrow::Schema> current_schema_patched_ = nullptr;
+        /// The IPC writer for the current streaming query result (if any)
+        std::unique_ptr<ArrowIPCWriter> current_ipc_writer_;
 
         /// The currently active prepared statements
         std::unordered_map<size_t, duckdb::unique_ptr<duckdb::PreparedStatement>> prepared_statements_ = {};
@@ -83,11 +82,6 @@ class WebDB {
         std::optional<ArrowInsertOptions> arrow_insert_options_ = std::nullopt;
         /// The current arrow ipc input stream
         std::unique_ptr<BufferingArrowIPCStreamDecoder> arrow_ipc_stream_;
-        /// Dictionary IDs already serialized for the current streaming query result.
-        /// Cleared on each new StreamQueryResult so subsequent FetchQueryResults
-        /// emits a dictionary IPC message before the first record batch that
-        /// references each one.
-        std::unordered_set<int64_t> sent_dictionaries_;
 
         // Fully materialize a given result set and return it as an Arrow Buffer
         arrow::Result<std::shared_ptr<arrow::Buffer>> MaterializeQueryResult(

@@ -1,91 +1,96 @@
 #include "duckdb/web/arrow_stream_buffer.h"
 
-#include <iostream>
-
-#include "duckdb/web/arrow_bridge.h"
-
 namespace duckdb {
 namespace web {
 
-/// Constructor
-ArrowIPCStreamBuffer::ArrowIPCStreamBuffer() : schema_(nullptr), batches_(), is_eos_(false) {}
-/// Decoded a schema
-arrow::Status ArrowIPCStreamBuffer::OnSchemaDecoded(std::shared_ptr<arrow::Schema> s) {
-    schema_ = s;
-    return arrow::Status::OK();
-}
-/// Decoded a record batch
-arrow::Status ArrowIPCStreamBuffer::OnRecordBatchDecoded(std::shared_ptr<arrow::RecordBatch> batch) {
-    batches_.push_back(batch);
-    return arrow::Status::OK();
-}
-/// Reached end of stream
-arrow::Status ArrowIPCStreamBuffer::OnEOS() {
-    is_eos_ = true;
-    return arrow::Status::OK();
+namespace {
+
+/// Release the reference a stream reader's input holds on the collected stream bytes
+void ReleaseStreamBuffer(ArrowBufferAllocator* allocator, uint8_t*, int64_t) {
+    delete static_cast<std::shared_ptr<ArrowIPCStreamBuffer>*>(allocator->private_data);
 }
 
-/// Constructor
-ArrowIPCStreamBufferReader::ArrowIPCStreamBufferReader(std::shared_ptr<ArrowIPCStreamBuffer> buffer)
-    : buffer_(buffer), next_batch_id_(0) {}
+/// Read the collected stream bytes as an ArrowArrayStream
+ArrowErrorCode OpenStream(const std::shared_ptr<ArrowIPCStreamBuffer>& buffer, ArrowArrayStream* out) {
+    // The reader's input borrows the bytes and keeps the buffer alive until it is released
+    nanoarrow::UniqueBuffer input_bytes;
+    auto& bytes = buffer->bytes();
+    NANOARROW_RETURN_NOT_OK(ArrowBufferSetAllocator(
+        input_bytes.get(),
+        ArrowBufferDeallocator(ReleaseStreamBuffer, new std::shared_ptr<ArrowIPCStreamBuffer>(buffer))));
+    input_bytes->data = bytes.data;
+    input_bytes->size_bytes = bytes.size_bytes;
+    input_bytes->capacity_bytes = bytes.size_bytes;
 
-/// Get the schema
-std::shared_ptr<arrow::Schema> ArrowIPCStreamBufferReader::schema() const { return buffer_->schema(); }
-/// Read the next record batch in the stream. Return null for batch when reaching end of stream
-arrow::Status ArrowIPCStreamBufferReader::ReadNext(std::shared_ptr<arrow::RecordBatch>* batch) {
-    if (next_batch_id_ >= buffer_->batches().size()) {
-        *batch = nullptr;
-        return arrow::Status::OK();
-    }
-    *batch = buffer_->batches()[next_batch_id_++];
-    return arrow::Status::OK();
+    nanoarrow::ipc::UniqueInputStream input;
+    NANOARROW_RETURN_NOT_OK(ArrowIpcInputStreamInitBuffer(input.get(), input_bytes.get()));
+    return ArrowIpcArrayStreamReaderInit(out, input.get(), nullptr);
 }
 
-/// Arrow array stream factory function
+}  // namespace
+
 duckdb::unique_ptr<duckdb::ArrowArrayStreamWrapper> ArrowIPCStreamBufferReader::CreateStream(
     uintptr_t buffer_ptr, duckdb::ArrowStreamParameters& parameters) {
     assert(buffer_ptr != 0);
     auto buffer = reinterpret_cast<std::shared_ptr<ArrowIPCStreamBuffer>*>(buffer_ptr);
-    auto reader = std::make_shared<ArrowIPCStreamBufferReader>(*buffer);
-
-    // Create arrow stream
     auto stream_wrapper = duckdb::make_uniq<duckdb::ArrowArrayStreamWrapper>();
     stream_wrapper->arrow_array_stream.release = nullptr;
-    auto maybe_ok = arrow::ExportRecordBatchReader(reader, &stream_wrapper->arrow_array_stream);
-    if (!maybe_ok.ok()) {
-        if (stream_wrapper->arrow_array_stream.release) {
-            stream_wrapper->arrow_array_stream.release(&stream_wrapper->arrow_array_stream);
-        }
+    if (OpenStream(*buffer, &stream_wrapper->arrow_array_stream) != NANOARROW_OK) {
         return nullptr;
     }
-
-    // Release the stream
     return stream_wrapper;
 }
 
 void ArrowIPCStreamBufferReader::GetSchema(uintptr_t buffer_ptr, duckdb::ArrowSchemaWrapper& schema) {
     assert(buffer_ptr != 0);
     auto buffer = reinterpret_cast<std::shared_ptr<ArrowIPCStreamBuffer>*>(buffer_ptr);
-    auto reader = std::make_shared<ArrowIPCStreamBufferReader>(*buffer);
-
-    // Create arrow stream
-    auto stream_wrapper = std::make_unique<duckdb::ArrowArrayStreamWrapper>();
-    stream_wrapper->arrow_array_stream.release = nullptr;
-    auto maybe_ok = arrow::ExportRecordBatchReader(reader, &stream_wrapper->arrow_array_stream);
-    if (!maybe_ok.ok()) {
-        if (stream_wrapper->arrow_array_stream.release) {
-            stream_wrapper->arrow_array_stream.release(&stream_wrapper->arrow_array_stream);
-        }
+    nanoarrow::UniqueArrayStream stream;
+    if (OpenStream(*buffer, stream.get()) != NANOARROW_OK) {
         return;
     }
-
-    // Pass ownership to caller
-    stream_wrapper->arrow_array_stream.get_schema(&stream_wrapper->arrow_array_stream, &schema.arrow_schema);
+    stream->get_schema(stream.get(), &schema.arrow_schema);
 }
 
-/// Constructor
 BufferingArrowIPCStreamDecoder::BufferingArrowIPCStreamDecoder(std::shared_ptr<ArrowIPCStreamBuffer> buffer)
-    : buffer_(buffer), arrow::ipc::StreamDecoder(buffer) {}
+    : buffer_(std::move(buffer)) {
+    ArrowIpcDecoderInit(decoder_.get());
+}
+
+arrow::Status BufferingArrowIPCStreamDecoder::Consume(const uint8_t* data, size_t size) {
+    if (buffer_->is_eos_) {
+        return arrow::Status::Invalid("Arrow IPC stream continues after its end-of-stream marker");
+    }
+    auto& bytes = *buffer_->bytes_.get();
+    if (ArrowBufferAppend(&bytes, data, static_cast<int64_t>(size)) != NANOARROW_OK) {
+        return arrow::Status::OutOfMemory("failed to buffer Arrow IPC stream");
+    }
+
+    // Skip over every complete message to see whether the end-of-stream marker has arrived
+    ArrowError error = {};
+    while (true) {
+        ArrowBufferView remaining;
+        remaining.data.as_uint8 = bytes.data + next_message_offset_;
+        remaining.size_bytes = bytes.size_bytes - next_message_offset_;
+        switch (ArrowIpcDecoderVerifyHeader(decoder_.get(), remaining, &error)) {
+            case NANOARROW_OK:
+                break;
+            case ENODATA:
+                buffer_->is_eos_ = true;
+                return arrow::Status::OK();
+            case ESPIPE:
+                // The header is incomplete
+                return arrow::Status::OK();
+            default:
+                return arrow::Status::Invalid("Invalid Arrow IPC stream: ", error.message);
+        }
+        auto message_size = static_cast<int64_t>(decoder_->header_size_bytes) + decoder_->body_size_bytes;
+        if (remaining.size_bytes < message_size) {
+            // The body is incomplete
+            return arrow::Status::OK();
+        }
+        next_message_offset_ += message_size;
+    }
+}
 
 }  // namespace web
 }  // namespace duckdb

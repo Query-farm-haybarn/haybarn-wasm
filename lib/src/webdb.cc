@@ -25,11 +25,8 @@
 #include "arrow/array/builder_primitive.h"
 #include "arrow/buffer.h"
 #include "arrow/io/memory.h"
-#include "arrow/ipc/dictionary.h"
-#include "arrow/ipc/options.h"
 #include "arrow/ipc/reader.h"
 #include "arrow/ipc/type_fwd.h"
-#include "arrow/ipc/writer.h"
 #include "arrow/record_batch.h"
 #include "arrow/result.h"
 #include "arrow/status.h"
@@ -52,6 +49,7 @@
 #include "duckdb/web/arrow_bridge.h"
 #include "duckdb/web/arrow_casts.h"
 #include "duckdb/web/arrow_insert_options.h"
+#include "duckdb/web/arrow_ipc_writer.h"
 #include "duckdb/web/arrow_stream_buffer.h"
 #include "duckdb/web/arrow_type_mapping.h"
 #include "duckdb/web/config.h"
@@ -142,8 +140,7 @@ ClientProperties MakeArrowClientProperties(duckdb::ClientContext& ctx, bool loss
 arrow::Result<std::shared_ptr<arrow::Buffer>> WebDB::Connection::MaterializeQueryResult(
     duckdb::unique_ptr<duckdb::QueryResult> result) {
     current_query_result_.reset();
-    current_schema_.reset();
-    current_schema_patched_.reset();
+    current_ipc_writer_.reset();
 
     // Configure the output writer
     ArrowSchema raw_schema;
@@ -152,48 +149,33 @@ arrow::Result<std::shared_ptr<arrow::Buffer>> WebDB::Connection::MaterializeQuer
     auto extension_type_cast = ArrowTypeExtensionData::GetExtensionTypes(*connection_.context, result->types);
     options.arrow_offset_size = ArrowOffsetSize::REGULAR;
     ArrowConverter::ToArrowSchema(&raw_schema, result->types, result->names, options);
-    ARROW_ASSIGN_OR_RAISE(auto schema, arrow::ImportSchema(&raw_schema));
-
-    // Patch the schema (if necessary)
-    std::shared_ptr<arrow::Schema> patched_schema = patchSchema(schema, webdb_.config_->query);
-    // Create the file writer
-    ARROW_ASSIGN_OR_RAISE(auto out, arrow::io::BufferOutputStream::Create());
-    ARROW_ASSIGN_OR_RAISE(auto writer, arrow::ipc::MakeFileWriter(out, patched_schema));
+    ARROW_ASSIGN_OR_RAISE(auto writer,
+                          ArrowIPCWriter::Create(&raw_schema, webdb_.config_->query, ArrowIPCWriter::Format::FILE));
 
     // Write chunk stream
     for (auto chunk = result->Fetch(); !!chunk && chunk->size() > 0; chunk = result->Fetch()) {
-        // Import the data chunk as record batch
         ArrowArray array;
         ArrowConverter::ToArrowArray(*chunk, &array, options, extension_type_cast);
-        // Import the record batch
-        ARROW_ASSIGN_OR_RAISE(auto batch, arrow::ImportRecordBatch(&array, schema));
-        // Patch the record batch
-        ARROW_ASSIGN_OR_RAISE(batch, patchRecordBatch(batch, patched_schema, webdb_.config_->query));
-        // Write the record batch
-        ARROW_RETURN_NOT_OK(writer->WriteRecordBatch(*batch));
+        ARROW_RETURN_NOT_OK(writer->Write(&array));
     }
-    ARROW_RETURN_NOT_OK(writer->Close());
-    return out->Finish();
+    ARROW_RETURN_NOT_OK(writer->Finish());
+    return writer->TakeBytes();
 }
 
 arrow::Result<std::shared_ptr<arrow::Buffer>> WebDB::Connection::StreamQueryResult(
     duckdb::unique_ptr<duckdb::QueryResult> result) {
     current_query_result_ = std::move(result);
-    current_schema_.reset();
-    current_schema_patched_.reset();
-    sent_dictionaries_.clear();
+    current_ipc_writer_.reset();
 
-    // Import the schema
+    // Serialize the schema
     ArrowSchema raw_schema;
     bool lossless_conversion = webdb_.config_->arrow_lossless_conversion;
     ClientProperties options = MakeArrowClientProperties(*connection_.context, lossless_conversion);
     options.arrow_offset_size = ArrowOffsetSize::REGULAR;
     ArrowConverter::ToArrowSchema(&raw_schema, current_query_result_->types, current_query_result_->names, options);
-    ARROW_ASSIGN_OR_RAISE(current_schema_, arrow::ImportSchema(&raw_schema));
-    current_schema_patched_ = patchSchema(current_schema_, webdb_.config_->query);
-
-    // Serialize the schema
-    return arrow::ipc::SerializeSchema(*current_schema_patched_);
+    ARROW_ASSIGN_OR_RAISE(current_ipc_writer_, ArrowIPCWriter::Create(&raw_schema, webdb_.config_->query,
+                                                                      ArrowIPCWriter::Format::STREAM));
+    return current_ipc_writer_->TakeBytes();
 }
 
 arrow::Result<std::shared_ptr<arrow::Buffer>> WebDB::Connection::RunQuery(std::string_view text) {
@@ -231,8 +213,7 @@ arrow::Result<std::shared_ptr<arrow::Buffer>> WebDB::Connection::PendingQuery(st
         current_pending_query_result_ = std::move(result);
         current_pending_query_was_canceled_ = false;
         current_query_result_.reset();
-        current_schema_.reset();
-        current_schema_patched_.reset();
+        current_ipc_writer_.reset();
         if (webdb_.config_->query.query_polling_interval.value_or(DEFAULT_QUERY_POLLING_INTERVAL) > 0) {
             return PollPendingQuery();
         } else {
@@ -404,8 +385,7 @@ DuckDBWasmResultsWrapper WebDB::Connection::FetchQueryResults() {
         // Reached end?
         if (!chunk) {
             current_query_result_.reset();
-            current_schema_.reset();
-            current_schema_patched_.reset();
+            current_ipc_writer_.reset();
             return DuckDBWasmResultsWrapper{nullptr};
         }
 
@@ -416,37 +396,9 @@ DuckDBWasmResultsWrapper WebDB::Connection::FetchQueryResults() {
         auto extension_type_cast = ArrowTypeExtensionData::GetExtensionTypes(*connection_.context, chunk->GetTypes());
         arrow_options.arrow_offset_size = ArrowOffsetSize::REGULAR;
         ArrowConverter::ToArrowArray(*chunk, &array, arrow_options, extension_type_cast);
-        ARROW_ASSIGN_OR_RAISE(auto batch, arrow::ImportRecordBatch(&array, current_schema_));
-        // Patch the record batch
-        ARROW_ASSIGN_OR_RAISE(batch, patchRecordBatch(batch, current_schema_patched_, webdb_.config_->query));
-
-        // Write a valid IPC stream: any not-yet-sent dictionary messages, then the
-        // record batch. SerializeRecordBatch only emits the record batch, leaving
-        // dictionary-encoded columns (DuckDB enums) empty on the JS side.
-        ARROW_ASSIGN_OR_RAISE(auto out, arrow::io::BufferOutputStream::Create());
-        auto ipc_options = arrow::ipc::IpcWriteOptions::Defaults();
-        ipc_options.use_threads = false;
-
-        arrow::ipc::DictionaryFieldMapper mapper(*current_schema_patched_);
-        ARROW_ASSIGN_OR_RAISE(auto dicts, arrow::ipc::CollectDictionaries(*batch, mapper));
-        for (const auto& [dict_id, dict_array] : dicts) {
-            if (sent_dictionaries_.count(dict_id) == 0) {
-                arrow::ipc::IpcPayload dict_payload;
-                ARROW_RETURN_NOT_OK(
-                    arrow::ipc::GetDictionaryPayload(dict_id, dict_array, ipc_options, &dict_payload));
-                int32_t metadata_length = 0;
-                ARROW_RETURN_NOT_OK(
-                    arrow::ipc::WriteIpcPayload(dict_payload, ipc_options, out.get(), &metadata_length));
-                sent_dictionaries_.insert(dict_id);
-            }
-        }
-
-        arrow::ipc::IpcPayload batch_payload;
-        ARROW_RETURN_NOT_OK(arrow::ipc::GetRecordBatchPayload(*batch, ipc_options, &batch_payload));
-        int32_t metadata_length = 0;
-        ARROW_RETURN_NOT_OK(arrow::ipc::WriteIpcPayload(batch_payload, ipc_options, out.get(), &metadata_length));
-
-        return out->Finish();
+        // Write the record batch, preceded by any dictionaries it references that changed
+        ARROW_RETURN_NOT_OK(current_ipc_writer_->Write(&array));
+        return DuckDBWasmResultsWrapper{current_ipc_writer_->TakeBytes()};
     } catch (std::exception& e) {
         return arrow::Status{arrow::StatusCode::ExecutionError, e.what()};
     }
