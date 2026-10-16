@@ -157,6 +157,24 @@ Trade-off: the name section adds size (text, compresses well) and fights
 `relsize`'s intent; if that ever matters the lean alternative is a separate
 `-gseparate-dwarf` side-car instead of in-binary names.
 
+### Lazy dynamic-linking glue (`scripts/patch_dylink_glue.cjs`)
+
+Loadable builds are `MAIN_MODULE=1`, so the engine exports tens of thousands
+of symbols for extensions to link against. Emscripten's dynamic-linking glue
+(`libdylink.js`) walks every one of them at startup, growing the function table
+one slot at a time and creating a `WebAssembly.Global` per symbol. That was
+about 40% of Node cold start (1055 → 640 ms on the EC2 build box), and every
+coi pthread worker repeats it. `wasm_build_lib.sh` runs `patch_dylink_glue.cjs` on loadable
+builds so the glue resolves main-module symbols on first use instead. The
+engine's copy of a symbol still wins over an extension's, and missing symbols
+still fail `dlopen`.
+
+The patch checks the exact shape of the glue it rewrites and **fails the build**
+if emscripten changed it. After an emsdk upgrade, re-validate the patch rather
+than skipping it. `scripts/test_dylink_glue.cjs` (run in CI on the loadable
+build) checks the dynamic-linking semantics with hand-written side modules in
+`scripts/dylink_fixtures/`, and must pass with or without the patch.
+
 ## Out-of-tree references
 
 | What                          | Where                                                |

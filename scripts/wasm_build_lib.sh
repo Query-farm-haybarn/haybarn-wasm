@@ -98,6 +98,13 @@ js-beautify ${BUILD_DIR}/duckdb_wasm.js > ${BUILD_DIR}/beauty.js
 # pthread, emscripten internals).
 awk '!(/var .*wasmExports\[/ || /var [_a-z0-9A-Z]+ = Module\[\"[_a-z0-9A-Z]+\"\] = [0-9]+;/) || /var _duckdb_web/ || /var _main/ || /var _calloc/ || /var _malloc/ || /var _free/ || /var stack/ || /var ___dl_seterr/ || /var __em/ || /var _em/ || /var _pthread/' ${BUILD_DIR}/beauty.js > ${BUILD_DIR}/duckdb_wasm.js
 
+# Loadable builds export every symbol for extensions to link against. Make the dynamic-linking glue
+# resolve those exports on first use instead of walking all of them at startup. This mirrors CMake,
+# which enables loadable extensions whenever DUCKDB_WASM_LOADABLE_EXTENSIONS is defined.
+if [ -n "${DUCKDB_WASM_LOADABLE_EXTENSIONS+x}" ]; then
+    node ${PROJECT_ROOT}/scripts/patch_dylink_glue.cjs ${BUILD_DIR}/duckdb_wasm.js ${BUILD_DIR}/duckdb_wasm.js
+fi
+
 cp ${BUILD_DIR}/duckdb_wasm.wasm ${DUCKDB_LIB_DIR}/duckdb${SUFFIX}.wasm
 sed \
   -e "s/duckdb_wasm\.wasm/.\/duckdb${SUFFIX}.wasm/g" \
