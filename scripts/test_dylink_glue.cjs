@@ -1,0 +1,138 @@
+#!/usr/bin/env node
+// Check the dynamic-linking behaviour that loadable extensions rely on, using hand-written side
+// modules (scripts/dylink_fixtures). Run against a loadable build's dist; it must pass with or
+// without patch_dylink_glue.cjs applied.
+//
+//   node scripts/test_dylink_glue.cjs packages/duckdb-wasm/dist
+//
+// It calls libc dlopen/dlsym/dlerror through the main module's raw exports, so it exercises the
+// emscripten glue directly rather than DuckDB's LOAD. Each fixture .so is built from its .wat:
+//   wat2wasm x.wat -o x.wasm && node scripts/dylink_fixtures/mkso.cjs x.wasm x.wat x.so
+'use strict';
+const fs = require('fs');
+const path = require('path');
+
+const dist = path.resolve(process.argv[2] || 'packages/duckdb-wasm/dist');
+const FIXTURES = path.join(__dirname, 'dylink_fixtures');
+
+// Capture the main module's raw exports when the bindings instantiate it
+let X = null;
+const instantiate = WebAssembly.instantiate;
+WebAssembly.instantiate = async function (...args) {
+    const result = await instantiate.apply(this, args);
+    const instance = result instanceof WebAssembly.Instance ? result : result.instance;
+    if (instance && instance.exports.duckdb_web_open) X = instance.exports;
+    return result;
+};
+
+const failures = [];
+function check(name, ok, detail) {
+    console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${detail === undefined ? '' : ` (${detail})`}`);
+    if (!ok) failures.push(name);
+}
+
+(async () => {
+    const bundle = path.join(dist, 'duckdb-node-blocking.cjs');
+    // The lazy glue's dlsym hook survives minification as this string array
+    const patched = /\[\s*"_dlsym_js"\s*,\s*"_dlsym_catchup_js"\s*\]/.test(fs.readFileSync(bundle, 'utf8'));
+    console.log(`glue: ${patched ? 'patched (lazy)' : 'unpatched'}`);
+
+    const duckdb = require(bundle);
+    const bundleFor = name => ({ mainModule: path.join(dist, `duckdb-${name}.wasm`), mainWorker: '' });
+    const db = await duckdb.createDuckDB({ mvp: bundleFor('mvp'), eh: bundleFor('eh') }, new duckdb.VoidLogger(), duckdb.NODE_RUNTIME);
+    await db.instantiate();
+    db.open({});
+    const conn = db.connect();
+    if (!X || !X.dlopen) throw new Error('not a loadable (MAIN_MODULE) build: dlopen is not exported');
+
+    const table = X.__indirect_function_table;
+    const heap = () => new Uint8Array(X.memory.buffer);
+    const cstr = s => {
+        const bytes = Buffer.from(s + '\0');
+        const ptr = X.malloc(bytes.length) >>> 0;
+        heap().set(bytes, ptr);
+        return ptr;
+    };
+    const readCstr = ptr => {
+        ptr >>>= 0;
+        if (!ptr) return null;
+        const m = heap();
+        let end = ptr;
+        while (m[end]) end++;
+        return Buffer.from(m.subarray(ptr, end)).toString();
+    };
+    // The bindings only fetch modules they expect, so write the side module into MEMFS for dlopen
+    const stage = file => {
+        const bytes = fs.readFileSync(path.join(FIXTURES, file));
+        const ptr = X.malloc(bytes.length) >>> 0;
+        heap().set(bytes, ptr);
+        const fp = X.fopen(cstr('/tmp/' + file), cstr('wb'));
+        if (!fp) throw new Error('fopen failed');
+        X.fwrite(ptr, 1, bytes.length, fp);
+        X.fclose(fp);
+        return '/tmp/' + file;
+    };
+    const RTLD_NOW = 2, RTLD_GLOBAL = 256;
+    const dlopen = file => X.dlopen(cstr(stage(file)), RTLD_NOW | RTLD_GLOBAL) >>> 0;
+    const dlsym = (handle, name) => X.dlsym(handle, cstr(name)) >>> 0;
+    const call = (handle, name, ...args) => table.get(dlsym(handle, name))(...args);
+
+    // Imports from GOT.func, GOT.mem and env resolve to the main module's definitions
+    const good = dlopen('good.so');
+    check('dlopen good.so', good !== 0, good ? undefined : readCstr(X.dlerror()));
+    if (good) {
+        const fn = call(good, 'hb_got_fn') >>> 0;
+        const strlen = call(good, 'hb_got_strlen') >>> 0;
+        check('GOT.func resolves to the main export', table.get(fn) === X.duckdb_web_get_version);
+        check('GOT.func for a libc function resolves to the main export', table.get(strlen) === X.strlen);
+        check('GOT.func for a main-module import is set', (call(good, 'hb_got_mainimp') >>> 0) !== 0);
+        check('missing weak GOT import is 0', (call(good, 'hb_got_weak') >>> 0) === 0);
+        check('GOT.mem typeinfo address matches', (call(good, 'hb_got_ti') >>> 0) === X._ZTIN6duckdb9ExceptionE.value >>> 0);
+        check('GOT.mem vtable address matches', (call(good, 'hb_got_vt') >>> 0) === X._ZTVN6duckdb9ExceptionE.value >>> 0);
+        const s = cstr('hello, haybarn');
+        check('direct env import call', call(good, 'hb_strlen_direct', s) === 14);
+        check('indirect call through GOT.func', call(good, 'hb_strlen_indirect', s) === 14);
+
+        const mainSym = dlsym(0, 'duckdb_web_get_version');
+        check('dlsym(RTLD_DEFAULT) finds a main export', mainSym !== 0 && table.get(mainSym) === X.duckdb_web_get_version);
+        check('dlsym(RTLD_DEFAULT) is stable', dlsym(0, 'duckdb_web_get_version') === mainSym);
+        check('dlsym(RTLD_DEFAULT) matches the GOT entry', dlsym(0, 'strlen') === strlen);
+        const sideSym = dlsym(0, 'hb_got_fn');
+        check('dlsym(RTLD_DEFAULT) finds a side-module export', sideSym !== 0 && (table.get(sideSym)() >>> 0) === fn);
+        check('dlsym(RTLD_DEFAULT) of a missing symbol fails', dlsym(0, 'hb_no_such_symbol') === 0);
+        check('dlsym(RTLD_DEFAULT) of a data symbol', dlsym(0, '_ZTIN6duckdb9ExceptionE') === X._ZTIN6duckdb9ExceptionE.value >>> 0);
+    }
+
+    // A missing env function still loads, and fails when it is called
+    const missingEnv = dlopen('missing_env.so');
+    check('dlopen with a missing env function succeeds', missingEnv !== 0);
+    if (missingEnv) {
+        let threw = false;
+        try {
+            call(missingEnv, 'hb_m3');
+        } catch (e) {
+            threw = true;
+        }
+        check('calling the missing function throws', threw);
+    }
+
+    // When a side module defines a symbol the main module also defines, the main module's copy wins
+    const dup = dlopen('dup.so');
+    check('dlopen dup.so', dup !== 0);
+    if (dup) check("duplicate definition resolves to the main module's copy", table.get(call(dup, 'hb_dup_got') >>> 0) === X.duckdb_web_get_feature_flags);
+
+    // A missing required GOT import fails dlopen
+    check('dlopen with a missing GOT.func import fails', dlopen('missing_got.so') === 0);
+    check('dlopen with a missing GOT.mem import fails', dlopen('missing_mem.so') === 0);
+
+    check('queries still work', conn.query('SELECT 40 + 2 AS v').toArray()[0].v === 42);
+
+    if (failures.length) {
+        console.error(`${failures.length} check(s) failed`);
+        process.exit(1);
+    }
+    console.log('all checks passed');
+})().catch(e => {
+    console.error(e);
+    process.exit(1);
+});

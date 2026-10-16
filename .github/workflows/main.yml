@@ -1098,6 +1098,11 @@ jobs:
               run: |
                       yarn workspace @haybarn/haybarn-wasm test:node
 
+            - name: Test dynamic linking on Node.js
+              shell: bash
+              run: |
+                      node scripts/test_dylink_glue.cjs packages/duckdb-wasm/dist
+
             # Pages deploy disabled for the initial release — we don't host
             # shell.haybarn.query.farm yet, and there's no gh-pages branch
             # bootstrapped on the repo. Re-enable by flipping `if: false`
