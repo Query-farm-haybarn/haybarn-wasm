@@ -17,6 +17,7 @@
 // registration) before forwarding pthread protocol messages onward.
 import DuckDB from '../bindings/duckdb-coi';
 import { BROWSER_RUNTIME } from '../bindings/runtime_browser';
+import { keepHeapViewsCurrent } from '../bindings/duckdb_module';
 
 // Register the global DuckDB runtime in the worker's globalThis so any
 // JS-library function the wasm module calls (via js-stubs.js) can resolve
@@ -31,8 +32,10 @@ for (const func of Object.getOwnPropertyNames(BROWSER_RUNTIME)) {
 // up to its first `await`; specifically the `self.onmessage = handleMessage`
 // assignment happens before the factory yields. So by the time DuckDB({})
 // returns control (even before its promise resolves), `self.onmessage` is
-// the emscripten pthread handler and ready to be wrapped below.
-DuckDB({});
+// the emscripten pthread handler and ready to be wrapped below. Runtime
+// functions called on this thread read the heap through the resolved module,
+// so keep its views current when other threads grow the memory.
+DuckDB({}).then(keepHeapViewsCurrent);
 
 // Wrap self.onmessage: handle Haybarn-specific commands locally, forward
 // everything else (`load`, `run`, `checkMailbox`, …) to emscripten's
