@@ -1,4 +1,4 @@
-import { DuckDBModule, PThread, runningWorkers } from './duckdb_module';
+import { DuckDBModule, PThread, runningWorkers, keepHeapViewsCurrent } from './duckdb_module';
 import { DuckDBConfig } from './config';
 import { Logger } from '../log';
 import { InstantiationProgress } from './progress';
@@ -98,6 +98,7 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
         // Wait for onRuntimeInitialized
         await this._initPromise;
         this._initPromise = null;
+        keepHeapViewsCurrent(this._instance);
         // Before any query can block a thread on HTTP; never fails instantiate.
         try {
             await startHttpFetchHelper(this._instance);
