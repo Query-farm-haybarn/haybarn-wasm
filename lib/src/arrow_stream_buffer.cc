@@ -24,7 +24,15 @@ ArrowErrorCode OpenStream(const std::shared_ptr<ArrowIPCStreamBuffer>& buffer, A
 
     nanoarrow::ipc::UniqueInputStream input;
     NANOARROW_RETURN_NOT_OK(ArrowIpcInputStreamInitBuffer(input.get(), input_bytes.get()));
-    return ArrowIpcArrayStreamReaderInit(out, input.get(), nullptr);
+
+    // Shared buffers let the arrays reference the collected bytes instead of copies.
+    // The stream comes from our own JS client, so check buffer sizes but don't scan every offset,
+    // as Arrow C++ didn't either.
+    ArrowIpcArrayStreamReaderOptions options;
+    options.field_index = -1;
+    options.use_shared_buffers = 1;
+    options.validation_level = NANOARROW_VALIDATION_LEVEL_DEFAULT;
+    return ArrowIpcArrayStreamReaderInit(out, input.get(), &options);
 }
 
 }  // namespace
