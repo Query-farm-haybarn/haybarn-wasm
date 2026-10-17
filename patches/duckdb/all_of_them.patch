@@ -446,7 +446,38 @@ index 50f95a2bb4..8f5ef30624 100644
  #ifndef DUCKDB_NO_THREADS
  #include <thread>
  #endif // DUCKDB_NO_THREADS
-@@ -371,13 +374,31 @@ bool ExtensionHelper::TryInitialLoad(DatabaseInstance &db, FileSystem &fs, const
+@@ -168,7 +171,29 @@ static T TryLoadFunctionFromDLL(void *dll, const string &function_name, const st
+ static void ComputeSHA256Buffer(const char *buffer, const idx_t start, const idx_t end, string *res) {
+ 	// Invoke MbedTls function to actually compute sha256
+ 	char hash[duckdb_mbedtls::MbedTlsWrapper::SHA256_HASH_LENGTH_BYTES];
+-	duckdb_mbedtls::MbedTlsWrapper::ComputeSha256Hash(buffer + start, end - start, hash);
++#ifdef WASM_LOADABLE_EXTENSIONS
++	// Under Node.js use its native SHA-256, which is much faster than mbedtls compiled to wasm.
++	auto hashed = EM_ASM_INT(
++	    {
++		    if (typeof process === "undefined" || typeof require !== "function") {
++			    return 0;
++		    }
++		    try {
++			    // threaded builds: pick up memory grown by other threads
++			    if (typeof growMemViews === "function") {
++				    growMemViews();
++			    }
++			    var digest = require("crypto").createHash("sha256").update(HEAPU8.subarray($0 >>> 0, ($0 >>> 0) + $1)).digest();
++			    HEAPU8.set(digest, $2 >>> 0);
++			    return 1;
++		    } catch (e) {
++			    return 0;
++		    }
++	    },
++	    buffer + start, NumericCast<int>(end - start), hash);
++	if (!hashed)
++#endif
++		duckdb_mbedtls::MbedTlsWrapper::ComputeSha256Hash(buffer + start, end - start, hash);
+ 	*res = std::string(hash, duckdb_mbedtls::MbedTlsWrapper::SHA256_HASH_LENGTH_BYTES);
+ }
+ 
+@@ -371,13 +396,31 @@ bool ExtensionHelper::TryInitialLoad(DatabaseInstance &db, FileSystem &fs, const
  	auto filename = fs.ConvertSeparators(extension);
  
  	bool direct_load;
@@ -479,7 +510,7 @@ index 50f95a2bb4..8f5ef30624 100644
  		string url = ExtensionFinalizeUrlTemplate(url_template, extension_name);
  
  		char *str = (char *)EM_ASM_PTR(
-@@ -453,77 +473,202 @@ bool ExtensionHelper::TryInitialLoad(DatabaseInstance &db, FileSystem &fs, const
+@@ -453,114 +495,208 @@ bool ExtensionHelper::TryInitialLoad(DatabaseInstance &db, FileSystem &fs, const
  		direct_load = true;
  		filename = fs.ExpandPath(filename);
  	}
@@ -507,8 +538,7 @@ index 50f95a2bb4..8f5ef30624 100644
 +
 +#ifdef WASM_LOADABLE_EXTENSIONS
 +	auto basename = fs.ExtractBaseName(filename);
-+	char *exe = NULL;
-+	exe = (char *)EM_ASM_PTR(
++	auto file_len = EM_ASM_INT(
 +	    {
 +		    // Next few lines should argubly in separate JavaScript-land function call
 +		    // TODO: move them out / have them configurable
@@ -583,45 +613,50 @@ index 50f95a2bb4..8f5ef30624 100644
 +			    uInt8Array = xhr.response;
 +		    }
 +
-+		    var valid = WebAssembly.validate(uInt8Array);
-+		    var len = uInt8Array.byteLength;
-+		    var fileOnWasmHeap = _malloc(len + 4);
-+
-+		    var properArray = new Uint8Array(uInt8Array);
-+
-+		    for (var iii = 0; iii < len; iii++) {
-+			    Module.HEAPU8[iii + fileOnWasmHeap + 4] = properArray[iii];
-+		    }
-+		    var LEN123 = new Uint8Array(4);
-+		    LEN123[0] = len % 256;
-+		    len -= LEN123[0];
-+		    len /= 256;
-+		    LEN123[1] = len % 256;
-+		    len -= LEN123[1];
-+		    len /= 256;
-+		    LEN123[2] = len % 256;
-+		    len -= LEN123[2];
-+		    len /= 256;
-+		    LEN123[3] = len % 256;
-+		    len -= LEN123[3];
-+		    len /= 256;
-+		    Module.HEAPU8.set(LEN123, fileOnWasmHeap);
-+		    // FIXME: found how to expose those to the logger interface
-+		    // console.log(LEN123);
-+		    // console.log(properArray);
-+		    // console.log(new Uint8Array(Module.HEAPU8, fileOnWasmHeap, len+4));
-+		    // console.log('Loading extension ', UTF8ToString($1));
- 
+-
 -	if (!metadata_mismatch_error.empty()) {
 -		metadata_mismatch_error = StringUtil::Format("Failed to load '%s', %s", extension, metadata_mismatch_error);
-+		    // Here we add the uInt8Array to Emscripten's filesystem, for it to be found by dlopen
-+		    FS.writeFile(UTF8ToString($1), new Uint8Array(uInt8Array));
-+		    return fileOnWasmHeap;
++		    // Hand the bytes to Emscripten's filesystem, where dlopen and the signature check below read them.
++		    var bytes = uInt8Array instanceof Uint8Array ? uInt8Array : new Uint8Array(uInt8Array);
++		    FS.writeFile(UTF8ToString($1), bytes, {canOwn : true});
++		    return bytes.byteLength;
 +	    },
 +	    filename.c_str(), basename.c_str());
-+	if (!exe) {
++	// Until dlopen has compiled it, close and remove the in-memory file on any error
++	struct ExtensionFileCleanup {
++		FILE *file = nullptr;
++		const char *path = nullptr;
++		~ExtensionFileCleanup() {
++			if (file) {
++				fclose(file);
++			}
++			if (path) {
++				std::remove(path);
++			}
++		}
++	} ext_file_cleanup;
++	ext_file_cleanup.path = basename.c_str();
++	if (file_len <= 0) {
 +		throw IOException("Extension %s is not available", filename);
  	}
++	auto file_size = NumericCast<idx_t>(file_len);
++	if (file_size < ParsedExtensionMetaData::FOOTER_SIZE) {
++		throw IOException("Extension %s is too small to be valid", filename);
++	}
++	// Read the file back from Emscripten's filesystem in chunks rather than copying it whole onto the wasm heap,
++	// which can't shrink again afterwards.
++	auto ext_file = fopen(basename.c_str(), "rb");
++	if (!ext_file) {
++		throw IOException("Extension %s is not available", filename);
++	}
++	ext_file_cleanup.file = ext_file;
++	auto read_at = [&](idx_t offset, char *out, idx_t len) {
++		if (fseek(ext_file, NumericCast<long>(offset), SEEK_SET) != 0 || fread(out, 1, len, ext_file) != len) {
++			throw IOException("Failed to read extension %s", filename);
++		}
++	};
++	string metadata_segment(ParsedExtensionMetaData::FOOTER_SIZE, '\0');
++	read_at(file_size - ParsedExtensionMetaData::FOOTER_SIZE, &metadata_segment[0], metadata_segment.size());
  
 +	auto dopen_from = basename;
  	if (!Settings::Get<AllowUnsignedExtensionsSetting>(db)) {
@@ -632,43 +667,28 @@ index 50f95a2bb4..8f5ef30624 100644
 -		} else {
 -			signature_valid = false;
 +		// signature is the last 256 bytes of the file
-+
 +		string signature;
 +		signature.resize(256);
++		auto signature_offset = file_size - signature.size();
 +
-+		D_ASSERT(exe);
-+		uint64_t LEN = 0;
-+		LEN *= 256;
-+		LEN += ((uint8_t *)exe)[3];
-+		LEN *= 256;
-+		LEN += ((uint8_t *)exe)[2];
-+		LEN *= 256;
-+		LEN += ((uint8_t *)exe)[1];
-+		LEN *= 256;
-+		LEN += ((uint8_t *)exe)[0];
-+		auto signature_offset = LEN - signature.size();
++		vector<string> hash_chunks;
++		vector<idx_t> splits;
++		IntializeAncillaryData(hash_chunks, splits, signature_offset);
 +
-+		const idx_t maxLenChunks = 1024ULL * 1024ULL;
-+		const idx_t numChunks = (signature_offset + maxLenChunks - 1) / maxLenChunks;
-+		std::vector<std::string> hash_chunks(numChunks);
-+		std::vector<idx_t> splits(numChunks + 1);
++		string chunk;
++		for (idx_t i = 0; i < hash_chunks.size(); i++) {
++			chunk.resize(splits[i + 1] - splits[i]);
++			read_at(splits[i], &chunk[0], chunk.size());
++			ComputeSHA256String(chunk, &hash_chunks[i]);
++		}
++		string two_level_hash = ComputeFinalHash(hash_chunks);
 +
-+		for (idx_t i = 0; i < numChunks; i++) {
-+			splits[i] = maxLenChunks * i;
- 		}
-+		splits.back() = signature_offset;
- 
+-		}
+-
 -		if (!metadata_mismatch_error.empty()) {
 -			throw InvalidInputException(metadata_mismatch_error);
-+		for (idx_t i = 0; i < numChunks; i++) {
-+			string x;
-+			x.resize(splits[i + 1] - splits[i]);
-+			for (idx_t j = 0; j < x.size(); j++) {
-+				x[j] = ((uint8_t *)exe)[j + 4 + splits[i]];
-+			}
-+			ComputeSHA256String(x, &hash_chunks[i]);
- 		}
- 
+-		}
+-
 -		if (!signature_valid) {
 -			throw IOException(db.config.error_manager->FormatException(ErrorType::UNSIGNED_EXTENSION, filename));
 -		}
@@ -677,18 +697,11 @@ index 50f95a2bb4..8f5ef30624 100644
 -			// Unsigned extensions AND configuration allowing n, loading allowed, mainly for
 -			// debugging purposes
 -			throw InvalidInputException(metadata_mismatch_error);
-+		string hash_concatenation;
-+		hash_concatenation.reserve(32 * numChunks); // 256 bits -> 32 bytes per chunk
-+
-+		for (auto &hash_chunk : hash_chunks) {
-+			hash_concatenation += hash_chunk;
- 		}
+-		}
 -	}
- 
+-
 -	auto filebase = fs.ExtractBaseName(filename);
-+		string two_level_hash;
-+		ComputeSHA256String(hash_concatenation, &two_level_hash);
- 
+-
 -#ifdef WASM_LOADABLE_EXTENSIONS
 -	EM_ASM(
 -	    {
@@ -701,9 +714,7 @@ index 50f95a2bb4..8f5ef30624 100644
 -		    var uInt8Array = xhr.response;
 -		    WebAssembly.validate(uInt8Array);
 -		    console.log('Loading extension ', UTF8ToString($1));
-+		for (idx_t j = 0; j < signature.size(); j++) {
-+			signature[j] = ((uint8_t *)exe)[4 + signature_offset + j];
-+		}
++		signature.assign(metadata_segment, ParsedExtensionMetaData::FOOTER_SIZE - signature.size(), signature.size());
 +		bool any_valid = false;
 +		bool allow_community_extensions = Settings::Get<AllowCommunityExtensionsSetting>(db);
 +		for (auto &key : ExtensionHelper::GetPublicKeys(allow_community_extensions)) {
@@ -716,29 +727,33 @@ index 50f95a2bb4..8f5ef30624 100644
 +			throw IOException(db.config.error_manager->FormatException(ErrorType::UNSIGNED_EXTENSION, filename));
 +		}
 +	}
- 
+-
 -		    // Here we add the uInt8Array to Emscripten's filesystem, for it to be found by dlopen
 -		    FS.writeFile(UTF8ToString($1), new Uint8Array(uInt8Array));
 -	    },
 -	    filename.c_str(), filebase.c_str());
 -	auto dopen_from = filebase;
-+	if (exe) {
-+		uint64_t LEN = 0;
-+		LEN *= 256;
-+		LEN += ((uint8_t *)exe)[3];
-+		LEN *= 256;
-+		LEN += ((uint8_t *)exe)[2];
-+		LEN *= 256;
-+		LEN += ((uint8_t *)exe)[1];
-+		LEN *= 256;
-+		LEN += ((uint8_t *)exe)[0];
-+		parsed_metadata = ParseExtensionMetaData(exe + LEN + 4 - ParsedExtensionMetaData::FOOTER_SIZE);
-+		free(exe);
-+	}
++	fclose(ext_file);
++	ext_file_cleanup.file = nullptr;
++	parsed_metadata = ParseExtensionMetaData(metadata_segment.data());
  #else
  	auto dopen_from = filename;
  #endif
-@@ -540,27 +677,30 @@ bool ExtensionHelper::TryInitialLoad(DatabaseInstance &db, FileSystem &fs, const
+ 
+ 	auto lib_hdl = dlopen(dopen_from.c_str(), RTLD_NOW | RTLD_LOCAL);
++#ifdef WASM_LOADABLE_EXTENSIONS
++	// dlopen has compiled the module (or failed); drop the in-memory file so its bytes don't stay resident
++	std::remove(dopen_from.c_str());
++	ext_file_cleanup.path = nullptr;
++#endif
+ 	if (!lib_hdl) {
+ 		throw IOException("Extension \"%s\" could not be loaded: %s", filename, GetDLError());
+ 	}
+ 
+ 	auto lowercase_extension_name = StringUtil::Lower(filebase);
+ 
+ 	// Initialize the ExtensionInitResult
+ 	result.filebase = lowercase_extension_name;
  	result.filename = filename;
  	result.lib_hdl = lib_hdl;
  	result.abi_type = parsed_metadata.abi_type;
@@ -784,7 +799,7 @@ index 50f95a2bb4..8f5ef30624 100644
  	}
  
  	return true;
-@@ -694,7 +834,7 @@ void ExtensionHelper::LoadExternalExtensionInternal(DatabaseInstance &db, FileSy
+@@ -694,7 +822,7 @@ void ExtensionHelper::LoadExternalExtensionInternal(DatabaseInstance &db, FileSy
  		return;
  	}
  
