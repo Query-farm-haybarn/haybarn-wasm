@@ -7,6 +7,7 @@
 #include <emscripten/threading.h>
 #endif
 
+#include <cctype>
 #include <chrono>
 #include <cstddef>
 #include <cstdio>
@@ -65,10 +66,8 @@
 #include "duckdb/web/io/file_page_buffer.h"
 #include "duckdb/web/io/ifstream.h"
 #include "duckdb/web/io/web_filesystem.h"
-#include "duckdb/web/json_analyzer.h"
 #include "duckdb/web/json_dataview.h"
 #include "duckdb/web/json_insert_options.h"
-#include "duckdb/web/json_table.h"
 #include "duckdb/web/udf.h"
 #include "duckdb/web/utils/debug.h"
 #include "duckdb/web/utils/wasm_response.h"
@@ -802,6 +801,25 @@ arrow::Status WebDB::Connection::InsertCSVFromPath(std::string_view path, std::s
     return arrow::Status::OK();
 }
 
+namespace {
+/// Peek at the first significant byte to tell a row array from a column object
+json::JSONTableShape DetectJSONTableShape(duckdb::FileHandle& handle) {
+    static constexpr unsigned char BOM[] = {0xEF, 0xBB, 0xBF};
+    char buffer[1024];
+    idx_t offset = 0;
+    for (int64_t n; (n = handle.Read(buffer, sizeof(buffer))) > 0;) {
+        for (int64_t i = 0; i < n; ++i, ++offset) {
+            auto c = static_cast<unsigned char>(buffer[i]);
+            if ((offset < sizeof(BOM) && c == BOM[offset]) || std::isspace(c)) continue;
+            if (c == '[') return json::JSONTableShape::ROW_ARRAY;
+            if (c == '{') return json::JSONTableShape::COLUMN_OBJECT;
+            return json::JSONTableShape::UNRECOGNIZED;
+        }
+    }
+    return json::JSONTableShape::UNRECOGNIZED;
+}
+}  // namespace
+
 /// Import a json file
 arrow::Status WebDB::Connection::InsertJSONFromPath(std::string_view path, std::string_view options_json) {
     try {
@@ -814,35 +832,86 @@ arrow::Status WebDB::Connection::InsertJSONFromPath(std::string_view path, std::
         /// Get table name and schema
         auto schema_name = options.schema_name.empty() ? "main" : options.schema_name;
         if (options.table_name.empty()) return arrow::Status::Invalid("missing 'name' option");
+        auto auto_detect = options.auto_detect.value_or(false);
 
-        // Create the input file stream
-        auto ifs = duckdb::make_uniq<io::InputFileStream>(webdb_.file_page_buffer_, path);
-        // Do we need to run the analyzer?
-        json::TableType table_type;
-        if (!options.table_shape || options.table_shape == json::JSONTableShape::UNRECOGNIZED ||
-            options.auto_detect.value_or(false)) {
-            io::InputFileStream ifs_copy{*ifs};
-            ARROW_RETURN_NOT_OK(json::InferTableType(ifs_copy, table_type));
-
-        } else {
-            table_type.shape = *options.table_shape;
-            table_type.type = arrow::struct_(options.columns.value_or(std::vector<std::shared_ptr<arrow::Field>>{}));
+        /// Resolve the table shape, peeking at the file unless it was given
+        auto& fs = FileSystem::GetFileSystem(*connection_.context);
+        auto file = fs.OpenFile(std::string{path}, FileFlags::FILE_FLAGS_READ);
+        auto file_size = file->GetFileSize();
+        auto shape = options.table_shape.value_or(json::JSONTableShape::UNRECOGNIZED);
+        if (shape == json::JSONTableShape::UNRECOGNIZED || auto_detect) {
+            shape = DetectJSONTableShape(*file);
         }
-        // Resolve the table reader
-        ARROW_ASSIGN_OR_RAISE(auto table_reader, json::TableReader::Resolve(std::move(ifs), table_type));
+        file.reset();
+        if (shape == json::JSONTableShape::UNRECOGNIZED) {
+            return arrow::Status::Invalid("JSON input must be an array of row objects or an object of column arrays");
+        }
 
-        /// Execute the arrow scan
-        vector<Value> params;
-        params.push_back(duckdb::Value::POINTER(reinterpret_cast<uintptr_t>(&table_reader)));
-        params.push_back(duckdb::Value::POINTER(reinterpret_cast<uintptr_t>(json::TableReader::CreateStream)));
-        params.push_back(duckdb::Value::POINTER(reinterpret_cast<uintptr_t>(json::TableReader::GetSchema)));
-        auto func = connection_.TableFunction("arrow_scan", params);
+        /// Map explicitly specified column types
+        child_list_t<LogicalType> column_types;
+        if (options.columns.has_value() && !auto_detect) {
+            for (auto& col : *options.columns) {
+                ARROW_ASSIGN_OR_RAISE(auto type, mapArrowTypeToDuckDB(*col->type()));
+                column_types.emplace_back(col->name(), std::move(type));
+            }
+        }
+
+        /// Both shapes are read as a single JSON document, so the object size limit must cover the whole file.
+        /// Map inference is disabled since wide rows would otherwise be read as MAPs that can't be unnested.
+        constexpr idx_t DEFAULT_MAXIMUM_OBJECT_SIZE = 16 * 1024 * 1024;
+        auto maximum_object_size = std::min<idx_t>(std::max<idx_t>(file_size + 1, DEFAULT_MAXIMUM_OBJECT_SIZE),
+                                                   std::numeric_limits<uint32_t>::max());
+        std::unordered_map<std::string, Value> named_params;
+        named_params.insert({"format", Value("unstructured")});
+        named_params.insert({"maximum_object_size", Value::UINTEGER(maximum_object_size)});
+        named_params.insert({"map_inference_threshold", Value::BIGINT(-1)});
+
+        shared_ptr<Relation> rel;
+        if (shape == json::JSONTableShape::ROW_ARRAY) {
+            // Read [{"a":1,"b":2},...] as a single LIST(STRUCT) value and unnest it into rows
+            named_params.insert({"records", Value("false")});
+            if (!column_types.empty()) {
+                child_list_t<Value> columns;
+                columns.emplace_back("json", Value(LogicalType::LIST(LogicalType::STRUCT(column_types)).ToString()));
+                named_params.insert({"columns", Value::STRUCT(std::move(columns))});
+            }
+            auto scan = duckdb::make_shared_ptr<TableFunctionRelation>(connection_.context, "read_json",
+                                                                       vector<Value>{Value(std::string{path})},
+                                                                       std::move(named_params));
+            auto& scan_columns = scan->Columns();
+            if (scan_columns.size() != 1 || scan_columns[0].Type().id() != LogicalTypeId::LIST ||
+                ListType::GetChildType(scan_columns[0].Type()).id() != LogicalTypeId::STRUCT) {
+                return arrow::Status::Invalid(
+                    "JSON row array must contain objects; specify 'columns' to insert an empty array");
+            }
+            rel = scan->Project("UNNEST(json)", "r")->Project("UNNEST(r)");
+        } else {
+            // Read {"a":[1,3],"b":[2,4]} as one record of LIST columns and unnest them side by side
+            named_params.insert({"records", Value("true")});
+            if (!column_types.empty()) {
+                child_list_t<Value> columns;
+                for (auto& [name, type] : column_types) {
+                    columns.emplace_back(name, Value(LogicalType::LIST(type).ToString()));
+                }
+                named_params.insert({"columns", Value::STRUCT(std::move(columns))});
+            }
+            auto scan = duckdb::make_shared_ptr<TableFunctionRelation>(connection_.context, "read_json",
+                                                                       vector<Value>{Value(std::string{path})},
+                                                                       std::move(named_params));
+            for (auto& column : scan->Columns()) {
+                if (column.Type().id() != LogicalTypeId::LIST) {
+                    return arrow::Status::Invalid("JSON column object field '" + column.Name() +
+                                                  "' must be an array");
+                }
+            }
+            rel = scan->Project("UNNEST(COLUMNS(*))");
+        }
 
         /// Create or insert
         if (options.create_new) {
-            func->Create(schema_name, options.table_name);
+            rel->Create(schema_name, options.table_name);
         } else {
-            func->Insert(schema_name, options.table_name);
+            rel->Insert(schema_name, options.table_name);
         }
 
     } catch (const std::exception& e) {
@@ -1072,11 +1141,9 @@ arrow::Status WebDB::Open(std::string_view args_json) {
         db_config.options.custom_user_agent = config_->custom_user_agent;
         db_config.options.use_direct_io = config_->use_direct_io;
         auto db = make_shared_ptr<duckdb::DuckDB>(config_->path, &db_config);
+        duckdb_web_json_init(db.get());
 #ifndef WASM_LOADABLE_EXTENSIONS
         duckdb_web_parquet_init(db.get());
-#if defined(DUCKDB_JSON_EXTENSION)
-        duckdb_web_json_init(db.get());
-#endif
 #endif  // WASM_LOADABLE_EXTENSIONS
         RegisterCustomExtensionOptions(db);
 
