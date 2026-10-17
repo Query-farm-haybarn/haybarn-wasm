@@ -25,6 +25,23 @@ WebAssembly.instantiate = async function (...args) {
     return result;
 };
 
+// Track the side-module bytes the glue compiles, to check they can be freed after dlopen
+const v8 = require('v8');
+v8.setFlagsFromString('--expose-gc');
+const gc = require('vm').runInNewContext('gc');
+const compiledBytes = [];
+const WasmModule = WebAssembly.Module;
+WebAssembly.Module = new Proxy(WasmModule, {
+    construct(target, args, newTarget) {
+        const bytes = args[0];
+        // Side modules start with a dylink.0 section; addFunction() also compiles small thunks
+        if (ArrayBuffer.isView(bytes) && Buffer.from(bytes.buffer, bytes.byteOffset, Math.min(bytes.byteLength, 32)).includes('dylink.0')) {
+            compiledBytes.push(new WeakRef(bytes));
+        }
+        return Reflect.construct(target, args, newTarget === WebAssembly.Module ? target : newTarget);
+    },
+});
+
 const failures = [];
 function check(name, ok, detail) {
     console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${detail === undefined ? '' : ` (${detail})`}`);
@@ -124,6 +141,15 @@ function check(name, ok, detail) {
     // A missing required GOT import fails dlopen
     check('dlopen with a missing GOT.func import fails', dlopen('missing_got.so') === 0);
     check('dlopen with a missing GOT.mem import fails', dlopen('missing_mem.so') === 0);
+
+    // patch_dylink_glue.cjs makes loadWebAssemblyModule drop the bytes once they are compiled
+    check('side modules were compiled from bytes', compiledBytes.length > 0, compiledBytes.length);
+    gc();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    gc();
+    const retained = compiledBytes.filter(ref => ref.deref() !== undefined).length;
+    if (patched) check('side-module bytes are freed after dlopen', retained === 0, `${retained} of ${compiledBytes.length} retained`);
+    else console.log(`info side-module bytes retained after dlopen: ${retained} of ${compiledBytes.length}`);
 
     check('queries still work', conn.query('SELECT 40 + 2 AS v').toArray()[0].v === 42);
 

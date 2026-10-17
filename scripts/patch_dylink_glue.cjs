@@ -20,6 +20,14 @@
 //   - applySignatureConversions() overlays its ~350 pointer-return wrappers on the exports instead
 //     of copying all of them with Object.assign.
 // Undefined-symbol reporting is unchanged.
+//
+// What changes on dlopen:
+//   - loadWebAssemblyModule drops its reference to the side module's bytes once they are compiled.
+//     When a side module imports a symbol that isn't defined yet, the import gets a lazy stub whose
+//     closure shares loadWebAssemblyModule's context, which holds `binary`, so the whole file stays
+//     in memory for as long as the module is loaded (~26 MB for spatial). The async path already
+//     replaces `binary` with the compiled module, so only the sync path changes. Needed until
+//     https://github.com/emscripten-core/emscripten/pull/28002 lands.
 'use strict';
 const fs = require('fs');
 
@@ -43,6 +51,10 @@ const REQUIRED = {
     dlsymCatchupImport: `_dlsym_catchup_js: __dlsym_catchup_js,`,
     applySignatureConversions: `function applySignatureConversions(wasmExports) { wasmExports = Object.assign({}, wasmExports);`,
 };
+// The end of loadWebAssemblyModule's loadModule(), as emitted by emscripten 6.0.12. Matching through
+// the closing brace shows nothing after the sync compile reads `binary` again.
+const LOAD_MODULE_TAIL = `if (flags.loadAsync) { return ((async () => { var instance; if (binary instanceof WebAssembly.Module) { instance = new WebAssembly.Instance(binary, info); } else { ({ module: binary, instance } = await WebAssembly.instantiate(binary, info)); } return postInstantiation(binary, instance); }))(); } var module = binary instanceof WebAssembly.Module ? binary : new WebAssembly.Module(binary); var instance = new WebAssembly.Instance(module, info); return postInstantiation(module, instance); } flags = {`;
+const FREE_BINARY_MARKER = '/* haybarn: free side-module bytes (scripts/patch_dylink_glue.cjs) */';
 // Glue features the injected runtime doesn't handle
 const UNSUPPORTED = {
     asyncify: 'asyncifyStubs', // isSymbolDefined has extra ASYNCIFY logic
@@ -66,11 +78,11 @@ if(wasmImports)__hbWrapDlsym();else{var __hbAssignWasmImports=assignWasmImports;
 function __hbOverlay(s){var v={};return new Proxy(v,{get:(o,k)=>k in v?v[k]:s[k],set:(o,k,x)=>(v[k]=x,!0),has:(o,k)=>k in v||k in s,ownKeys:()=>Reflect.ownKeys(s),getOwnPropertyDescriptor:(o,k)=>k in v||k in s?{value:k in v?v[k]:s[k],writable:!0,enumerable:!0,configurable:!0}:void 0})}
 `;
 
-const isPatched = src => src.includes('__hbMainExports');
+const isLazyPatched = src => src.includes('__hbMainExports');
+const isFreeBinaryPatched = src => src.includes(FREE_BINARY_MARKER);
+const isPatched = src => isLazyPatched(src) && isFreeBinaryPatched(src);
 
-function patch(src) {
-    if (isPatched(src)) throw new Error('already patched');
-    const code = normalize(src);
+function checkGlue(code) {
     for (const [name, snippets] of Object.entries(REQUIRED)) {
         // A check passes when exactly one of its alternative forms occurs, exactly once
         const counts = [].concat(snippets).map(snippet => occurrences(code, normalize(snippet)));
@@ -81,9 +93,35 @@ function patch(src) {
     for (const [name, marker] of Object.entries(UNSUPPORTED)) {
         if (code.includes(marker)) throw new Error(`unsupported glue feature present: ${name}`);
     }
+}
+
+// Load extensions without startup walking all main-module exports
+function patchLazy(src) {
+    checkGlue(normalize(src));
     const anchor = /function\s+applySignatureConversions\s*\(\s*wasmExports\s*\)\s*\{(\s*(?:\/\/[^\n]*\s*)*)wasmExports\s*=\s*Object\.assign\(\s*\{\s*\}\s*,\s*wasmExports\s*\)\s*;/;
     if (!anchor.test(src)) throw new Error('applySignatureConversions is not in the expected form');
     return src.replace(anchor, (_, between) => `${RUNTIME}function applySignatureConversions(wasmExports) {${between}wasmExports = __hbOverlay(wasmExports);`);
+}
+
+// Don't keep a side module's bytes alive after compiling it
+function patchFreeBinary(src) {
+    const found = occurrences(normalize(src), normalize(LOAD_MODULE_TAIL));
+    if (found !== 1) {
+        throw new Error(`glue check 'loadModuleTail' found ${found} matches, expected 1 (did emscripten change libdylink.js? re-validate the patch)`);
+    }
+    const anchor = /(var\s+module\s*=\s*binary\s+instanceof\s+WebAssembly\.Module\s*\?\s*binary\s*:\s*new\s+WebAssembly\.Module\(\s*binary\s*\)\s*;)/g;
+    const matches = src.match(anchor);
+    if (!matches || matches.length !== 1) throw new Error('loadModule sync compile is not in the expected form');
+    return src.replace(anchor, `$1 binary = null; ${FREE_BINARY_MARKER}`);
+}
+
+// Apply each rewrite that isn't applied yet, so output from an older version of this script is
+// brought up to date
+function patch(src) {
+    if (isPatched(src)) throw new Error('already patched');
+    if (!isLazyPatched(src)) src = patchLazy(src);
+    if (!isFreeBinaryPatched(src)) src = patchFreeBinary(src);
+    return src;
 }
 
 if (require.main === module) {
@@ -106,4 +144,4 @@ if (require.main === module) {
         process.exit(1);
     }
 }
-module.exports = { patch, isPatched };
+module.exports = { patch, isPatched, FREE_BINARY_MARKER };
