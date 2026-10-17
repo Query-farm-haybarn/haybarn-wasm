@@ -28,6 +28,12 @@
 //     in memory for as long as the module is loaded (~26 MB for spatial). The async path already
 //     replaces `binary` with the compiled module, so only the sync path changes. Needed until
 //     https://github.com/emscripten-core/emscripten/pull/28002 lands.
+//   - relocateExports reads which exported globals are mutable from the side module's bytes,
+//     instead of calling isImmutableGlobal on each one. That probe writes to the global and catches
+//     the exception, so every data symbol a side module exports threw once (1,286 for spatial,
+//     ~30-60 ms per LOAD in Chrome). It falls back to the probe when it only has a compiled module
+//     or meets something it doesn't parse. Needed until
+//     https://github.com/emscripten-core/emscripten/pull/28006 lands.
 'use strict';
 const fs = require('fs');
 
@@ -55,6 +61,21 @@ const REQUIRED = {
 // the closing brace shows nothing after the sync compile reads `binary` again.
 const LOAD_MODULE_TAIL = `if (flags.loadAsync) { return ((async () => { var instance; if (binary instanceof WebAssembly.Module) { instance = new WebAssembly.Instance(binary, info); } else { ({ module: binary, instance } = await WebAssembly.instantiate(binary, info)); } return postInstantiation(binary, instance); }))(); } var module = binary instanceof WebAssembly.Module ? binary : new WebAssembly.Module(binary); var instance = new WebAssembly.Instance(module, info); return postInstantiation(module, instance); } flags = {`;
 const FREE_BINARY_MARKER = '/* haybarn: free side-module bytes (scripts/patch_dylink_glue.cjs) */';
+// The relocateExports and loadWebAssemblyModule code the mutable-globals rewrite changes, as
+// emitted by emscripten 6.0.12
+const MUTABLE_GLOBALS_REQUIRED = {
+    relocateExports: `var relocateExports = (exports, memoryBase = 0) => { function relocateExport(name, value) { if (isImmutableGlobal(value)) { return new WebAssembly.Global({ "value": "i32" }, value.value + memoryBase); } return value; } var relocated = {}; for (var e in exports) { relocated[e] = relocateExport(e, exports[e]); } return relocated; };`,
+    getDylinkMetadata: `var metadata = getDylinkMetadata(binary);`,
+    relocateCall: `moduleExports = relocateExports(instance.exports, memoryBase);`,
+};
+const MUTABLE_GLOBALS_MARKER = '/* haybarn: mutable globals from the binary (scripts/patch_dylink_glue.cjs) */';
+// Returns the names of a side module's exported globals that are mutable, read from its import,
+// global and export sections, or undefined if it only has a compiled module or meets something it
+// doesn't parse. A port of getMutableGlobals() from emscripten#28006. Pthreads get the bytes as an
+// Int8Array (HEAP8.slice), so read them through an unsigned view.
+const MUTABLE_GLOBALS_RUNTIME = `${MUTABLE_GLOBALS_MARKER}
+function __hbMutableGlobals(b){if(!ArrayBuffer.isView(b))return;b=new Uint8Array(b.buffer,b.byteOffset,b.byteLength);var o=8,m=[],r=new Set,L=()=>{for(var v=0,s=1,x;;s*=128)if(x=b[o++],v+=(x&127)*s,!(x&128))return v},S=()=>{var n=L();o+=n},T=()=>{var t=b[o++];(t==99||t==100)&&L()},M=()=>{var f=b[o++];L();f&1&&L();f&8&&L()};while(o<b.length){var id=b[o++],n=L(),e=o+n;if(id==2){for(var c=L();c--;){S();S();var k=b[o++];if(k==0)L();else if(k==1){T();M()}else if(k==2)M();else if(k==3){T();m.push(b[o++]&1)}else if(k==4){o++;L()}else return}}else if(id==6){for(var c=L();c--;){T();m.push(b[o++]&1);for(var p;(p=b[o++])!=11;)if(p==67)o+=4;else if(p==68)o+=8;else if(p==65||p==66||p==35||p==208||p==210)L();else if(!(p>=106&&p<=108||p>=124&&p<=126))return}}else if(id==7){for(var c=L();c--;){var a=o;S();var k=b[o++],i=L();if(k==3&&m[i]){var q=o;o=a;var l=L();r.add(UTF8ArrayToString(b,o,l));o=q}}return o==e?r:void 0}else o=e;if(o!=e)return}return r}
+`;
 // Glue features the injected runtime doesn't handle
 const UNSUPPORTED = {
     asyncify: 'asyncifyStubs', // isSymbolDefined has extra ASYNCIFY logic
@@ -80,7 +101,8 @@ function __hbOverlay(s){var v={};return new Proxy(v,{get:(o,k)=>k in v?v[k]:s[k]
 
 const isLazyPatched = src => src.includes('__hbMainExports');
 const isFreeBinaryPatched = src => src.includes(FREE_BINARY_MARKER);
-const isPatched = src => isLazyPatched(src) && isFreeBinaryPatched(src);
+const isMutableGlobalsPatched = src => src.includes(MUTABLE_GLOBALS_MARKER);
+const isPatched = src => isLazyPatched(src) && isFreeBinaryPatched(src) && isMutableGlobalsPatched(src);
 
 function checkGlue(code) {
     for (const [name, snippets] of Object.entries(REQUIRED)) {
@@ -115,12 +137,36 @@ function patchFreeBinary(src) {
     return src.replace(anchor, `$1 binary = null; ${FREE_BINARY_MARKER}`);
 }
 
+// Read exported global mutability from the side module's bytes instead of probing each global
+function patchMutableGlobals(src) {
+    const code = normalize(src);
+    for (const [name, snippet] of Object.entries(MUTABLE_GLOBALS_REQUIRED)) {
+        const found = occurrences(code, normalize(snippet));
+        if (found !== 1) {
+            throw new Error(`glue check '${name}' found ${found} matches, expected 1 (did emscripten change libdylink.js? re-validate the patch)`);
+        }
+    }
+    const rewrites = [
+        [/var\s+relocateExports\s*=\s*\(\s*exports\s*,\s*memoryBase\s*=\s*0\s*\)\s*=>\s*\{(\s*function\s+relocateExport\s*\(\s*name\s*,\s*value\s*\)\s*\{(?:\s*\/\/[^\n]*)*\s*)if\s*\(\s*isImmutableGlobal\(\s*value\s*\)\s*\)/,
+            (_, between) => `${MUTABLE_GLOBALS_RUNTIME}var relocateExports = (exports, memoryBase = 0, __hbMut) => {${between}if (__hbMut ? value instanceof WebAssembly.Global && !__hbMut.has(name) : isImmutableGlobal(value))`],
+        [/var\s+metadata\s*=\s*getDylinkMetadata\(\s*binary\s*\)\s*;/, '$& var __hbMut = __hbMutableGlobals(binary);'],
+        [/moduleExports\s*=\s*relocateExports\(\s*instance\.exports\s*,\s*memoryBase\s*\)/, 'moduleExports = relocateExports(instance.exports, memoryBase, __hbMut)'],
+    ];
+    for (const [anchor, replacement] of rewrites) {
+        const matches = src.match(new RegExp(anchor.source, 'g'));
+        if (!matches || matches.length !== 1) throw new Error(`mutable globals: ${anchor.source.slice(0, 40)}... is not in the expected form`);
+        src = src.replace(anchor, replacement);
+    }
+    return src;
+}
+
 // Apply each rewrite that isn't applied yet, so output from an older version of this script is
 // brought up to date
 function patch(src) {
     if (isPatched(src)) throw new Error('already patched');
     if (!isLazyPatched(src)) src = patchLazy(src);
     if (!isFreeBinaryPatched(src)) src = patchFreeBinary(src);
+    if (!isMutableGlobalsPatched(src)) src = patchMutableGlobals(src);
     return src;
 }
 
@@ -144,4 +190,4 @@ if (require.main === module) {
         process.exit(1);
     }
 }
-module.exports = { patch, isPatched, FREE_BINARY_MARKER };
+module.exports = { patch, isPatched, FREE_BINARY_MARKER, MUTABLE_GLOBALS_RUNTIME };
