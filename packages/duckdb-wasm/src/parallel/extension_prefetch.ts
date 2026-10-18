@@ -1,0 +1,118 @@
+// Prefetching of wasm extensions inside the worker.
+//
+// LOAD runs synchronously inside the engine: it downloads the extension with a synchronous XHR and
+// hashes it with SHA-256 compiled to wasm before checking its signature. Prefetching does that work
+// ahead of time and asynchronously: all downloads run in parallel, and the signature hash is computed
+// with WebCrypto. The engine's LOAD takes the entry for its URL (see the prefetch patch in
+// patches/duckdb), so it only has to check the RSA signature against the hash.
+//
+// The hash is computed here over exactly the bytes the engine is given, and neither ever leaves this
+// worker, so this trusts nothing the synchronous path didn't already trust. The signature check itself
+// stays in the engine.
+
+/** The size of the signature at the end of an extension file */
+const SIGNATURE_SIZE = 256;
+/** The chunk size of the two-level hash. Must match the engine's verifier (extension_load.cpp). */
+const HASH_CHUNK_SIZE = 1024 * 1024;
+
+/** A prefetched extension */
+export interface PrefetchedExtension {
+    /** The file, as LOAD would have downloaded it */
+    bytes: Uint8Array;
+    /** SHA-256 over the SHA-256 hashes of each 1 MB chunk of the file without its signature */
+    hash: Uint8Array | null;
+}
+
+/** Prefetched extensions by URL, until a LOAD takes them */
+const prefetched = new Map<string, PrefetchedExtension>();
+/** Prefetches that are still running, by URL */
+const running = new Map<string, Promise<void>>();
+
+/** Compute the engine's two-level signature hash of an extension file */
+export async function computeExtensionHash(bytes: Uint8Array): Promise<Uint8Array | null> {
+    if (bytes.byteLength < SIGNATURE_SIZE || typeof crypto === 'undefined' || !crypto.subtle) {
+        return null;
+    }
+    const end = bytes.byteLength - SIGNATURE_SIZE;
+    const chunks: Promise<ArrayBuffer>[] = [];
+    for (let offset = 0; offset < end; offset += HASH_CHUNK_SIZE) {
+        chunks.push(crypto.subtle.digest('SHA-256', bytes.subarray(offset, Math.min(end, offset + HASH_CHUNK_SIZE))));
+    }
+    const hashes = await Promise.all(chunks);
+    const concatenated = new Uint8Array(hashes.length * 32);
+    hashes.forEach((h, i) => concatenated.set(new Uint8Array(h), i * 32));
+    return new Uint8Array(await crypto.subtle.digest('SHA-256', concatenated));
+}
+
+/** Download and hash one extension. Failures are dropped: LOAD then downloads it itself and reports the error. */
+async function prefetchOne(url: string): Promise<void> {
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            return;
+        }
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        let hash: Uint8Array | null = null;
+        try {
+            hash = await computeExtensionHash(bytes);
+        } catch (e) {
+            // Without a hash the engine hashes the bytes itself
+            hash = null;
+        }
+        prefetched.set(url, { bytes, hash });
+    } catch (e) {
+        // Network error: leave it to LOAD
+    } finally {
+        running.delete(url);
+    }
+}
+
+/** Prefetch extensions by URL. Resolves once every download has finished or failed; never rejects. */
+export async function prefetchExtensions(urls: string[]): Promise<void> {
+    installPrefetchHook();
+    const work: Promise<void>[] = [];
+    for (const url of urls) {
+        if (prefetched.has(url)) {
+            continue;
+        }
+        let p = running.get(url);
+        if (!p) {
+            p = prefetchOne(url);
+            running.set(url, p);
+        }
+        work.push(p);
+    }
+    await Promise.all(work);
+}
+
+/** Wait for running prefetches, so a LOAD issued meanwhile doesn't download the same file again */
+export async function waitForPrefetches(): Promise<void> {
+    while (running.size > 0) {
+        await Promise.all([...running.values()]);
+    }
+}
+
+/** Are prefetches running? */
+export function prefetchesRunning(): boolean {
+    return running.size > 0;
+}
+
+/** Take the prefetched entry for a URL. Called by the engine's LOAD; each entry serves one LOAD. */
+export function takePrefetchedExtension(url: string): PrefetchedExtension | null {
+    const entry = prefetched.get(url);
+    if (!entry) {
+        return null;
+    }
+    prefetched.delete(url);
+    return entry;
+}
+
+/** Drop prefetched extensions that no LOAD took */
+export function clearPrefetchedExtensions(): void {
+    prefetched.clear();
+}
+
+/** Make the prefetched entries reachable from the engine's LOAD */
+export function installPrefetchHook(): void {
+    (globalThis as any).__haybarnTakePrefetchedExtension = takePrefetchedExtension;
+}

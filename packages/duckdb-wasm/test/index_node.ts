@@ -81,6 +81,7 @@ import { testRegressionAsync } from './regression';
 import { testFTS } from './fts.test';
 import { testPivot } from './pivot.test';
 import { testVgiWebWorkerBridge } from './vgi_webworker_bridge.test';
+import { testExtensionPrefetch } from './extension_prefetch.test';
 
 testUDF(() => db!);
 longQueries(() => adb!);
@@ -105,3 +106,4 @@ testTokenizationAsync(() => adb!);
 testFTS(() => db!);
 testPivot(() => db!, { skipValuesCheck: true });
 testVgiWebWorkerBridge();
+testExtensionPrefetch();

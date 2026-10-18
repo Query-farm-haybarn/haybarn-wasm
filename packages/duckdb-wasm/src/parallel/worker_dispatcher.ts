@@ -2,6 +2,12 @@ import { DuckDBBindings, DuckDBDataProtocol } from '../bindings';
 import { WorkerResponseVariant, WorkerRequestVariant, WorkerRequestType, WorkerResponseType } from './worker_request';
 import { Logger, LogEntryVariant } from '../log';
 import { InstantiationProgress } from '../bindings/progress';
+import {
+    clearPrefetchedExtensions,
+    prefetchExtensions,
+    prefetchesRunning,
+    waitForPrefetches,
+} from './extension_prefetch';
 
 /**
  * Cadence at which the SAB-cancel watcher polls the flag while a pending
@@ -200,9 +206,23 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
             return this.failWith(request, new Error('duckdb is not initialized'));
         }
 
+        // A LOAD that runs while its extension is still being prefetched would download it a second time
+        if (prefetchesRunning() && request.type !== WorkerRequestType.PREFETCH_EXTENSIONS) {
+            await waitForPrefetches();
+        }
+
         // Catch every exception and forward it as error message to the main thread
         try {
             switch (request.type) {
+                case WorkerRequestType.PREFETCH_EXTENSIONS: {
+                    // Only browsers gain: Node's LOAD reads its on-disk cache and hashes with native crypto
+                    if (typeof XMLHttpRequest !== 'undefined') {
+                        const urls = request.data.map(name => this._bindings!.getExtensionUrl(name));
+                        await prefetchExtensions(urls);
+                    }
+                    this.sendOK(request);
+                    break;
+                }
                 case WorkerRequestType.GET_VERSION:
                     this.postMessage(
                         {
@@ -230,6 +250,7 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                     // is targeting; stop before the next tick can fire a
                     // cancel against freed memory.
                     this._stopCancelWatch();
+                    clearPrefetchedExtensions();
                     this._bindings.reset();
                     this.sendOK(request);
                     break;

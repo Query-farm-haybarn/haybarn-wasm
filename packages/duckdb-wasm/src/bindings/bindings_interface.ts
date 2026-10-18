@@ -11,6 +11,7 @@ export interface DuckDBBindings {
     instantiate(onProgress?: (p: InstantiationProgress) => void): Promise<this>;
 
     getVersion(): string;
+    getExtensionUrl(name: string): string;
     getFeatureFlags(): number;
     tokenize(text: string): ScriptTokens;
 

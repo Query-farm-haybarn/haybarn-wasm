@@ -239,6 +239,7 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
             case WorkerRequestType.INSERT_JSON_FROM_PATH:
             case WorkerRequestType.OPEN:
             case WorkerRequestType.PING:
+            case WorkerRequestType.PREFETCH_EXTENSIONS:
             case WorkerRequestType.REGISTER_FILE_BUFFER:
             case WorkerRequestType.REGISTER_FILE_HANDLE:
             case WorkerRequestType.REGISTER_FILE_URL:
@@ -443,6 +444,27 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
     public async open(config: DuckDBConfig): Promise<void> {
         this._config = config;
         const task = new WorkerTask<WorkerRequestType.OPEN, DuckDBConfig, null>(WorkerRequestType.OPEN, config);
+        await this.postTask(task);
+    }
+
+    /**
+     * Download and hash extensions ahead of LOAD.
+     *
+     * In browsers, LOAD downloads each extension synchronously and hashes it with SHA-256 compiled to
+     * wasm before checking its signature. This does that work in the worker ahead of time: the downloads
+     * run in parallel and the hash is computed with WebCrypto. A later `LOAD <name>` that resolves to the
+     * same URL then only checks the signature. Settings that change the URL (such as
+     * `custom_extension_repository`) must be set before prefetching.
+     *
+     * Resolves once every download has finished or failed, and never rejects: a failed prefetch leaves
+     * the download to LOAD, which reports any error. Queries sent while a prefetch runs wait for it.
+     * Each prefetched extension serves one LOAD. Does nothing in Node.js.
+     */
+    public async prefetchExtensions(names: string[]): Promise<void> {
+        const task = new WorkerTask<WorkerRequestType.PREFETCH_EXTENSIONS, string[], null>(
+            WorkerRequestType.PREFETCH_EXTENSIONS,
+            names,
+        );
         await this.postTask(task);
     }
 

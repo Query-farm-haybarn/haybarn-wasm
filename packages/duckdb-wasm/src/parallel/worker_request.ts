@@ -38,6 +38,7 @@ export enum WorkerRequestType {
     OPEN = 'OPEN',
     PING = 'PING',
     POLL_PENDING_QUERY = 'POLL_PENDING_QUERY',
+    PREFETCH_EXTENSIONS = 'PREFETCH_EXTENSIONS',
     REGISTER_FILE_BUFFER = 'REGISTER_FILE_BUFFER',
     REGISTER_FILE_HANDLE = 'REGISTER_FILE_HANDLE',
     REGISTER_FILE_URL = 'REGISTER_FILE_URL',
@@ -138,6 +139,7 @@ export type WorkerRequestVariant =
     | WorkerRequest<WorkerRequestType.INSTANTIATE, [string, string | null, boolean?]>
     | WorkerRequest<WorkerRequestType.OPEN, DuckDBConfig>
     | WorkerRequest<WorkerRequestType.PING, null>
+    | WorkerRequest<WorkerRequestType.PREFETCH_EXTENSIONS, string[]>
     | WorkerRequest<WorkerRequestType.POLL_PENDING_QUERY, number>
     | WorkerRequest<WorkerRequestType.REGISTER_FILE_BUFFER, [string, Uint8Array]>
     | WorkerRequest<WorkerRequestType.REGISTER_FILE_HANDLE, [string, any, DuckDBDataProtocol, boolean]>
@@ -200,6 +202,7 @@ export type WorkerTaskVariant =
     | WorkerTask<WorkerRequestType.INSTANTIATE, [string, string | null, boolean?], null>
     | WorkerTask<WorkerRequestType.OPEN, DuckDBConfig, null>
     | WorkerTask<WorkerRequestType.PING, null, null>
+    | WorkerTask<WorkerRequestType.PREFETCH_EXTENSIONS, string[], null>
     | WorkerTask<WorkerRequestType.REGISTER_FILE_BUFFER, [string, Uint8Array], null>
     | WorkerTask<WorkerRequestType.REGISTER_FILE_HANDLE, [string, any, DuckDBDataProtocol, boolean], null>
     | WorkerTask<WorkerRequestType.REGISTER_FILE_URL, [string, string, DuckDBDataProtocol, boolean], null>

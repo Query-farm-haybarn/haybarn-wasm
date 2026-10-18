@@ -1,0 +1,146 @@
+diff --git a/src/include/duckdb/main/extension_helper.hpp b/src/include/duckdb/main/extension_helper.hpp
+--- a/src/include/duckdb/main/extension_helper.hpp
++++ b/src/include/duckdb/main/extension_helper.hpp
+@@ -151,6 +151,8 @@
+ 	                                   const string &version);
+ 	//! Return the extension url template with the variables replaced
+ 	static string ExtensionFinalizeUrlTemplate(const string &url, const string &name);
++	//! The URL a wasm LOAD of this extension fetches (repository, preferred repository and version applied)
++	static string WasmExtensionUrl(DatabaseInstance &db, const string &extension);
+ 
+ 	//! Default extensions are all extensions that DuckDB knows and expect to be available (both in-tree and
+ 	//! out-of-tree)
+diff --git a/src/main/extension/extension_load.cpp b/src/main/extension/extension_load.cpp
+--- a/src/main/extension/extension_load.cpp
++++ b/src/main/extension/extension_load.cpp
+@@ -386,6 +386,29 @@
+ 	return CheckExtensionBufferSignature(buffer, signature_offset, signature, allow_community_extensions);
+ }
+ 
++#ifdef WASM_LOADABLE_EXTENSIONS
++string ExtensionHelper::WasmExtensionUrl(DatabaseInstance &db, const string &extension) {
++	string extension_name = ApplyExtensionAlias(extension);
++	ExtensionRepository repository;
++
++	repository = ExtensionRepository("custom", "https://haybarn-extensions.query.farm/core");
++	string custom_endpoint = Settings::Get<CustomExtensionRepositorySetting>(db);
++	if (!custom_endpoint.empty()) {
++		repository = ExtensionRepository("custom", custom_endpoint);
++	}
++               {
++                       auto preferredRepo = DatabaseInstance::GetPreferredRepository(extension);
++                       if (!preferredRepo.empty()) {
++                               repository = ExtensionRepository("x", preferredRepo);
++                       }
++               }
++	auto preferredVersion = DatabaseInstance::GetPreferredVersion(extension);
++
++	string url_template = ExtensionUrlTemplate(db, repository, preferredVersion);
++	return ExtensionFinalizeUrlTemplate(url_template, extension_name);
++}
++#endif
++
+ bool ExtensionHelper::TryInitialLoad(DatabaseInstance &db, FileSystem &fs, const string &extension,
+                                      ExtensionInitResult &result, string &error) {
+ #ifdef DUCKDB_DISABLE_EXTENSION_LOAD
+@@ -405,24 +428,8 @@
+ 		direct_load = false;
+ 		string extension_name = ApplyExtensionAlias(extension);
+ #ifdef WASM_LOADABLE_EXTENSIONS
+-		ExtensionRepository repository;
+-
+-		repository = ExtensionRepository("custom", "https://haybarn-extensions.query.farm/core");
+-		string custom_endpoint = Settings::Get<CustomExtensionRepositorySetting>(db);
+-		if (!custom_endpoint.empty()) {
+-			repository = ExtensionRepository("custom", custom_endpoint);
+-		}
+-               {
+-                       auto preferredRepo = DatabaseInstance::GetPreferredRepository(extension);
+-                       if (!preferredRepo.empty()) {
+-                               repository = ExtensionRepository("x", preferredRepo);
+-                       }
+-               }
+-		auto preferredVersion = DatabaseInstance::GetPreferredVersion(extension);
+ 		install_mode = ExtensionInstallMode::REPOSITORY;
+-
+-		string url_template = ExtensionUrlTemplate(db, repository, preferredVersion);
+-		string url = ExtensionFinalizeUrlTemplate(url_template, extension_name);
++		string url = WasmExtensionUrl(db, extension);
+ 
+ 		char *str = (char *)EM_ASM_PTR(
+ 		    {
+@@ -513,6 +520,8 @@
+ 
+ #ifdef WASM_LOADABLE_EXTENSIONS
+ 	auto basename = fs.ExtractBaseName(filename);
++	// Filled by the fetch below when the worker prefetched this URL: 32-byte signature hash, then a flag byte
++	char prehash[33] = {0};
+ 	auto file_len = EM_ASM_INT(
+ 	    {
+ 		    // Next few lines should argubly in separate JavaScript-land function call
+@@ -520,7 +529,21 @@
+ 
+ 		    var url = (UTF8ToString($0));
+ 
+-		    if (typeof XMLHttpRequest === "undefined") {
++		    // The worker may have prefetched this URL and hashed it with WebCrypto, over these same bytes.
++		    // Taking the entry removes it, so each prefetch serves one LOAD.
++		    var uInt8Array;
++		    var pre = (typeof globalThis.__haybarnTakePrefetchedExtension === "function") ? globalThis.__haybarnTakePrefetchedExtension(url) : null;
++		    if (pre && pre.hash && pre.hash.length == 32) {
++			    if (typeof growMemViews === "function") {
++				    growMemViews();
++			    }
++			    HEAPU8.set(pre.hash, $2 >>> 0);
++			    HEAPU8[($2 >>> 0) + 32] = 1;
++		    }
++
++		    if (pre) {
++			    uInt8Array = pre.bytes;
++		    } else if (typeof XMLHttpRequest === "undefined") {
+ 			    const os = require('os');
+ 			    const path = require('path');
+ 			    const fs = require('fs');
+@@ -592,7 +615,7 @@
+ 		    FS.writeFile(UTF8ToString($1), bytes, {canOwn : true});
+ 		    return bytes.byteLength;
+ 	    },
+-	    filename.c_str(), basename.c_str());
++	    filename.c_str(), basename.c_str(), prehash);
+ 	// Until dlopen has compiled it, close and remove the in-memory file on any error
+ 	struct ExtensionFileCleanup {
+ 		FILE *file = nullptr;
+@@ -636,17 +659,23 @@
+ 		signature.resize(256);
+ 		auto signature_offset = file_size - signature.size();
+ 
+-		vector<string> hash_chunks;
+-		vector<idx_t> splits;
+-		IntializeAncillaryData(hash_chunks, splits, signature_offset);
+-
+-		string chunk;
+-		for (idx_t i = 0; i < hash_chunks.size(); i++) {
+-			chunk.resize(splits[i + 1] - splits[i]);
+-			read_at(splits[i], &chunk[0], chunk.size());
+-			ComputeSHA256String(chunk, &hash_chunks[i]);
++		string two_level_hash;
++		if (prehash[32] == 1) {
++			// Computed by the worker when it prefetched these bytes; same 1 MB chunk scheme as below
++			two_level_hash.assign(prehash, 32);
++		} else {
++			vector<string> hash_chunks;
++			vector<idx_t> splits;
++			IntializeAncillaryData(hash_chunks, splits, signature_offset);
++
++			string chunk;
++			for (idx_t i = 0; i < hash_chunks.size(); i++) {
++				chunk.resize(splits[i + 1] - splits[i]);
++				read_at(splits[i], &chunk[0], chunk.size());
++				ComputeSHA256String(chunk, &hash_chunks[i]);
++			}
++			two_level_hash = ComputeFinalHash(hash_chunks);
+ 		}
+-		string two_level_hash = ComputeFinalHash(hash_chunks);
+ 
+ 		signature.assign(metadata_segment, ParsedExtensionMetaData::FOOTER_SIZE - signature.size(), signature.size());
+ 		bool any_valid = false;
