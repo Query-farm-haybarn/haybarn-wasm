@@ -42,6 +42,21 @@ WebAssembly.Module = new Proxy(WasmModule, {
     },
 });
 
+// Count writes to immutable globals, which is how isImmutableGlobal probes each exported global
+let immutableWrites = 0;
+const globalValue = Object.getOwnPropertyDescriptor(WebAssembly.Global.prototype, 'value');
+Object.defineProperty(WebAssembly.Global.prototype, 'value', {
+    ...globalValue,
+    set(v) {
+        try {
+            globalValue.set.call(this, v);
+        } catch (e) {
+            immutableWrites++;
+            throw e;
+        }
+    },
+});
+
 const failures = [];
 function check(name, ok, detail) {
     console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${detail === undefined ? '' : ` (${detail})`}`);
@@ -137,6 +152,34 @@ function check(name, ok, detail) {
     const dup = dlopen('dup.so');
     check('dlopen dup.so', dup !== 0);
     if (dup) check("duplicate definition resolves to the main module's copy", table.get(call(dup, 'hb_dup_got') >>> 0) === X.duckdb_web_get_feature_flags);
+
+    // Exported globals: an immutable data global is relocated, a mutable one is passed through.
+    // With the mutable-globals rewrite, neither is probed by writing to it.
+    const writesBefore = immutableWrites;
+    const globals = dlopen('globals.so');
+    const probes = immutableWrites - writesBefore;
+    check('dlopen globals.so', globals !== 0, globals ? undefined : readCstr(X.dlerror()));
+    if (globals) {
+        check('exported data global is relocated', dlsym(globals, 'hb_data') === (call(globals, 'hb_data_addr') >>> 0));
+        call(globals, 'hb_set_mut', 9);
+        check('exported mutable global is passed through', dlsym(globals, 'hb_mut') === 9);
+    }
+    if (patched) check('exported globals are not probed by writing to them', probes === 0, `${probes} probes`);
+    else console.log(`info exported globals probed by writing to them: ${probes}`);
+
+    // The parser itself, on each fixture, from both byte types loadWebAssemblyModule passes it
+    const { MUTABLE_GLOBALS_RUNTIME } = require('./patch_dylink_glue.cjs');
+    const mutableGlobals = new Function('UTF8ArrayToString', `${MUTABLE_GLOBALS_RUNTIME}; return __hbMutableGlobals;`)(
+        (bytes, start, len) => Buffer.from(bytes.buffer, bytes.byteOffset + start, len).toString());
+    for (const file of fs.readdirSync(FIXTURES).filter(f => f.endsWith('.so')).sort()) {
+        const bytes = fs.readFileSync(path.join(FIXTURES, file));
+        const expected = file === 'globals.so' ? 'hb_mut' : '';
+        const unsigned = mutableGlobals(new Uint8Array(bytes));
+        const signed = mutableGlobals(new Int8Array(bytes.buffer, bytes.byteOffset, bytes.length));
+        const got = [unsigned, signed].map(set => (set ? [...set].join(',') : 'unparsed'));
+        check(`mutable exported globals of ${file}`, got[0] === expected && got[1] === expected, got.join(' / '));
+    }
+    check('a compiled module is left to the probe', mutableGlobals(new WebAssembly.Module(fs.readFileSync(path.join(FIXTURES, 'good.so')))) === undefined);
 
     // A missing required GOT import fails dlopen
     check('dlopen with a missing GOT.func import fails', dlopen('missing_got.so') === 0);
