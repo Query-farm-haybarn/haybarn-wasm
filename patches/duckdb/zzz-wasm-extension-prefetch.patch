@@ -78,7 +78,7 @@ diff --git a/src/main/extension/extension_load.cpp b/src/main/extension/extensio
  	auto file_len = EM_ASM_INT(
  	    {
  		    // Next few lines should argubly in separate JavaScript-land function call
-@@ -520,7 +529,21 @@
+@@ -520,7 +529,24 @@
  
  		    var url = (UTF8ToString($0));
  
@@ -95,13 +95,16 @@ diff --git a/src/main/extension/extension_load.cpp b/src/main/extension/extensio
 +			    HEAPU8[($2 >>> 0) + 32] = 1;
 +		    }
 +
++		    // dlopen only gets it once the engine arms it, after the signature check (see below)
++		    globalThis.__haybarnPendingModule = ((pre && pre.module) ? ({name : UTF8ToString($1), module : pre.module, bytes : pre.bytes}) : null);
++
 +		    if (pre) {
 +			    uInt8Array = pre.bytes;
 +		    } else if (typeof XMLHttpRequest === "undefined") {
  			    const os = require('os');
  			    const path = require('path');
  			    const fs = require('fs');
-@@ -592,7 +615,7 @@
+@@ -592,7 +618,7 @@
  		    FS.writeFile(UTF8ToString($1), bytes, {canOwn : true});
  		    return bytes.byteLength;
  	    },
@@ -110,7 +113,7 @@ diff --git a/src/main/extension/extension_load.cpp b/src/main/extension/extensio
  	// Until dlopen has compiled it, close and remove the in-memory file on any error
  	struct ExtensionFileCleanup {
  		FILE *file = nullptr;
-@@ -636,17 +659,23 @@
+@@ -636,17 +662,23 @@
  		signature.resize(256);
  		auto signature_offset = file_size - signature.size();
  
@@ -144,3 +147,20 @@ diff --git a/src/main/extension/extension_load.cpp b/src/main/extension/extensio
  
  		signature.assign(metadata_segment, ParsedExtensionMetaData::FOOTER_SIZE - signature.size(), signature.size());
  		bool any_valid = false;
+@@ -668,8 +700,16 @@
+ 	auto dopen_from = filename;
+ #endif
+ 
++#ifdef WASM_LOADABLE_EXTENSIONS
++	// The signature (if required) has been checked: let dlopen use the module compiled from these bytes
++	EM_ASM({
++		globalThis.__haybarnArmedModule = globalThis.__haybarnPendingModule || null;
++		globalThis.__haybarnPendingModule = null;
++	});
++#endif
+ 	auto lib_hdl = dlopen(dopen_from.c_str(), RTLD_NOW | RTLD_LOCAL);
+ #ifdef WASM_LOADABLE_EXTENSIONS
++	EM_ASM({ globalThis.__haybarnArmedModule = null; });
+ 	// dlopen has compiled the module (or failed); drop the in-memory file so its bytes don't stay resident
+ 	std::remove(dopen_from.c_str());
+ 	ext_file_cleanup.path = nullptr;

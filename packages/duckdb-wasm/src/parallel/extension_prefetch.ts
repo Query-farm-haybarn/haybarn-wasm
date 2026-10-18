@@ -2,9 +2,11 @@
 //
 // LOAD runs synchronously inside the engine: it downloads the extension with a synchronous XHR and
 // hashes it with SHA-256 compiled to wasm before checking its signature. Prefetching does that work
-// ahead of time and asynchronously: all downloads run in parallel, and the signature hash is computed
-// with WebCrypto. The engine's LOAD takes the entry for its URL (see the prefetch patch in
-// patches/duckdb), so it only has to check the RSA signature against the hash.
+// ahead of time and asynchronously: all downloads run in parallel, the signature hash is computed
+// with WebCrypto, and the module is compiled with WebAssembly.compileStreaming (which also lets
+// Chrome cache the compiled code). The engine's LOAD takes the entry for its URL (see the prefetch
+// patch in patches/duckdb), so it only has to check the RSA signature against the hash, and
+// dlopen instantiates the compiled module once that check has passed.
 //
 // The hash is computed here over exactly the bytes the engine is given, and neither ever leaves this
 // worker, so this trusts nothing the synchronous path didn't already trust. The signature check itself
@@ -21,6 +23,8 @@ export interface PrefetchedExtension {
     bytes: Uint8Array;
     /** SHA-256 over the SHA-256 hashes of each 1 MB chunk of the file without its signature */
     hash: Uint8Array | null;
+    /** The module compiled from the same download, or null */
+    module: WebAssembly.Module | null;
 }
 
 /** Prefetched extensions by URL, until a LOAD takes them */
@@ -51,15 +55,18 @@ async function prefetchOne(url: string): Promise<void> {
         if (!response.ok) {
             return;
         }
-        const bytes = new Uint8Array(await response.arrayBuffer());
-        let hash: Uint8Array | null = null;
-        try {
-            hash = await computeExtensionHash(bytes);
-        } catch (e) {
-            // Without a hash the engine hashes the bytes itself
-            hash = null;
+        // Compile from the response itself and read the bytes from a clone, so both come from one
+        // download. Without a module, dlopen compiles the bytes as before.
+        let compiling: Promise<WebAssembly.Module | null> = Promise.resolve(null);
+        let body = response;
+        if (typeof WebAssembly.compileStreaming === 'function') {
+            body = response.clone();
+            compiling = WebAssembly.compileStreaming(response).catch(() => null);
         }
-        prefetched.set(url, { bytes, hash });
+        const bytes = new Uint8Array(await body.arrayBuffer());
+        // Without a hash the engine hashes the bytes itself
+        const [hash, module] = await Promise.all([computeExtensionHash(bytes).catch(() => null), compiling]);
+        prefetched.set(url, { bytes, hash, module });
     } catch (e) {
         // Network error: leave it to LOAD
     } finally {
