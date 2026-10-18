@@ -48,6 +48,8 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
     protected _nextUDFId: number;
     /** The config the database was opened with (retained for runtime decisions) */
     protected _config: DuckDBConfig | null = null;
+    /** The thread count to restore after a run of extension loads, see withSingleThreadedExtensionLoad */
+    private _deferredThreads: number | null = null;
 
     constructor(logger: Logger, runtime: DuckDBRuntime) {
         this._logger = logger;
@@ -122,6 +124,7 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
 
     /** Reset the database */
     public reset(): void {
+        this._deferredThreads = null;
         const [s, d, n] = callSRet(this.mod, 'duckdb_web_reset', [], []);
         if (s !== StatusCode.SUCCESS) {
             throw new Error(readString(this.mod, d, n));
@@ -234,6 +237,11 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
             return work();
         }
         if (!DuckDBBindingsBase.EXTENSION_LOAD_RE.test(text)) {
+            this.restoreDeferredThreads(conn);
+            return work();
+        }
+        // Still single-threaded from the previous LOAD
+        if (this._deferredThreads !== null) {
             return work();
         }
         const previousThreads = this.readThreadsSetting(conn);
@@ -242,11 +250,21 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
             return work();
         }
         this.runQueryImpl(conn, 'SET threads=1');
-        try {
-            return work();
-        } finally {
-            this.runQueryImpl(conn, `SET threads=${previousThreads}`);
+        // Restoring the thread count starts new threads, which first load every extension loaded so far,
+        // and the next LOAD's `SET threads=1` would wait for them to finish and exit. So consecutive
+        // LOADs stay single-threaded, and the next other statement restores the thread count.
+        this._deferredThreads = previousThreads;
+        return work();
+    }
+
+    /** Restore the thread count that consecutive extension loads left at 1 */
+    private restoreDeferredThreads(conn: number): void {
+        if (this._deferredThreads === null) {
+            return;
         }
+        const threads = this._deferredThreads;
+        this._deferredThreads = null;
+        this.runQueryImpl(conn, `SET threads=${threads}`);
     }
 
     /** Send a query and return the full result */
@@ -423,6 +441,7 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
 
     /** Prepare a statement and return its identifier */
     public createPrepared(conn: number, text: string): number {
+        this.restoreDeferredThreads(conn);
         const BUF = TEXT_ENCODER.encode(text);
         const bufferPtr = this.mod._malloc(BUF.length);
         const bufferOfs = this.mod.HEAPU8.subarray(bufferPtr, bufferPtr + BUF.length);
@@ -452,6 +471,7 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
 
     /** Execute a prepared statement and return the full result */
     public runPrepared(conn: number, statement: number, params: any[]): Uint8Array {
+        this.restoreDeferredThreads(conn);
         const [s, d, n] = callSRet(
             this.mod,
             'duckdb_web_prepared_run',
@@ -468,6 +488,7 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
 
     /** Execute a prepared statement and stream the result */
     public sendPrepared(conn: number, statement: number, params: any[]): Uint8Array {
+        this.restoreDeferredThreads(conn);
         const [s, d, n] = callSRet(
             this.mod,
             'duckdb_web_prepared_send',
@@ -484,6 +505,7 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
 
     /** Insert record batches from an arrow ipc stream */
     public insertArrowFromIPCStream(conn: number, buffer: Uint8Array, options?: ArrowInsertOptions): void {
+        this.restoreDeferredThreads(conn);
         if (buffer.length == 0) return;
         // Store buffer
         const bufferPtr = this.mod._malloc(buffer.length);
@@ -508,6 +530,7 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
 
     /** Insert csv from path */
     public insertCSVFromPath(conn: number, path: string, options: CSVInsertOptions): void {
+        this.restoreDeferredThreads(conn);
         // Stringify options
         if (options.columns !== undefined) {
             options.columnsFlat = [];
@@ -533,6 +556,7 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
     }
     /** Insert json from path */
     public insertJSONFromPath(conn: number, path: string, options: JSONInsertOptions): void {
+        this.restoreDeferredThreads(conn);
         // Stringify options
         if (options.columns !== undefined) {
             options.columnsFlat = [];
