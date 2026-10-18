@@ -24,6 +24,21 @@ import { ProgressEntry } from '../log';
 
 const TEXT_ENCODER = new TextEncoder();
 
+/** The default time a worker gets to answer its first message (see AsyncDuckDBOptions.workerStartTimeout) */
+export const DEFAULT_WORKER_START_TIMEOUT_MS = 30000;
+
+/** Options for the async DuckDB */
+export interface AsyncDuckDBOptions {
+    /**
+     * Milliseconds the worker gets to answer its first message before all pending
+     * requests are rejected with "worker did not start". Only a cheap PING is timed,
+     * and only until the worker's first response arrives, so slow instantiation or
+     * long-running queries are never cut short. 0 disables the check.
+     * Defaults to DEFAULT_WORKER_START_TIMEOUT_MS (30 s).
+     */
+    workerStartTimeout?: number;
+}
+
 export class AsyncDuckDB implements AsyncDuckDBBindings {
     /** The message handler */
     protected readonly _onMessageHandler: (event: MessageEvent) => void;
@@ -31,6 +46,8 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
     protected readonly _onErrorHandler: (event: ErrorEvent) => void;
     /** The close handler */
     protected readonly _onCloseHandler: () => void;
+    /** The message error handler */
+    protected readonly _onMessageErrorHandler: (event: MessageEvent) => void;
 
     /** Instantiate the module */
     protected _onInstantiationProgress: ((p: InstantiationProgress) => void)[] = [];
@@ -54,11 +71,20 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
     /** The DuckDBConfig */
     protected _config: DuckDBConfig = {};
 
-    constructor(logger: Logger, worker: Worker | null = null) {
+    /** Milliseconds the worker gets to answer its first message, 0 disables the check */
+    protected readonly _workerStartTimeout: number;
+    /** Did the attached worker send anything yet? */
+    protected _workerStarted = false;
+    /** The armed worker start timer, if any */
+    protected _workerStartTimer: ReturnType<typeof setTimeout> | null = null;
+
+    constructor(logger: Logger, worker: Worker | null = null, options: AsyncDuckDBOptions = {}) {
         this._logger = logger;
+        this._workerStartTimeout = options.workerStartTimeout ?? DEFAULT_WORKER_START_TIMEOUT_MS;
         this._onMessageHandler = this.onMessage.bind(this);
         this._onErrorHandler = this.onError.bind(this);
         this._onCloseHandler = this.onClose.bind(this);
+        this._onMessageErrorHandler = this.onMessageError.bind(this);
         if (worker != null) this.attach(worker);
     }
 
@@ -75,9 +101,11 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
     /** Attach to worker */
     protected attach(worker: Worker): void {
         this._worker = worker;
+        this._workerStarted = false;
         this._worker.addEventListener('message', this._onMessageHandler);
         this._worker.addEventListener('error', this._onErrorHandler);
         this._worker.addEventListener('close', this._onCloseHandler);
+        this._worker.addEventListener('messageerror', this._onMessageErrorHandler);
         this._workerShutdownPromise = new Promise<null>(
             (resolve: (value: PromiseLike<null> | null) => void, _reject: (reason?: void) => void) => {
                 this._workerShutdownResolver = resolve;
@@ -91,7 +119,10 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
         this._worker.removeEventListener('message', this._onMessageHandler);
         this._worker.removeEventListener('error', this._onErrorHandler);
         this._worker.removeEventListener('close', this._onCloseHandler);
+        this._worker.removeEventListener('messageerror', this._onMessageErrorHandler);
         this._worker = null;
+        this.clearWorkerStartTimer();
+        this.rejectPendingRequests(new Error('duckdb worker was detached before the request completed'));
         this._workerShutdownResolver(null);
         this._workerShutdownPromise = null;
         this._workerShutdownResolver = () => {};
@@ -103,8 +134,59 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
         this._worker.terminate();
         //await this._workerShutdownPromise; TODO deadlocking in karma?
         this._worker = null;
+        this.clearWorkerStartTimer();
+        this.rejectPendingRequests(new Error('duckdb worker was terminated before the request completed'));
         this._workerShutdownPromise = null;
         this._workerShutdownResolver = () => {};
+    }
+
+    /** Reject all pending requests with an error and forget them */
+    protected rejectPendingRequests(error: Error): void {
+        const pending = [...this._pendingRequests.values()];
+        this._pendingRequests.clear();
+        for (const task of pending) {
+            task.promiseRejecter(error);
+        }
+    }
+
+    /** Stop waiting for the worker to start */
+    protected clearWorkerStartTimer(): void {
+        if (this._workerStartTimer !== null) {
+            clearTimeout(this._workerStartTimer);
+            this._workerStartTimer = null;
+        }
+    }
+
+    /**
+     * Make sure a worker that never starts fails instead of hanging.
+     *
+     * A worker can fail to load without ever emitting 'error' (e.g. a script error swallowed by
+     * a Worker polyfill), in which case every request would wait forever. Before the first
+     * request goes out we send a PING, which the dispatcher answers immediately, ahead of the
+     * request itself. Any message from the worker disarms the timer. If none arrives in time,
+     * all pending requests are rejected. Long-running requests are never timed.
+     */
+    protected armWorkerStartTimer(): void {
+        if (!this._worker || this._workerStarted || this._workerStartTimer !== null) return;
+        if (!(this._workerStartTimeout > 0)) return;
+        const ping = new WorkerTask<WorkerRequestType.PING, null, null>(WorkerRequestType.PING, null);
+        ping.promise.catch(() => {});
+        const mid = this._nextMessageId++;
+        this._pendingRequests.set(mid, ping);
+        this._worker.postMessage({ messageId: mid, type: ping.type, data: ping.data });
+        const timeout = this._workerStartTimeout;
+        this._workerStartTimer = setTimeout(() => {
+            this._workerStartTimer = null;
+            if (this._workerStarted) return;
+            const error = new Error(
+                `duckdb worker did not start: no response within ${timeout} ms. ` +
+                    'The worker script probably failed to load or threw during startup; check the worker console ' +
+                    'output. In Node.js, also check the `web-worker` package version. ' +
+                    'The timeout can be changed with the `workerStartTimeout` option of AsyncDuckDB.',
+            );
+            console.error(error.message);
+            this.rejectPendingRequests(error);
+        }, timeout);
     }
 
     /**
@@ -154,6 +236,7 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
             console.error('cannot send a message since the worker is not set!:' + task.type+"," + task.data);
             return undefined as any;
         }
+        this.armWorkerStartTimer();
         const mid = this._nextMessageId++;
         this._pendingRequests.set(mid, task);
         this._worker.postMessage(
@@ -169,6 +252,12 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
 
     /** Received a message */
     protected onMessage(event: MessageEvent): void {
+        // Any message proves the worker is running
+        if (!this._workerStarted) {
+            this._workerStarted = true;
+            this.clearWorkerStartTimer();
+        }
+
         // Unassociated responses?
         const response = event.data as WorkerResponseVariant;
         switch (response.type) {
@@ -361,17 +450,25 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
     protected onError(event: ErrorEvent): void {
         console.error(event);
         console.error(`error in duckdb worker: ${event.message}`);
-        this._pendingRequests.clear();
+        this.clearWorkerStartTimer();
+        this.rejectPendingRequests(new Error(`error in duckdb worker: ${event.message ?? 'unknown error'}`));
+    }
+
+    /** A message from the worker could not be deserialized */
+    protected onMessageError(_event: MessageEvent): void {
+        // We cannot tell which request the lost response belonged to, so fail them all rather than hang.
+        console.error('duckdb worker sent a message that could not be deserialized');
+        this.rejectPendingRequests(new Error('duckdb worker sent a message that could not be deserialized'));
     }
 
     /** The worker was closed */
     protected onClose(): void {
         this._workerShutdownResolver(null);
+        this.clearWorkerStartTimer();
         if (this._pendingRequests.size != 0) {
             console.warn(`worker terminated with ${this._pendingRequests.size} pending requests`);
-            return;
         }
-        this._pendingRequests.clear();
+        this.rejectPendingRequests(new Error('duckdb worker closed before the request completed'));
     }
 
     /** Is in detached state, no worker defined */
