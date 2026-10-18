@@ -56,6 +56,42 @@ const EXTERNALS_BROWSER = ['apache-arrow', 'module', ...NODE_BUILTIN_EXTERNALS];
 const EXTERNALS_WEBWORKER = ['module', ...NODE_BUILTIN_EXTERNALS];
 const EXTERNALS_TEST_BROWSER = ['module', ...NODE_BUILTIN_EXTERNALS];
 
+// The Node worker bundles are CommonJS, but web-worker >= 1.5 runs a classic
+// worker (no `{ type: 'module' }`) as a plain script: it reads the file and
+// calls `vm.runInThisContext`, so there is no `module`, `exports`, `require`
+// or `__dirname`, and the bundle dies at `module.exports = ...`
+// (developit/web-worker#55). Older web-worker versions `require()` the file
+// and are fine. Passing `{ type: 'module' }` to `new Worker()` is the
+// documented fix; this guard is a fallback for callers who don't.
+//
+// When `module` is missing, the guard finds this script's own path from the
+// filename the script was evaluated under (the V8 call site, not web-worker
+// internals) and loads the same file again through Node's CommonJS loader,
+// where the real bundle runs with `module`/`require`/`__dirname` as usual.
+// Getting `require` from plain script code needs `process.getBuiltinModule`
+// (Node >= 20.16 / 22.3); without it the guard throws a clear error instead of
+// crashing on `module`. In the normal CommonJS path the bundle runs inside a
+// function called with the module's `this`, which changes nothing: Node already
+// wraps every CommonJS file in a function, and the bundle's own "use strict"
+// stays the first statement of that function body, so it still applies.
+//
+// Node worker bundles only. Remove once web-worker#55 is fixed and released.
+const NODE_WORKER_CJS_GUARD = {
+    banner: {
+        js:
+            'if(typeof module>"u"){(function(){' +
+            'var g=typeof process<"u"&&process.getBuiltinModule,p=Error.prepareStackTrace,l=Error.stackTraceLimit,f;' +
+            'try{Error.prepareStackTrace=function(_,s){return s};Error.stackTraceLimit=1;' +
+            'f=new Error().stack[0].getFileName()}catch(e){}finally{Error.prepareStackTrace=p;Error.stackTraceLimit=l}' +
+            'if(!g||!f)throw new Error("Haybarn\'s Node worker is CommonJS and was run as a plain script ' +
+            "(web-worker >= 1.5 does this for classic workers). Pass { type: 'module' } to new Worker(), " +
+            'or use Node >= 20.16 / 22.3.");' +
+            'g("node:module").createRequire(f)(f)' +
+            '})()}else(function(){',
+    },
+    footer: { js: '}).call(this);' },
+};
+
 // Read CLI flags
 let is_debug = false;
 let args = process.argv.slice(2);
@@ -312,6 +348,7 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
         outfile: 'dist/duckdb-node-mvp.worker.cjs',
         platform: 'node',
         format: 'cjs',
+        ...NODE_WORKER_CJS_GUARD,
         target: TARGET_NODE,
         bundle: true,
         minify: !is_debug,
@@ -325,6 +362,7 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-coi.wasm'), path.resolve(dist,
         outfile: 'dist/duckdb-node-eh.worker.cjs',
         platform: 'node',
         format: 'cjs',
+        ...NODE_WORKER_CJS_GUARD,
         target: TARGET_NODE,
         bundle: true,
         minify: !is_debug,
