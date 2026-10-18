@@ -103,6 +103,34 @@ const db = new duckdb.AsyncDuckDB(logger, worker);
 await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
 ```
 
+Node.js (with the [`web-worker`](https://www.npmjs.com/package/web-worker) package, `>=1.4.0`):
+```js
+const duckdb = require('@haybarn/haybarn-wasm');
+const path = require('path');
+const Worker = require('web-worker');
+const DUCKDB_DIST = path.dirname(require.resolve('@haybarn/haybarn-wasm'));
+
+(async () => {
+    const bundle = await duckdb.selectBundle({
+        mvp: {
+            mainModule: path.resolve(DUCKDB_DIST, './duckdb-mvp.wasm'),
+            mainWorker: path.resolve(DUCKDB_DIST, './duckdb-node-mvp.worker.cjs'),
+        },
+        eh: {
+            mainModule: path.resolve(DUCKDB_DIST, './duckdb-eh.wasm'),
+            mainWorker: path.resolve(DUCKDB_DIST, './duckdb-node-eh.worker.cjs'),
+        },
+    });
+    // Pass { type: 'module' }: web-worker 1.5 runs classic workers as plain
+    // scripts, where the CommonJS worker bundle crashes (`module is not defined`).
+    const worker = new Worker(bundle.mainWorker, { type: 'module' });
+    const logger = new duckdb.ConsoleLogger();
+    const db = new duckdb.AsyncDuckDB(logger, worker);
+    await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+    // ... db.connect(), conn.query(...), db.terminate(), worker.terminate()
+})();
+```
+
 ## Loading extensions
 
 Extensions are fetched lazily from `https://haybarn-extensions.query.farm/{core,community}/v1.5.2/wasm_<variant>/`:

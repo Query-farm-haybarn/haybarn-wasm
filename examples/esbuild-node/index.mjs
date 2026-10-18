@@ -17,7 +17,7 @@ const DUCKDB_DIST = path.dirname(require2.resolve("@haybarn/haybarn-wasm"));
       }
     });
     const logger = new duckdb.ConsoleLogger();
-    const worker = new Worker(DUCKDB_CONFIG.mainWorker);
+    const worker = new Worker(DUCKDB_CONFIG.mainWorker, { type: "module" });
     const db = new duckdb.AsyncDuckDB(logger, worker);
     await db.instantiate(DUCKDB_CONFIG.mainModule, DUCKDB_CONFIG.pthreadWorker);
     const conn = await db.connect();
