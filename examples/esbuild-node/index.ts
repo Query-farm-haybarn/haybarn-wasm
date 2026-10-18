@@ -21,7 +21,10 @@ const Worker = require('web-worker');
         });
 
         const logger = new duckdb.ConsoleLogger();
-        const worker = new Worker(DUCKDB_CONFIG.mainWorker!);
+        // type: 'module' makes web-worker load the .cjs worker with import(), so Node
+        // runs it as CommonJS. web-worker 1.5 runs classic workers as plain scripts,
+        // where `module` is undefined and the worker crashes.
+        const worker = new Worker(DUCKDB_CONFIG.mainWorker!, { type: 'module' });
         const db = new duckdb.AsyncDuckDB(logger, worker);
         await db.instantiate(DUCKDB_CONFIG.mainModule, DUCKDB_CONFIG.pthreadWorker);
 

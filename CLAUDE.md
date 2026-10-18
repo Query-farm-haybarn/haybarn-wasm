@@ -130,7 +130,9 @@ To test an extension **functionally**, use Node, not the browser: in-browser
 `console.log` stubs; `checkDirectory` always returns false) and `LOAD`-by-path
 is rejected ("dynamic linking not enabled"). Node has a real FS and loads the
 *same* `wasm_eh` engine + extension binary. Recipe: `require('web-worker')`
-for the Worker, `dist/duckdb-node.cjs` `AsyncDuckDB`, offer only the `eh`
+for the Worker, created with `new Worker(path, { type: 'module' })` (web-worker
+1.5 runs classic workers as plain scripts, so the `.cjs` worker crashes with
+`module is not defined` and the caller hangs), `dist/duckdb-node.cjs` `AsyncDuckDB`, offer only the `eh`
 bundle (`duckdb-eh.wasm` + `duckdb-node-eh.worker.cjs`) so `selectBundle`
 picks it, then `INSTALL … FROM community; LOAD …; SELECT …`.
 
