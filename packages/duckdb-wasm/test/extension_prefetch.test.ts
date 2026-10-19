@@ -1,4 +1,6 @@
 import { createHash } from 'crypto';
+import { createServer } from 'http';
+import { AddressInfo } from 'net';
 import {
     clearPrefetchedExtensions,
     computeExtensionHash,
@@ -74,6 +76,22 @@ export function testExtensionPrefetch(): void {
             clearPrefetchedExtensions();
             await prefetching;
             expect(takePrefetchedExtension(url)).toBeNull();
+        });
+
+        it('leaves downloads that time out to LOAD', async () => {
+            // Accepts the connection and never answers
+            const server = createServer(() => {});
+            await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+            const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/hangs.duckdb_extension.wasm`;
+            try {
+                const started = Date.now();
+                await prefetchExtensions([url], 200);
+                expect(Date.now() - started).toBeLessThan(5000);
+                expect(takePrefetchedExtension(url)).toBeNull();
+            } finally {
+                server.closeAllConnections();
+                server.close();
+            }
         });
 
         it('leaves failed downloads to LOAD', async () => {

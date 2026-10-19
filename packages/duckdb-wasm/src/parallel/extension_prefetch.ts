@@ -18,6 +18,8 @@ const SIGNATURE_SIZE = 256;
 const HASH_CHUNK_SIZE = 1024 * 1024;
 /** The most bytes held for LOADs that haven't taken them; prefetches beyond it are left to LOAD */
 const MAX_HELD_BYTES = 256 * 1024 * 1024;
+/** How long a download may take before it is left to LOAD. Requests wait for prefetches, so one must never hang. */
+export const PREFETCH_TIMEOUT_MS = 30_000;
 
 /** A prefetched extension */
 export interface PrefetchedExtension {
@@ -55,10 +57,12 @@ export async function computeExtensionHash(bytes: Uint8Array): Promise<Uint8Arra
 }
 
 /** Download and hash one extension. Failures are dropped: LOAD then downloads it itself and reports the error. */
-async function prefetchOne(url: string): Promise<void> {
+async function prefetchOne(url: string, timeoutMs: number): Promise<void> {
     const startedIn = generation;
     try {
-        const response = await fetch(url);
+        // The signal also aborts reading the body, and with it the compile
+        const signal = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(timeoutMs) : undefined;
+        const response = await fetch(url, { signal });
         // LOAD's XHR only accepts 200
         if (response.status !== 200) {
             return;
@@ -80,14 +84,14 @@ async function prefetchOne(url: string): Promise<void> {
         prefetched.set(url, { bytes, hash, module });
         heldBytes += bytes.byteLength;
     } catch (e) {
-        // Network error: leave it to LOAD
+        // Network error or timeout: leave it to LOAD
     } finally {
         running.delete(url);
     }
 }
 
-/** Prefetch extensions by URL. Resolves once every download has finished or failed; never rejects. */
-export async function prefetchExtensions(urls: string[]): Promise<void> {
+/** Prefetch extensions by URL. Resolves once every download has finished, failed or timed out; never rejects. */
+export async function prefetchExtensions(urls: string[], timeoutMs: number = PREFETCH_TIMEOUT_MS): Promise<void> {
     installPrefetchHook();
     const work: Promise<void>[] = [];
     for (const url of urls) {
@@ -96,7 +100,7 @@ export async function prefetchExtensions(urls: string[]): Promise<void> {
         }
         let p = running.get(url);
         if (!p) {
-            p = prefetchOne(url);
+            p = prefetchOne(url, timeoutMs);
             running.set(url, p);
         }
         work.push(p);
