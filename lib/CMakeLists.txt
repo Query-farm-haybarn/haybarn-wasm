@@ -254,11 +254,8 @@ add_library(
   ${CMAKE_SOURCE_DIR}/src/io/ifstream.cc
   ${CMAKE_SOURCE_DIR}/src/io/memory_filesystem.cc
   ${CMAKE_SOURCE_DIR}/src/io/web_filesystem.cc
-  ${CMAKE_SOURCE_DIR}/src/json_analyzer.cc
   ${CMAKE_SOURCE_DIR}/src/json_dataview.cc
   ${CMAKE_SOURCE_DIR}/src/json_insert_options.cc
-  ${CMAKE_SOURCE_DIR}/src/json_parser.cc
-  ${CMAKE_SOURCE_DIR}/src/json_table.cc
   ${CMAKE_SOURCE_DIR}/src/json_typedef.cc
   ${CMAKE_SOURCE_DIR}/src/udf.cc
   ${CMAKE_SOURCE_DIR}/src/utils/parking_lot.cc
@@ -268,33 +265,22 @@ add_library(
   ${CMAKE_SOURCE_DIR}/src/webdb.cc
   ${CMAKE_SOURCE_DIR}/src/webdb_api.cc)
 
-if (DUCKDB_WASM_LOADABLE_EXTENSIONS)
-  set(EXTENSION_CACHE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../.ccache/extension")
-  set(JSON_EXTENSION_CACHE_FILE "${EXTENSION_CACHE_DIR}/json")
-  set(DUCKDB_WEB_JSON "")
+# The JSON extension is always linked in: insertJSONFromPath reads through read_json, and the synchronous
+# browser bindings can't fetch a loadable extension on demand
+add_library(
+  duckdb_web_json
+  ${CMAKE_SOURCE_DIR}/src/extensions/json_extension.cc)
+target_link_libraries(duckdb_web_json duckdb duckdb_json)
 
-  target_link_libraries(duckdb_web duckdb arrow rapidjson ${THREAD_LIBS})
+if (DUCKDB_WASM_LOADABLE_EXTENSIONS)
+  target_link_libraries(duckdb_web duckdb duckdb_web_json arrow rapidjson ${THREAD_LIBS})
 else()
   add_library(
     duckdb_web_parquet
     ${CMAKE_SOURCE_DIR}/src/extensions/parquet_extension.cc)
 
-  add_library(
-    duckdb_web_json
-    ${CMAKE_SOURCE_DIR}/src/extensions/json_extension.cc)
-
-  set(EXTENSION_CACHE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../.ccache/extension")
-  set(JSON_EXTENSION_CACHE_FILE "${EXTENSION_CACHE_DIR}/json")
-
-  set(DUCKDB_WEB_JSON "")
-  if(EXISTS "${JSON_EXTENSION_CACHE_FILE}")
-    set(DUCKDB_WEB_JSON "duckdb_web_json")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDUCKDB_JSON_EXTENSION")
-  endif()
-
-  target_link_libraries(duckdb_web duckdb duckdb_web_parquet ${DUCKDB_WEB_JSON} arrow rapidjson ${THREAD_LIBS})
+  target_link_libraries(duckdb_web duckdb duckdb_web_parquet duckdb_web_json arrow rapidjson ${THREAD_LIBS})
   target_link_libraries(duckdb_web_parquet duckdb duckdb_parquet)
-  target_link_libraries(duckdb_web_json duckdb duckdb_json)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -342,8 +328,7 @@ if(NOT EMSCRIPTEN)
       ${CMAKE_SOURCE_DIR}/test/insert_arrow_test.cc
       ${CMAKE_SOURCE_DIR}/test/insert_csv_test.cc
       ${CMAKE_SOURCE_DIR}/test/insert_json_test.cc
-      ${CMAKE_SOURCE_DIR}/test/json_analyzer_test.cc
-      ${CMAKE_SOURCE_DIR}/test/json_table_test.cc
+      ${CMAKE_SOURCE_DIR}/test/json_parser.cc
 #      ${CMAKE_SOURCE_DIR}/test/json_typedef_test.cc
       ${CMAKE_SOURCE_DIR}/test/json_dataview_test.cc
       ${CMAKE_SOURCE_DIR}/test/memory_filesystem_test.cc
@@ -354,7 +339,7 @@ if(NOT EMSCRIPTEN)
       ${CMAKE_SOURCE_DIR}/test/webdb_test.cc
       ${CMAKE_SOURCE_DIR}/test/tester.cc)
 
-  set(TEST_LIBS duckdb_web duckdb_web_parquet ${DUCKDB_WEB_JSON} gtest gmock gflags ${THREAD_LIBS})
+  set(TEST_LIBS duckdb_web duckdb_web_parquet duckdb_web_json gtest gmock gflags ${THREAD_LIBS})
 
   add_executable(tester ${TEST_CC})
   target_link_libraries(tester ${TEST_LIBS})

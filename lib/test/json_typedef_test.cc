@@ -3,7 +3,6 @@
 #include <optional>
 
 #include "duckdb/common/types.hpp"
-#include "duckdb/web/json_analyzer.h"
 #include "gtest/gtest.h"
 #include "rapidjson/document.h"
 #include "rapidjson/memorystream.h"

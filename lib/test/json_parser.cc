@@ -18,7 +18,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "duckdb/web/json_parser.h"
+#include "duckdb/web/test/json_parser.h"
 
 #include <rapidjson/error/error.h>
 #include <rapidjson/reader.h>
@@ -45,7 +45,6 @@
 #include "arrow/type_fwd.h"
 #include "arrow/type_traits.h"
 #include "arrow/util/value_parsing.h"
-#include "duckdb/web/json_analyzer.h"
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
 #include "rapidjson/writer.h"
@@ -717,123 +716,7 @@ arrow::Result<std::shared_ptr<ArrayParser>> GetDictArrayParser(const std::shared
     RETURN_NOT_OK(res->Init());
     return res;
 }
-
-// -------------------------------------------
-// Type tests
-
-template <arrow::Type::type TYPE> bool TestType(const rapidjson::Value& value, const arrow::DataType& type);
-
-template <> bool TestType<arrow::Type::NA>(const rapidjson::Value& json_obj, const arrow::DataType& type) {
-    return json_obj.IsNull();
-}
-template <> bool TestType<arrow::Type::BOOL>(const rapidjson::Value& json_obj, const arrow::DataType& type) {
-    return ParseBoolean(json_obj, type).ok();
-}
-template <> bool TestType<arrow::Type::DECIMAL128>(const rapidjson::Value& json_obj, const arrow::DataType& type) {
-    return ParseDecimal128(json_obj, type).ok();
-}
-template <> bool TestType<arrow::Type::DECIMAL256>(const rapidjson::Value& json_obj, const arrow::DataType& type) {
-    return ParseDecimal256(json_obj, type).ok();
-}
-#define PARSE_NUMBER(TYPE, TYPE_OBJ)                                                                 \
-    template <> bool TestType<TYPE>(const rapidjson::Value& json_obj, const arrow::DataType& type) { \
-        return ParseNumber<TYPE_OBJ>(json_obj, type).ok();                                           \
-    }
-PARSE_NUMBER(arrow::Type::UINT8, arrow::UInt8Type);
-PARSE_NUMBER(arrow::Type::UINT16, arrow::UInt16Type);
-PARSE_NUMBER(arrow::Type::UINT32, arrow::UInt32Type);
-PARSE_NUMBER(arrow::Type::UINT64, arrow::UInt64Type);
-PARSE_NUMBER(arrow::Type::INT8, arrow::Int8Type);
-PARSE_NUMBER(arrow::Type::INT16, arrow::Int16Type);
-PARSE_NUMBER(arrow::Type::INT32, arrow::Int32Type);
-PARSE_NUMBER(arrow::Type::INT64, arrow::Int64Type);
-PARSE_NUMBER(arrow::Type::FLOAT, arrow::FloatType);
-PARSE_NUMBER(arrow::Type::HALF_FLOAT, arrow::HalfFloatType);
-PARSE_NUMBER(arrow::Type::DOUBLE, arrow::DoubleType);
-PARSE_NUMBER(arrow::Type::DATE32, arrow::Date32Type);
-PARSE_NUMBER(arrow::Type::DATE64, arrow::Date64Type);
-PARSE_NUMBER(arrow::Type::TIME32, arrow::Time32Type);
-PARSE_NUMBER(arrow::Type::TIME64, arrow::Time64Type);
-PARSE_NUMBER(arrow::Type::DURATION, arrow::DurationType);
-PARSE_NUMBER(arrow::Type::INTERVAL_MONTHS, arrow::MonthIntervalType);
-#undef PARSE_NUMBER
-template <> bool TestType<arrow::Type::TIMESTAMP>(const rapidjson::Value& json_obj, const arrow::DataType& type) {
-    return ParseTimestamp(json_obj, type).ok();
-}
-template <>
-bool TestType<arrow::Type::INTERVAL_DAY_TIME>(const rapidjson::Value& json_obj, const arrow::DataType& type) {
-    return ParseDayTime(json_obj, type).ok();
-}
-template <> bool TestType<arrow::Type::STRING>(const rapidjson::Value& json_obj, const arrow::DataType& type) {
-    return json_obj.IsString();
-}
-template <>
-bool TestType<arrow::Type::FIXED_SIZE_BINARY>(const rapidjson::Value& json_obj, const arrow::DataType& type) {
-    return ParseFixedSizeBinary(json_obj, type).ok();
-}
-
-// -------------------------------------------
-// Type analyzer
-
-template <arrow::Type::type TYPE> struct GenericTypeAnalyzer : public TypeAnalyzer {
-    /// Constructor
-    GenericTypeAnalyzer(std::shared_ptr<arrow::DataType> type) : TypeAnalyzer(std::move(type)) {}
-
-    /// Check if a value is of the type
-    bool TestValue(const rapidjson::Value& value) override { return value.IsNull() || TestType<TYPE>(value, *type_); }
-    /// Check if multiple values are of the type
-    size_t TestValues(const std::vector<rapidjson::Value>& json_values) override {
-        size_t hits = 0;
-        for (unsigned i = 0; i < json_values.size(); ++i) {
-            auto& value = json_values[i];
-            hits += value.IsNull() || TestType<TYPE>(json_values[i], *type_);
-        }
-        return hits;
-    }
-};
-
 }  // namespace
-
-/// Constructor
-TypeAnalyzer::TypeAnalyzer(std::shared_ptr<arrow::DataType> type) : type_(std::move(type)){};
-
-/// Resolve a type analyzer
-std::unique_ptr<TypeAnalyzer> TypeAnalyzer::ResolveScalar(std::shared_ptr<arrow::DataType> type) {
-#define ANALYZER_CASE(ID) \
-    case ID:              \
-        return std::make_unique<GenericTypeAnalyzer<ID>>(type);
-
-    switch (type->id()) {
-        ANALYZER_CASE(arrow::Type::INT8)
-        ANALYZER_CASE(arrow::Type::INT16)
-        ANALYZER_CASE(arrow::Type::INT32)
-        ANALYZER_CASE(arrow::Type::INT64)
-        ANALYZER_CASE(arrow::Type::UINT8)
-        ANALYZER_CASE(arrow::Type::UINT16)
-        ANALYZER_CASE(arrow::Type::UINT32)
-        ANALYZER_CASE(arrow::Type::UINT64)
-        ANALYZER_CASE(arrow::Type::TIMESTAMP)
-        ANALYZER_CASE(arrow::Type::DATE32)
-        ANALYZER_CASE(arrow::Type::DATE64)
-        ANALYZER_CASE(arrow::Type::TIME32)
-        ANALYZER_CASE(arrow::Type::TIME64)
-        ANALYZER_CASE(arrow::Type::DURATION)
-        ANALYZER_CASE(arrow::Type::NA)
-        ANALYZER_CASE(arrow::Type::BOOL)
-        ANALYZER_CASE(arrow::Type::HALF_FLOAT)
-        ANALYZER_CASE(arrow::Type::FLOAT)
-        ANALYZER_CASE(arrow::Type::DOUBLE)
-        ANALYZER_CASE(arrow::Type::STRING)
-        ANALYZER_CASE(arrow::Type::FIXED_SIZE_BINARY)
-        ANALYZER_CASE(arrow::Type::DECIMAL128)
-        ANALYZER_CASE(arrow::Type::DECIMAL256)
-        ANALYZER_CASE(arrow::Type::INTERVAL_MONTHS)
-        ANALYZER_CASE(arrow::Type::INTERVAL_DAY_TIME)
-        default:
-            return nullptr;
-    }
-#undef ANALYZER_CASE
-}
 
 // -------------------------------------------
 // Resolvers
