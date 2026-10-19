@@ -83,10 +83,11 @@ function __hbMutableGlobals(b){if(!ArrayBuffer.isView(b))return;b=new Uint8Array
 `;
 const PRECOMPILED_MARKER = '/* haybarn: precompiled side modules (scripts/patch_dylink_glue.cjs) */';
 // Takes the module the engine armed for this library, if any. The armed entry carries the bytes the
-// module was compiled from, for the mutable-globals scan.
+// module was compiled from, for the mutable-globals scan. Every load first drops a scan left by a
+// precompiled load that failed before using it.
 const PRECOMPILED_RUNTIME = `${PRECOMPILED_MARKER}
 var __hbNextMut;
-function __hbTakeArmedModule(n){var a=globalThis.__haybarnArmedModule;if(!a||typeof n!="string"||!(n==a.name||n.endsWith("/"+a.name)))return;globalThis.__haybarnArmedModule=null;__hbNextMut=__hbMutableGlobals(a.bytes);return a.module}
+function __hbTakeArmedModule(n){__hbNextMut=void 0;var a=globalThis.__haybarnArmedModule;if(!a||typeof n!="string"||!(n==a.name||n.endsWith("/"+a.name)))return;globalThis.__haybarnArmedModule=null;__hbNextMut=__hbMutableGlobals(a.bytes);return a.module}
 `;
 // Glue features the injected runtime doesn't handle
 const UNSUPPORTED = {
@@ -222,4 +223,4 @@ if (require.main === module) {
         process.exit(1);
     }
 }
-module.exports = { patch, isPatched, FREE_BINARY_MARKER, MUTABLE_GLOBALS_RUNTIME };
+module.exports = { patch, isPatched, FREE_BINARY_MARKER, MUTABLE_GLOBALS_RUNTIME, PRECOMPILED_RUNTIME };

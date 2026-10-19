@@ -456,9 +456,10 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
      * same URL then only checks the signature. Settings that change the URL (such as
      * `custom_extension_repository`) must be set before prefetching.
      *
-     * Resolves once every download has finished or failed, and never rejects: a failed prefetch leaves
-     * the download to LOAD, which reports any error. Queries sent while a prefetch runs wait for it.
-     * Each prefetched extension serves one LOAD. Does nothing in Node.js.
+     * Resolves once every download has finished or failed. A name that can't be resolved or downloaded
+     * is skipped, leaving the download to LOAD, which reports any error; so are extensions that are
+     * already loaded. Queries sent while a prefetch runs wait for it. Each prefetched extension serves
+     * one LOAD, and at most 256 MiB is held for LOADs that haven't run yet. Does nothing in Node.js.
      */
     public async prefetchExtensions(names: string[]): Promise<void> {
         const task = new WorkerTask<WorkerRequestType.PREFETCH_EXTENSIONS, string[], null>(

@@ -99,9 +99,11 @@ export interface DuckDBConfig {
      * extension binary with a *blocking* synchronous XHR. With background
      * scheduler threads live, that blocking fetch can deadlock across the
      * worker/main-thread boundary (and exhaust the emscripten pthread pool).
-     * When enabled, the binding brackets each `LOAD`/`INSTALL` with
-     * `SET threads=1` … `SET threads=<previous>` so the fetch runs with no
-     * background workers, then restores the prior thread count.
+     * When enabled, the binding runs `SET threads=1` before a `LOAD`/`INSTALL`
+     * so the fetch runs with no background workers. Consecutive loads stay at
+     * one thread, and the prior thread count is restored before the next
+     * statement of any other kind: restoring it starts threads that first load
+     * every extension loaded so far, which the next load would wait for.
      *
      * Defaults to enabled. It is a no-op on single-threaded (mvp/eh) builds and
      * whenever `threads` is already 1, so it only ever engages on threaded

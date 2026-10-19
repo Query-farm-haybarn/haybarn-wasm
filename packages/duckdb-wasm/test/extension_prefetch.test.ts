@@ -1,5 +1,6 @@
 import { createHash } from 'crypto';
 import {
+    clearPrefetchedExtensions,
     computeExtensionHash,
     prefetchExtensions,
     takePrefetchedExtension,
@@ -59,6 +60,19 @@ export function testExtensionPrefetch(): void {
             expect(entry).not.toBeNull();
             expect(Buffer.from(entry!.bytes).equals(Buffer.from(bytes))).toBeTrue();
             expect(Buffer.from(entry!.hash!).toString('hex')).toEqual(Buffer.from(engineHash(bytes)).toString('hex'));
+            expect(takePrefetchedExtension(url)).toBeNull();
+        });
+
+        it('drops prefetches that are still running when cleared', async () => {
+            if (!hasWebCrypto) {
+                pending('no WebCrypto');
+                return;
+            }
+            const url = `data:application/wasm;base64,${Buffer.from(pseudoRandomBytes(2048)).toString('base64')}`;
+            const prefetching = prefetchExtensions([url]);
+            // As a RESET does while the download runs
+            clearPrefetchedExtensions();
+            await prefetching;
             expect(takePrefetchedExtension(url)).toBeNull();
         });
 

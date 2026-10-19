@@ -163,12 +163,18 @@ void duckdb_web_get_version(WASMResponse* packed) {
 }
 /// Get the duckdb feature flags
 uint32_t duckdb_web_get_feature_flags() { return ResolveFeatureFlags(); }
-/// Get the URL that LOAD fetches a wasm extension from, so the worker can prefetch it
+/// Get the URL that LOAD fetches a wasm extension from, so the worker can prefetch it.
+/// Empty when the extension is already loaded, since LOAD then fetches nothing.
 void duckdb_web_extension_url(WASMResponse* packed, const char* name) {
     GET_WEBDB(*packed);
 #ifdef WASM_LOADABLE_EXTENSIONS
     try {
-        auto url = duckdb::ExtensionHelper::WasmExtensionUrl(*webdb.database().instance, name);
+        auto& db = *webdb.database().instance;
+        if (db.ExtensionIsLoaded(duckdb::ExtensionHelper::ApplyExtensionAlias(name))) {
+            WASMResponseBuffer::Get().Store(*packed, arrow::Result<std::string>(std::string{}));
+            return;
+        }
+        auto url = duckdb::ExtensionHelper::WasmExtensionUrl(db, name);
         WASMResponseBuffer::Get().Store(*packed, arrow::Result<std::string>(std::move(url)));
     } catch (std::exception& e) {
         WASMResponseBuffer::Get().Store(*packed, arrow::Result<std::string>(arrow::Status::Invalid(e.what())));

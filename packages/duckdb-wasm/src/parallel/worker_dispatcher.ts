@@ -217,7 +217,18 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                 case WorkerRequestType.PREFETCH_EXTENSIONS: {
                     // Only browsers gain: Node's LOAD reads its on-disk cache and hashes with native crypto
                     if (typeof XMLHttpRequest !== 'undefined') {
-                        const urls = request.data.map(name => this._bindings!.getExtensionUrl(name));
+                        const urls: string[] = [];
+                        for (const name of request.data) {
+                            try {
+                                // Empty when the extension is already loaded
+                                const url = this._bindings.getExtensionUrl(name);
+                                if (url) {
+                                    urls.push(url);
+                                }
+                            } catch (e) {
+                                // Not resolvable (e.g. no loadable extensions in this build): LOAD reports it
+                            }
+                        }
                         await prefetchExtensions(urls);
                     }
                     this.sendOK(request);

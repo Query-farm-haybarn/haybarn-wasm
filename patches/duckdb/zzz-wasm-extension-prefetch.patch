@@ -113,7 +113,16 @@ diff --git a/src/main/extension/extension_load.cpp b/src/main/extension/extensio
  	// Until dlopen has compiled it, close and remove the in-memory file on any error
  	struct ExtensionFileCleanup {
  		FILE *file = nullptr;
-@@ -636,17 +662,23 @@
+@@ -603,6 +629,8 @@
+ 			}
+ 			if (path) {
+ 				std::remove(path);
++				// The LOAD failed before dlopen: drop the module prefetched for it
++				EM_ASM({ globalThis.__haybarnPendingModule = null; });
+ 			}
+ 		}
+ 	} ext_file_cleanup;
+@@ -636,17 +664,23 @@
  		signature.resize(256);
  		auto signature_offset = file_size - signature.size();
  
@@ -147,7 +156,7 @@ diff --git a/src/main/extension/extension_load.cpp b/src/main/extension/extensio
  
  		signature.assign(metadata_segment, ParsedExtensionMetaData::FOOTER_SIZE - signature.size(), signature.size());
  		bool any_valid = false;
-@@ -668,8 +700,16 @@
+@@ -668,8 +702,16 @@
  	auto dopen_from = filename;
  #endif
  
