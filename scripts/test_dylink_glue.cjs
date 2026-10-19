@@ -94,18 +94,18 @@ function check(name, ok, detail) {
         return Buffer.from(m.subarray(ptr, end)).toString();
     };
     // The bindings only fetch modules they expect, so write the side module into MEMFS for dlopen
-    const stage = file => {
+    const stage = (file, as = file) => {
         const bytes = fs.readFileSync(path.join(FIXTURES, file));
         const ptr = X.malloc(bytes.length) >>> 0;
         heap().set(bytes, ptr);
-        const fp = X.fopen(cstr('/tmp/' + file), cstr('wb'));
+        const fp = X.fopen(cstr('/tmp/' + as), cstr('wb'));
         if (!fp) throw new Error('fopen failed');
         X.fwrite(ptr, 1, bytes.length, fp);
         X.fclose(fp);
-        return '/tmp/' + file;
+        return '/tmp/' + as;
     };
     const RTLD_NOW = 2, RTLD_GLOBAL = 256;
-    const dlopen = file => X.dlopen(cstr(stage(file)), RTLD_NOW | RTLD_GLOBAL) >>> 0;
+    const dlopen = (file, as) => X.dlopen(cstr(stage(file, as)), RTLD_NOW | RTLD_GLOBAL) >>> 0;
     const dlsym = (handle, name) => X.dlsym(handle, cstr(name)) >>> 0;
     const call = (handle, name, ...args) => table.get(dlsym(handle, name))(...args);
 
@@ -180,6 +180,47 @@ function check(name, ok, detail) {
         check(`mutable exported globals of ${file}`, got[0] === expected && got[1] === expected, got.join(' / '));
     }
     check('a compiled module is left to the probe', mutableGlobals(new WebAssembly.Module(fs.readFileSync(path.join(FIXTURES, 'good.so')))) === undefined);
+
+    // dlopen uses a module the engine armed for that file (prefetched extensions), instead of compiling it
+    const precompiled = fs.readFileSync(bundle, 'utf8').includes('__haybarnArmedModule');
+    if (precompiled) {
+        // Compiled with the original constructor, so only the glue's own compiles are counted
+        const globalsBytes = new Uint8Array(fs.readFileSync(path.join(FIXTURES, 'globals.so')));
+        const compiledBefore = compiledBytes.length;
+        const probesBefore = immutableWrites;
+        globalThis.__haybarnArmedModule = { name: 'globals-pre.so', module: new WasmModule(globalsBytes), bytes: globalsBytes };
+        const pre = dlopen('globals.so', 'globals-pre.so');
+        check('dlopen an armed module', pre !== 0, pre ? undefined : readCstr(X.dlerror()));
+        check('the armed module is used, not compiled again', compiledBytes.length === compiledBefore, `${compiledBytes.length - compiledBefore} compiled`);
+        check('the armed module is taken', globalThis.__haybarnArmedModule === null);
+        if (pre) {
+            check('armed module: exported data global is relocated', dlsym(pre, 'hb_data') === (call(pre, 'hb_data_addr') >>> 0));
+            call(pre, 'hb_set_mut', 7);
+            check('armed module: exported mutable global is passed through', dlsym(pre, 'hb_mut') === 7);
+        }
+        check('armed module: globals are read from its bytes, not probed', immutableWrites === probesBefore, `${immutableWrites - probesBefore} probes`);
+
+        // A module armed for another file is left alone
+        const other = { name: 'other.so', module: new WasmModule(globalsBytes), bytes: globalsBytes };
+        globalThis.__haybarnArmedModule = other;
+        const compiledBeforeGood = compiledBytes.length;
+        const good2 = dlopen('good.so', 'good-copy.so');
+        check('dlopen next to a module armed for another file', good2 !== 0);
+        check('it compiles its own bytes', compiledBytes.length === compiledBeforeGood + 1);
+        check('the other armed module is left', globalThis.__haybarnArmedModule === other);
+        globalThis.__haybarnArmedModule = null;
+
+        // The runtime on its own: a scan taken by a load that failed before using it is dropped by the next load
+        const { PRECOMPILED_RUNTIME } = require('./patch_dylink_glue.cjs');
+        const rt = new Function('__hbMutableGlobals', `${PRECOMPILED_RUNTIME}; return { take: __hbTakeArmedModule, next: () => __hbNextMut };`)(
+            () => new Set(['scanned']));
+        globalThis.__haybarnArmedModule = { name: 'a.so', module: {}, bytes: globalsBytes };
+        check('the armed module is matched by file name', rt.take('/tmp/xa.so') === undefined && rt.take('/tmp/a.so') !== undefined);
+        check('the armed module serves one load', rt.take('/tmp/a.so') === undefined);
+        check('a scan left by a failed load is dropped', rt.next() === undefined);
+    } else {
+        console.log('info glue has no precompiled-module rewrite');
+    }
 
     // A missing required GOT import fails dlopen
     check('dlopen with a missing GOT.func import fails', dlopen('missing_got.so') === 0);

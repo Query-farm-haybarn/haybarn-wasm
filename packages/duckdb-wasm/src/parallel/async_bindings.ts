@@ -239,6 +239,7 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
             case WorkerRequestType.INSERT_JSON_FROM_PATH:
             case WorkerRequestType.OPEN:
             case WorkerRequestType.PING:
+            case WorkerRequestType.PREFETCH_EXTENSIONS:
             case WorkerRequestType.REGISTER_FILE_BUFFER:
             case WorkerRequestType.REGISTER_FILE_HANDLE:
             case WorkerRequestType.REGISTER_FILE_URL:
@@ -443,6 +444,32 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
     public async open(config: DuckDBConfig): Promise<void> {
         this._config = config;
         const task = new WorkerTask<WorkerRequestType.OPEN, DuckDBConfig, null>(WorkerRequestType.OPEN, config);
+        await this.postTask(task);
+    }
+
+    /**
+     * Download and hash extensions ahead of LOAD.
+     *
+     * In browsers, LOAD downloads each extension synchronously and hashes it with SHA-256 compiled to
+     * wasm before checking its signature. This does that work in the worker ahead of time: the downloads
+     * run in parallel and the hash is computed with WebCrypto. A later `LOAD <name>` that resolves to the
+     * same URL then only checks the signature. Settings that change the URL (such as
+     * `custom_extension_repository`) must be set before prefetching.
+     *
+     * Call it once while setting up the session, before running queries, and after any setting that
+     * changes the URL. Requests sent while a prefetch runs wait for it, and a second prefetch sent while
+     * requests are waiting on the first can make them run out of order.
+     *
+     * Resolves once every download has finished, failed or timed out (after 30 seconds). A name that
+     * can't be resolved or downloaded is skipped, leaving the download to LOAD, which reports any error;
+     * so are extensions that are already loaded. Each prefetched extension serves one LOAD, and at most
+     * 256 MiB is held for LOADs that haven't run yet. Does nothing in Node.js.
+     */
+    public async prefetchExtensions(names: string[]): Promise<void> {
+        const task = new WorkerTask<WorkerRequestType.PREFETCH_EXTENSIONS, string[], null>(
+            WorkerRequestType.PREFETCH_EXTENSIONS,
+            names,
+        );
         await this.postTask(task);
     }
 

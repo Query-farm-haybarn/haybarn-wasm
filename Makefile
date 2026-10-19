@@ -437,6 +437,9 @@ patch_duckdb:
 	@for p in $$(ls patches/duckdb/*.patch 2>/dev/null | sort); do echo "Applying $$p"; patch -p1 --forward -d submodules/duckdb < $$p || true; done
 	@for p in $$(ls patches/arrow/*.patch 2>/dev/null | sort); do echo "Applying $$p"; patch -p1 --forward -d submodules/arrow < $$p || true; done
 	@for p in $$(ls patches/rapidjson/*.patch 2>/dev/null | sort); do echo "Applying $$p"; patch -p1 --forward -d submodules/rapidjson < $$p || true; done
+	@# The patches stack, so a re-run can't tell applied from failed and the loop above ignores both. A prefetch
+	@# patch that stopped applying would only show as prefetched extensions that LOAD never uses, so check it.
+	@grep -q __haybarnTakePrefetchedExtension submodules/duckdb/src/main/extension/extension_load.cpp || { echo "patches/duckdb/zzz-wasm-extension-prefetch.patch did not apply"; exit 1; }
 
 apply_patches: patch_duckdb
 
