@@ -1,0 +1,130 @@
+# Haybarn replacement for `duckdb/duckdb-wasm-ci-env@<sha>`.
+#
+# Runs the caller's `script:` inside the shared Haybarn wasm build
+# environment image at:
+#
+#   ghcr.io/query-farm-haybarn/haybarn-wasm-base:v<engine-version>
+#
+# The tag is *derived*, not pinned — see the "Resolve base image" step.
+# The image is rebuilt once per engine release train (v1.5.4, v1.5.5, …)
+# and its tag carries the same `<major>.<minor>.<patch>` as the workspace
+# version, so the workspace version is the single source of truth. This
+# keeps the build toolchain in lockstep with haybarn-extension-ci-tools,
+# which builds extension .wasm against the same image family — toolchain
+# drift between the two is what produces exception-ABI mismatches (#9).
+#
+# Same image haybarn-extension-ci-tools / haybarn-community-extensions
+# use to compile community .duckdb_extension.wasm artifacts — Ubuntu
+# 24.04 + emsdk + ccache 4.13.6 (musl-static, supports HTTP bearer-auth
+# remote storage) + sccache + vcpkg.
+#
+# Differences from the upstream action:
+#   * Newer base image (upstream: Ubuntu 22.10 + emsdk 3.1.55).
+#   * Forwards CCACHE_REMOTE_STORAGE so ccache writes to the shared
+#     Haybarn R2 worker (haybarn-vcpkg-cache.rusty-bb6.workers.dev/ccache)
+#     for cross-run, cross-repo cache reuse.
+#   * Forwards SCCACHE_WEBDAV_* for Rust crate caching when present.
+#   * yarn isn't preinstalled — engine-build scripts that need it call
+#     `npm install -g yarn` themselves, leveraging the node bundled in
+#     emsdk.
+
+name: 'Haybarn wasm CI env'
+description: 'Run a script inside the shared Haybarn wasm build image, with R2-backed ccache/sccache.'
+
+inputs:
+  script:
+    description: 'Script to execute inside the container'
+    required: true
+  image:
+    description: >-
+      Container image reference. Leave empty to use $HAYBARN_WASM_CI_IMAGE
+      when the workflow sets it, and otherwise derive the tag from the
+      workspace version; set it to pin an explicit image (e.g. when
+      bisecting a toolchain regression).
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    # Derive `…haybarn-wasm-base:v<M.N.P>` from the workspace version so
+    # rolling the engine doesn't leave a stale hardcoded tag behind.
+    #
+    # Read the version from `git show HEAD:` rather than the working
+    # tree: scripts/npm_version.sh rewrites package.json in place partway
+    # through the js_libs jobs (to a `-dev<N>.0` prerelease off the last
+    # tag), so a later step in the same job would otherwise resolve a
+    # different image than an earlier one. The committed value is stable
+    # for the whole run.
+    #
+    # Stripping at the first `-` is what makes this robust across every
+    # version shape the repo produces — `1.5.5-rc1`, `1.5.5`, and
+    # `1.5.2-dev1.0` all yield the same `<M.N.P>` image tag.
+    - name: Resolve base image
+      id: resolve
+      shell: bash
+      run: |
+        set -euo pipefail
+        REPO=ghcr.io/query-farm-haybarn/haybarn-wasm-base
+        IMAGE='${{ inputs.image }}'
+        IMAGE="${IMAGE:-${HAYBARN_WASM_CI_IMAGE:-}}"
+
+        if [ -z "$IMAGE" ]; then
+            RAW=$(git show HEAD:packages/duckdb-wasm/package.json \
+                  | node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8")).version')
+            test -n "$RAW" || { echo "could not read workspace version"; exit 1; }
+            IMAGE="${REPO}:v${RAW%%-*}"
+            echo "workspace version ${RAW} -> ${IMAGE}"
+
+            # The image is built out-of-tree, so a freshly-rolled engine
+            # version can point at a tag that doesn't exist yet. Warn and
+            # fall back rather than failing every job in the workflow.
+            if ! docker manifest inspect "$IMAGE" > /dev/null 2>&1; then
+                echo "::warning title=Base image not found::${IMAGE} is not in ghcr yet; falling back to :latest"
+                IMAGE="${REPO}:latest"
+            fi
+        else
+            echo "using caller-pinned image ${IMAGE}"
+        fi
+
+        echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+
+    - name: Pull container image
+      shell: bash
+      run: |
+        docker pull "${{ steps.resolve.outputs.image }}"
+        # Log the digest so a build is reproducible from its own log even
+        # though the tag it resolved is mutable.
+        docker image inspect --format '{{index .RepoDigests 0}}' \
+            "${{ steps.resolve.outputs.image }}"
+
+    - name: Fix workspace permissions (pre)
+      shell: bash
+      run: sudo chown -R $(id -u):$(id -g) ${{ github.workspace }}
+
+    - name: Run script in container
+      shell: bash
+      run: |
+        # RUSTC_WRAPPER=sccache is set ONLY inside the container — the
+        # image has /usr/local/bin/sccache. On the GitHub runner host
+        # there's no sccache, so leaking the var out would break any
+        # runner-level cargo invocation (e.g. Dataprep's tpch-gen build).
+        docker run --rm \
+          -v "${{ github.workspace }}:/github/workspace/:delegated" \
+          -w /github/workspace \
+          -e EM_CACHE=/github/workspace/.emscripten_cache \
+          -e YARN_CACHE_FOLDER=/github/workspace/.yarn_cache \
+          -e CARGO_HOME=/github/workspace/.cargo \
+          -e CCACHE_DIR=/github/workspace/.ccache \
+          -e CCACHE_BASEDIR=/github/workspace \
+          -e CCACHE_REMOTE_STORAGE \
+          -e SCCACHE_WEBDAV_ENDPOINT \
+          -e SCCACHE_WEBDAV_TOKEN \
+          -e RUSTC_WRAPPER=sccache \
+          -e CARGO_INCREMENTAL \
+          "${{ steps.resolve.outputs.image }}" \
+          bash -lc "source /emsdk/emsdk_env.sh >/dev/null 2>&1 || true; command -v yarn >/dev/null || npm install -g --silent yarn; ${{ inputs.script }}"
+
+    - name: Fix workspace permissions (post)
+      shell: bash
+      run: sudo chown -R $(id -u):$(id -g) ${{ github.workspace }}

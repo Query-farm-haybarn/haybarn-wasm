@@ -4,7 +4,7 @@ on:
     pull_request:
     create:
         tags:
-            - v*
+            - haybarn-v*
     workflow_call:
       inputs:
         override_git_describe:
@@ -13,6 +13,11 @@ on:
           type: string
         skip_tests:
           type: string
+        # Haybarn: opt in to the benchmark suite (micro + TPC-H 0.01..0.5 +
+        # merge_reports). Off by default: it adds ~30 min per run.
+        run_benchmarks:
+          type: boolean
+          default: false
     workflow_dispatch:
       inputs:
         override_git_describe:
@@ -21,36 +26,41 @@ on:
           type: string
         skip_tests:
           type: string
+        # Haybarn: opt in to the benchmark suite (micro + TPC-H 0.01..0.5 +
+        # merge_reports). Off by default: it adds ~30 min per run.
+        run_benchmarks:
+          type: boolean
+          default: false
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.head_ref || '' }}-${{ github.base_ref || '' }}-${{ github.ref != 'refs/heads/main' || github.sha }}-${{ github.event_name}}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.head_ref || '' }}-${{ github.base_ref || '' }}-${{ github.ref != 'refs/heads/haybarn-2.0' || github.sha }}-${{ github.event_name}}
   cancel-in-progress: true
 
 env:
   EMSCRIPTEN_VERSION: '6.0.13'
   EMSCRIPTEN_VERSION_COI: '6.0.13'
   DEFAULT_USE_GENERATED_EXPORTED_LIST: 'no'
-  # DuckDB >= v2.0 no longer derives its version from git tags, the wasm builds pick this up instead
-  OVERRIDE_GIT_DESCRIBE: ${{ inputs.override_git_describe }}
+  # DuckDB >= v2.0 no longer derives its version from git tags, the wasm builds pick this up instead.
+  # Haybarn: always the engine release, so extensions resolve under core/v2.0.0/ on every build.
+  OVERRIDE_GIT_DESCRIBE: ${{ inputs.override_git_describe || 'v2.0.0' }}
+  # The image the JS and data-prep steps run in (.github/actions/haybarn-wasm-ci-env). Those steps
+  # only need node, yarn, rust and a C toolchain; the wasm modules are compiled on the runner with
+  # the emsdk pinned above, so the 1.5 image is fine until a 2.0 one is published.
+  HAYBARN_WASM_CI_IMAGE: 'ghcr.io/query-farm-haybarn/haybarn-wasm-base:v1.5.6'
+  # Placeholder npm token. `actions/setup-node` with `registry-url:` writes an .npmrc containing a
+  # literal `${NODE_AUTH_TOKEN}`, and yarn 1.x hard-errors ("Failed to replace env in config") if
+  # it is unset. The publish step sets the real HAYBARN_NPM_TOKEN at step level.
+  NODE_AUTH_TOKEN: 'XXXXX-XXXXX-XXXXX-XXXXX'
+  # R2-backed ccache shared with haybarn-extension-ci-tools (same worker, bucket and bearer auth).
+  CCACHE_REMOTE_STORAGE: "http://haybarn-vcpkg-cache.rusty-bb6.workers.dev/ccache|bearer-token=${{ secrets.HAYBARN_VCPKG_TOKEN }}|connect-timeout=10000|operation-timeout=30000"
+  # sccache for the Rust shell crate when it compiles inside the CI image.
+  SCCACHE_WEBDAV_ENDPOINT: "https://haybarn-vcpkg-cache.rusty-bb6.workers.dev/sccache/"
+  SCCACHE_WEBDAV_TOKEN: ${{ secrets.HAYBARN_VCPKG_TOKEN }}
+  CARGO_INCREMENTAL: 0
 
 jobs:
-    clang_format:
-        name: Clang-Format
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v6
-              with:
-                  submodules: true
-
-            - name: Lint ./lib
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
-              with:
-                  script: |-
-                      python3 ./scripts/run_clang_format.py \
-                        --exclude ./lib/build \
-                        --exclude ./lib/third_party \
-                        -r ./lib/
-
+    # Haybarn: no Clang-Format job, as on 1.5. lib/ follows upstream's formatting and the Haybarn
+    # CI image ships a different clang-format than upstream's, which would flag upstream's own code.
     eslint:
         name: ESLint
         runs-on: ubuntu-latest
@@ -72,28 +82,28 @@ jobs:
                       ${{ runner.os }}-yarn-
 
             - name: Prepare repository
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       yarn install --frozen-lockfile --prefer-offline
 
-            - name: Lint @duckdb/duckdb-wasm
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+            - name: Lint @haybarn/haybarn-wasm
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
-                      yarn workspace @duckdb/duckdb-wasm run lint
+                      yarn workspace @haybarn/haybarn-wasm run lint
 
-            - name: Lint @duckdb/duckdb-wasm-shell
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+            - name: Lint @haybarn/haybarn-wasm-shell
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
-                      yarn workspace @duckdb/duckdb-wasm-shell run lint
+                      yarn workspace @haybarn/haybarn-wasm-shell run lint
 
-            - name: Lint @duckdb/benchmarks
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+            - name: Lint @haybarn/benchmarks
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
-                      yarn workspace @duckdb/benchmarks run lint
+                      yarn workspace @haybarn/benchmarks run lint
 
     tpchgen:
         name: TPCH Generator
@@ -112,7 +122,7 @@ jobs:
 
             - name: Build generator
               if: steps.cache-generator.outputs.cache-hit != 'true'
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       make -C ./submodules/tpch-dbgen/dbgen/ dbgen
@@ -209,7 +219,7 @@ jobs:
                   cd submodules/duckdb && git tag ${{ inputs.override_git_describe }}
 
             - name: Prepare environment
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       mkdir -p ./lib/build/debug ./reports
@@ -220,7 +230,7 @@ jobs:
                       ccache -s
 
             - name: Build project
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       cmake \
@@ -237,7 +247,7 @@ jobs:
                       ccache -s
 
             - name: Test project
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       export LLVM_PROFILE_FILE=./reports/lib.profraw
@@ -246,7 +256,7 @@ jobs:
                           --gtest_output=xml:./reports/tests_lib_debug.xml
 
             - name: Code Coverage
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       llvm-profdata merge \
@@ -307,7 +317,7 @@ jobs:
                   cd submodules/duckdb && git tag ${{ inputs.override_git_describe }}
 
             - name: Prepare environment
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       mkdir -p ./lib/build/release ./reports
@@ -318,7 +328,7 @@ jobs:
                       ccache -s
 
             - name: Build project
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       cmake \
@@ -335,7 +345,7 @@ jobs:
                       ccache -s
 
             - name: Test project
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       export LLVM_PROFILE_FILE=./reports/lib.profraw
@@ -344,7 +354,7 @@ jobs:
                           --gtest_output=xml:./reports/tests_lib_release.xml
 
             - name: Code Coverage
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       llvm-profdata merge \
@@ -372,9 +382,35 @@ jobs:
                   make apply_patches
                   cd submodules/duckdb && git tag ${{ inputs.override_git_describe }}
 
-            - uses: mymindstorm/setup-emsdk@v14
+            # Install emsdk at the fixed path /opt/emsdk. setup-emsdk installs to a per-run
+            # directory, which gets hashed into every ccache entry and defeats cross-run reuse.
+            - name: Cache /opt/emsdk
+              id: cache-emsdk
+              uses: actions/cache@v5
               with:
-                  version: ${{ env.EMSCRIPTEN_VERSION }}
+                  path: /opt/emsdk
+                  key: emsdk-${{ env.EMSCRIPTEN_VERSION }}-x86_64-linux
+            - name: Install emsdk at /opt/emsdk
+              if: steps.cache-emsdk.outputs.cache-hit != 'true'
+              shell: bash
+              run: |
+                  set -euxo pipefail
+                  sudo mkdir -p /opt && sudo chown -R "$(id -u):$(id -g)" /opt
+                  git clone --depth=1 https://github.com/emscripten-core/emsdk.git /opt/emsdk
+                  cd /opt/emsdk
+                  ./emsdk install ${{ env.EMSCRIPTEN_VERSION }}
+                  ./emsdk activate ${{ env.EMSCRIPTEN_VERSION }}
+            - name: Activate emsdk on PATH
+              shell: bash
+              run: |
+                  set -exo pipefail   # NOT -u: emsdk_env.sh doesn't always set every var
+                  source /opt/emsdk/emsdk_env.sh
+                  echo "EMSDK=${EMSDK:-/opt/emsdk}" >> "$GITHUB_ENV"
+                  echo "EMSDK_NODE=${EMSDK_NODE:-}" >> "$GITHUB_ENV"
+                  echo "EM_CONFIG=${EM_CONFIG:-/opt/emsdk/.emscripten}" >> "$GITHUB_ENV"
+                  echo "/opt/emsdk"                       >> "$GITHUB_PATH"
+                  echo "/opt/emsdk/upstream/emscripten"   >> "$GITHUB_PATH"
+                  if [ -n "${EMSDK_NODE:-}" ]; then echo "$(dirname "$EMSDK_NODE")" >> "$GITHUB_PATH"; fi
 
             - name: Setup Ccache
               uses: hendrikmuhs/ccache-action@main
@@ -415,9 +451,35 @@ jobs:
                   make apply_patches
                   cd submodules/duckdb && git tag ${{ inputs.override_git_describe }}
 
-            - uses: mymindstorm/setup-emsdk@v14
+            # Install emsdk at the fixed path /opt/emsdk. setup-emsdk installs to a per-run
+            # directory, which gets hashed into every ccache entry and defeats cross-run reuse.
+            - name: Cache /opt/emsdk
+              id: cache-emsdk
+              uses: actions/cache@v5
               with:
-                  version: ${{ env.EMSCRIPTEN_VERSION_COI }}
+                  path: /opt/emsdk
+                  key: emsdk-${{ env.EMSCRIPTEN_VERSION_COI }}-x86_64-linux
+            - name: Install emsdk at /opt/emsdk
+              if: steps.cache-emsdk.outputs.cache-hit != 'true'
+              shell: bash
+              run: |
+                  set -euxo pipefail
+                  sudo mkdir -p /opt && sudo chown -R "$(id -u):$(id -g)" /opt
+                  git clone --depth=1 https://github.com/emscripten-core/emsdk.git /opt/emsdk
+                  cd /opt/emsdk
+                  ./emsdk install ${{ env.EMSCRIPTEN_VERSION_COI }}
+                  ./emsdk activate ${{ env.EMSCRIPTEN_VERSION_COI }}
+            - name: Activate emsdk on PATH
+              shell: bash
+              run: |
+                  set -exo pipefail   # NOT -u: emsdk_env.sh doesn't always set every var
+                  source /opt/emsdk/emsdk_env.sh
+                  echo "EMSDK=${EMSDK:-/opt/emsdk}" >> "$GITHUB_ENV"
+                  echo "EMSDK_NODE=${EMSDK_NODE:-}" >> "$GITHUB_ENV"
+                  echo "EM_CONFIG=${EM_CONFIG:-/opt/emsdk/.emscripten}" >> "$GITHUB_ENV"
+                  echo "/opt/emsdk"                       >> "$GITHUB_PATH"
+                  echo "/opt/emsdk/upstream/emscripten"   >> "$GITHUB_PATH"
+                  if [ -n "${EMSDK_NODE:-}" ]; then echo "$(dirname "$EMSDK_NODE")" >> "$GITHUB_PATH"; fi
 
             - name: Setup Ccache
               uses: hendrikmuhs/ccache-action@main
@@ -463,9 +525,35 @@ jobs:
                   make apply_patches
                   cd submodules/duckdb && git tag ${{ inputs.override_git_describe }}
 
-            - uses: mymindstorm/setup-emsdk@v14
+            # Install emsdk at the fixed path /opt/emsdk. setup-emsdk installs to a per-run
+            # directory, which gets hashed into every ccache entry and defeats cross-run reuse.
+            - name: Cache /opt/emsdk
+              id: cache-emsdk
+              uses: actions/cache@v5
               with:
-                  version: ${{ env.EMSCRIPTEN_VERSION }}
+                  path: /opt/emsdk
+                  key: emsdk-${{ env.EMSCRIPTEN_VERSION }}-x86_64-linux
+            - name: Install emsdk at /opt/emsdk
+              if: steps.cache-emsdk.outputs.cache-hit != 'true'
+              shell: bash
+              run: |
+                  set -euxo pipefail
+                  sudo mkdir -p /opt && sudo chown -R "$(id -u):$(id -g)" /opt
+                  git clone --depth=1 https://github.com/emscripten-core/emsdk.git /opt/emsdk
+                  cd /opt/emsdk
+                  ./emsdk install ${{ env.EMSCRIPTEN_VERSION }}
+                  ./emsdk activate ${{ env.EMSCRIPTEN_VERSION }}
+            - name: Activate emsdk on PATH
+              shell: bash
+              run: |
+                  set -exo pipefail   # NOT -u: emsdk_env.sh doesn't always set every var
+                  source /opt/emsdk/emsdk_env.sh
+                  echo "EMSDK=${EMSDK:-/opt/emsdk}" >> "$GITHUB_ENV"
+                  echo "EMSDK_NODE=${EMSDK_NODE:-}" >> "$GITHUB_ENV"
+                  echo "EM_CONFIG=${EM_CONFIG:-/opt/emsdk/.emscripten}" >> "$GITHUB_ENV"
+                  echo "/opt/emsdk"                       >> "$GITHUB_PATH"
+                  echo "/opt/emsdk/upstream/emscripten"   >> "$GITHUB_PATH"
+                  if [ -n "${EMSDK_NODE:-}" ]; then echo "$(dirname "$EMSDK_NODE")" >> "$GITHUB_PATH"; fi
 
             - name: Setup Ccache
               uses: hendrikmuhs/ccache-action@main
@@ -518,9 +606,35 @@ jobs:
                   make apply_patches
                   cd submodules/duckdb && git tag ${{ inputs.override_git_describe }}
 
-            - uses: mymindstorm/setup-emsdk@v14
+            # Install emsdk at the fixed path /opt/emsdk. setup-emsdk installs to a per-run
+            # directory, which gets hashed into every ccache entry and defeats cross-run reuse.
+            - name: Cache /opt/emsdk
+              id: cache-emsdk
+              uses: actions/cache@v5
               with:
-                  version: ${{ env.EMSCRIPTEN_VERSION_COI }}
+                  path: /opt/emsdk
+                  key: emsdk-${{ env.EMSCRIPTEN_VERSION_COI }}-x86_64-linux
+            - name: Install emsdk at /opt/emsdk
+              if: steps.cache-emsdk.outputs.cache-hit != 'true'
+              shell: bash
+              run: |
+                  set -euxo pipefail
+                  sudo mkdir -p /opt && sudo chown -R "$(id -u):$(id -g)" /opt
+                  git clone --depth=1 https://github.com/emscripten-core/emsdk.git /opt/emsdk
+                  cd /opt/emsdk
+                  ./emsdk install ${{ env.EMSCRIPTEN_VERSION_COI }}
+                  ./emsdk activate ${{ env.EMSCRIPTEN_VERSION_COI }}
+            - name: Activate emsdk on PATH
+              shell: bash
+              run: |
+                  set -exo pipefail   # NOT -u: emsdk_env.sh doesn't always set every var
+                  source /opt/emsdk/emsdk_env.sh
+                  echo "EMSDK=${EMSDK:-/opt/emsdk}" >> "$GITHUB_ENV"
+                  echo "EMSDK_NODE=${EMSDK_NODE:-}" >> "$GITHUB_ENV"
+                  echo "EM_CONFIG=${EM_CONFIG:-/opt/emsdk/.emscripten}" >> "$GITHUB_ENV"
+                  echo "/opt/emsdk"                       >> "$GITHUB_PATH"
+                  echo "/opt/emsdk/upstream/emscripten"   >> "$GITHUB_PATH"
+                  if [ -n "${EMSDK_NODE:-}" ]; then echo "$(dirname "$EMSDK_NODE")" >> "$GITHUB_PATH"; fi
 
             - name: Setup Ccache
               uses: hendrikmuhs/ccache-action@main
@@ -563,7 +677,6 @@ jobs:
         needs:
             - wasm_base
             - wasm_threads
-            - clang_format
             - eslint
         steps:
             - uses: actions/checkout@v6
@@ -573,7 +686,7 @@ jobs:
 
             - uses: actions/setup-node@v6
               with:
-                  node-version: '18.x'
+                  node-version: '24'
                   registry-url: 'https://registry.npmjs.org'
 
             - name: Git submodule status
@@ -631,7 +744,7 @@ jobs:
                   (cd ./submodules/duckdb && git fetch --all --tags)
 
             - name: Prepare environment
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       git config --global --add safe.directory '*'
@@ -644,56 +757,60 @@ jobs:
                       ./scripts/generate_uni.sh
                       ./scripts/npm_version.sh
 
-            - name: Build @duckdb/duckdb-wasm
+            - name: Build @haybarn/haybarn-wasm
               shell: bash
               run: |
                       rm -rf ./packages/duckdb-wasm/dist/
-                      yarn workspace @duckdb/duckdb-wasm build:release
-                      yarn workspace @duckdb/duckdb-wasm docs
+                      yarn workspace @haybarn/haybarn-wasm build:release
+                      yarn workspace @haybarn/haybarn-wasm docs
 
-            - name: Build @duckdb/duckdb-wasm-shell
+            - name: Build @haybarn/haybarn-wasm-shell
               shell: bash
               run: |
                       rm -rf ./packages/duckdb-wasm-shell/dist/
-                      yarn workspace @duckdb/duckdb-wasm-shell install:wasmpack
-                      yarn workspace @duckdb/duckdb-wasm-shell build:release
+                      yarn workspace @haybarn/haybarn-wasm-shell install:wasmpack
+                      yarn workspace @haybarn/haybarn-wasm-shell build:release
 
-            - name: Build @duckdb/duckdb-wasm-app
+            - name: Build @haybarn/haybarn-wasm-app
               shell: bash
               run: |
                       rm -rf ./packages/duckdb-wasm-app/build/
-                      yarn workspace @duckdb/duckdb-wasm-app build:release
+                      yarn workspace @haybarn/haybarn-wasm-app build:release
 
-            - name: Test @duckdb/duckdb-wasm on Chrome
+            - name: Test @haybarn/haybarn-wasm on Chrome
               shell: bash
               run: |
-                      CHROME_BIN=`which google-chrome` yarn workspace @duckdb/duckdb-wasm test:chrome
+                      CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome
 
-            #            - name: Test @duckdb/duckdb-wasm on Firefox
-            #              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+            #            - name: Test @haybarn/haybarn-wasm on Firefox
+            #              uses: ./.github/actions/haybarn-wasm-ci-env
             #              with:
             #                  script: |-
-            #                      yarn workspace @duckdb/duckdb-wasm test:firefox
+            #                      yarn workspace @haybarn/haybarn-wasm test:firefox
 
-            - name: Test @duckdb/duckdb-wasm on Node.js
+            - name: Test @haybarn/haybarn-wasm on Node.js
               shell: bash
               run: |
-                      yarn workspace @duckdb/duckdb-wasm test:node
+                      yarn workspace @haybarn/haybarn-wasm test:node
 
-            - name: Coverage @duckdb/duckdb-wasm
+            - name: Coverage @haybarn/haybarn-wasm
               shell: bash
               run: |
-                       CHROME_BIN=`which google-chrome` yarn workspace @duckdb/duckdb-wasm test:chrome:coverage
+                       CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:coverage
 
+            # The examples take @haybarn/haybarn-wasm as a file: dependency, which yarn copies at install
+            # time, before dist/ is built. Upstream's plain `yarn install` refreshes the copy only because
+            # npm_version.sh has just changed the package version; without a haybarn-v* tag it keeps the
+            # committed one, so force the copy.
             - name: Build examples
               shell: bash
               run: |
-                      yarn install
-                      yarn workspace @duckdb/duckdb-wasm-examples-bare-node test
-                      yarn workspace @duckdb/duckdb-wasm-examples-bare-browser build
-                      yarn workspace @duckdb/duckdb-wasm-examples-esbuild-node build
-                      yarn workspace @duckdb/duckdb-wasm-examples-esbuild-node test
-                      yarn workspace @duckdb/duckdb-wasm-examples-esbuild-browser build
+                      yarn install --force
+                      yarn workspace @haybarn/haybarn-wasm-examples-bare-node test
+                      yarn workspace @haybarn/haybarn-wasm-examples-bare-browser build
+                      yarn workspace @haybarn/haybarn-wasm-examples-esbuild-node build
+                      yarn workspace @haybarn/haybarn-wasm-examples-esbuild-node test
+                      yarn workspace @haybarn/haybarn-wasm-examples-esbuild-browser build
 
             - name: Package
               shell: bash
@@ -704,19 +821,21 @@ jobs:
                   name: duckdb-wasm-packages
                   path: duckdb-wasm-packages.zip
 
-            - name: Build @duckdb/benchmarks
+            - name: Build @haybarn/benchmarks
+              if: inputs.run_benchmarks
               shell: bash
               run: |
                 rm -r packages/duckdb-wasm/node_modules/*
-                yarn workspace @duckdb/benchmarks build
-                yarn workspace @duckdb/benchmarks bench:system:sort:int
-                yarn workspace @duckdb/benchmarks bench:system:join:2
-                yarn workspace @duckdb/benchmarks bench:system:join:3
-                yarn workspace @duckdb/benchmarks bench:system:regex
-                yarn workspace @duckdb/benchmarks bench:system:sum:int
-                yarn workspace @duckdb/benchmarks bench:system:sum:csv
+                yarn workspace @haybarn/benchmarks build
+                yarn workspace @haybarn/benchmarks bench:system:sort:int
+                yarn workspace @haybarn/benchmarks bench:system:join:2
+                yarn workspace @haybarn/benchmarks bench:system:join:3
+                yarn workspace @haybarn/benchmarks bench:system:regex
+                yarn workspace @haybarn/benchmarks bench:system:sum:int
+                yarn workspace @haybarn/benchmarks bench:system:sum:csv
 
             - name: Upload reports
+              if: inputs.run_benchmarks
               uses: actions/upload-artifact@v7
               with:
                   name: reports_micro
@@ -730,8 +849,8 @@ jobs:
                   retention-days: 1
 
             - name: Preparation TPCH 0.01
-              if: github.ref == 'refs/heads/main'
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              if: inputs.run_benchmarks
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       git config --global --add safe.directory '*'
@@ -743,16 +862,16 @@ jobs:
                       ./scripts/generate_tpch_sqlite.sh 0.01
 
             - name: Benchmarks TPCH 0.01
-              if: github.ref == 'refs/heads/main'
+              if: inputs.run_benchmarks
               shell: bash
               run: |
-                yarn workspace @duckdb/benchmarks bench:system:tpch:duckdb 0.01
-                yarn workspace @duckdb/benchmarks bench:system:tpch:sqljs 0.01
-                yarn workspace @duckdb/benchmarks bench:system:tpch:arquero 0.01
-                yarn workspace @duckdb/benchmarks bench:system:tpch:lovefield 0.01
+                yarn workspace @haybarn/benchmarks bench:system:tpch:duckdb 0.01
+                yarn workspace @haybarn/benchmarks bench:system:tpch:sqljs 0.01
+                yarn workspace @haybarn/benchmarks bench:system:tpch:arquero 0.01
+                yarn workspace @haybarn/benchmarks bench:system:tpch:lovefield 0.01
 
             - name: Upload reports TPCH 0.01
-              if: github.ref == 'refs/heads/main'
+              if: inputs.run_benchmarks
               uses: actions/upload-artifact@v7
               with:
                   name: reports_tpch_0_01
@@ -764,8 +883,8 @@ jobs:
                   retention-days: 1
 
             - name: Preparation TPCH 0.1
-              if: github.ref == 'refs/heads/main'
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              if: inputs.run_benchmarks
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       git config --global --add safe.directory '*'
@@ -777,16 +896,16 @@ jobs:
                       ./scripts/generate_tpch_sqlite.sh 0.1
 
             - name: Benchmarks TPCH 0.1
-              if: github.ref == 'refs/heads/main'
+              if: inputs.run_benchmarks
               shell: bash
               run: |
-                yarn workspace @duckdb/benchmarks bench:system:tpch:duckdb 0.1
-                yarn workspace @duckdb/benchmarks bench:system:tpch:sqljs 0.1
-                yarn workspace @duckdb/benchmarks bench:system:tpch:arquero 0.1
-                yarn workspace @duckdb/benchmarks bench:system:tpch:lovefield 0.1
+                yarn workspace @haybarn/benchmarks bench:system:tpch:duckdb 0.1
+                yarn workspace @haybarn/benchmarks bench:system:tpch:sqljs 0.1
+                yarn workspace @haybarn/benchmarks bench:system:tpch:arquero 0.1
+                yarn workspace @haybarn/benchmarks bench:system:tpch:lovefield 0.1
 
             - name: Upload reports TPCH 0.1
-              if: github.ref == 'refs/heads/main'
+              if: inputs.run_benchmarks
               uses: actions/upload-artifact@v7
               with:
                   name: reports_tpch_0_1
@@ -798,8 +917,8 @@ jobs:
                   retention-days: 1
 
             - name: Preparation TPCH 0.25
-              if: github.ref == 'refs/heads/main'
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              if: inputs.run_benchmarks
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       git config --global --add safe.directory '*'
@@ -811,16 +930,16 @@ jobs:
                       ./scripts/generate_tpch_sqlite.sh 0.25
 
             - name: Benchmarks TPCH 0.25
-              if: github.ref == 'refs/heads/main'
+              if: inputs.run_benchmarks
               shell: bash
               run: |
-                yarn workspace @duckdb/benchmarks bench:system:tpch:duckdb 0.25
-                yarn workspace @duckdb/benchmarks bench:system:tpch:sqljs 0.25
-                yarn workspace @duckdb/benchmarks bench:system:tpch:arquero 0.25
-                yarn workspace @duckdb/benchmarks bench:system:tpch:lovefield 0.25
+                yarn workspace @haybarn/benchmarks bench:system:tpch:duckdb 0.25
+                yarn workspace @haybarn/benchmarks bench:system:tpch:sqljs 0.25
+                yarn workspace @haybarn/benchmarks bench:system:tpch:arquero 0.25
+                yarn workspace @haybarn/benchmarks bench:system:tpch:lovefield 0.25
 
             - name: Upload reports TPCH 0.25
-              if: github.ref == 'refs/heads/main'
+              if: inputs.run_benchmarks
               uses: actions/upload-artifact@v7
               with:
                   name: reports_tpch_0_25
@@ -832,8 +951,8 @@ jobs:
                   retention-days: 1
 
             - name: Preparation TPCH 0.5
-              if: github.ref == 'refs/heads/main'
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              if: inputs.run_benchmarks
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       git config --global --add safe.directory '*'
@@ -845,16 +964,16 @@ jobs:
                       ./scripts/generate_tpch_sqlite.sh 0.5
 
             - name: Benchmarks TPCH 0.5
-              if: github.ref == 'refs/heads/main'
+              if: inputs.run_benchmarks
               shell: bash
               run: |
-                yarn workspace @duckdb/benchmarks bench:system:tpch:duckdb 0.5
-                yarn workspace @duckdb/benchmarks bench:system:tpch:sqljs 0.5
-                yarn workspace @duckdb/benchmarks bench:system:tpch:arquero 0.5
-                yarn workspace @duckdb/benchmarks bench:system:tpch:lovefield 0.5
+                yarn workspace @haybarn/benchmarks bench:system:tpch:duckdb 0.5
+                yarn workspace @haybarn/benchmarks bench:system:tpch:sqljs 0.5
+                yarn workspace @haybarn/benchmarks bench:system:tpch:arquero 0.5
+                yarn workspace @haybarn/benchmarks bench:system:tpch:lovefield 0.5
 
             - name: Upload reports TPCH 0.5
-              if: github.ref == 'refs/heads/main'
+              if: inputs.run_benchmarks
               uses: actions/upload-artifact@v7
               with:
                   name: reports_tpch_0_5
@@ -871,7 +990,6 @@ jobs:
         needs:
             - wasm_base_loadable
             - wasm_threads_loadable
-            - clang_format
             - eslint
         steps:
             - uses: actions/checkout@v6
@@ -881,7 +999,7 @@ jobs:
 
             - uses: actions/setup-node@v6
               with:
-                  node-version: '18.x'
+                  node-version: '24'
                   registry-url: 'https://registry.npmjs.org'
 
             - name: Git submodule status
@@ -949,7 +1067,7 @@ jobs:
                   (cd ./submodules/duckdb && git fetch --all --tags)
 
             - name: Prepare environment
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       git config --global --add safe.directory '*'
@@ -962,30 +1080,30 @@ jobs:
                       ./scripts/generate_uni.sh
                       ./scripts/npm_version.sh
 
-            - name: Build @duckdb/duckdb-wasm
+            - name: Build @haybarn/haybarn-wasm
               shell: bash
               run: |
                       rm -rf ./packages/duckdb-wasm/dist/
-                      yarn workspace @duckdb/duckdb-wasm build:release
-                      yarn workspace @duckdb/duckdb-wasm docs
+                      yarn workspace @haybarn/haybarn-wasm build:release
+                      yarn workspace @haybarn/haybarn-wasm docs
 
-            - name: Build @duckdb/duckdb-wasm-shell
+            - name: Build @haybarn/haybarn-wasm-shell
               shell: bash
               run: |
                       rm -rf ./packages/duckdb-wasm-shell/dist/
-                      yarn workspace @duckdb/duckdb-wasm-shell install:wasmpack
-                      yarn workspace @duckdb/duckdb-wasm-shell build:release
+                      yarn workspace @haybarn/haybarn-wasm-shell install:wasmpack
+                      yarn workspace @haybarn/haybarn-wasm-shell build:release
 
-            - name: Build @duckdb/duckdb-wasm-app
+            - name: Build @haybarn/haybarn-wasm-app
               shell: bash
               run: |
                       rm -rf ./packages/duckdb-wasm-app/build/
-                      yarn workspace @duckdb/duckdb-wasm-app build:release
+                      yarn workspace @haybarn/haybarn-wasm-app build:release
 
-            #- name: Coverage @duckdb/duckdb-wasm
+            #- name: Coverage @haybarn/haybarn-wasm
             #  shell: bash
             #  run: |
-            #           CHROME_BIN=`which google-chrome` yarn workspace @duckdb/duckdb-wasm test:chrome:coverage
+            #           CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:coverage
 
             - name: Package
               shell: bash
@@ -1000,26 +1118,27 @@ jobs:
               run: |
                   ./scripts/npm_measure_lib.sh
 
-            - name: Test @duckdb/duckdb-wasm on Chrome
+            - name: Test @haybarn/haybarn-wasm on Chrome
               shell: bash
               run: |
-                      CHROME_BIN=`which google-chrome` yarn workspace @duckdb/duckdb-wasm test:chrome
+                      CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome
 
             - name: Test loadable threaded bundle on Chrome
               shell: bash
               run: |
-                      CHROME_BIN=`which google-chrome` yarn workspace @duckdb/duckdb-wasm test:chrome:threads:smoke
+                      CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:threads:smoke
 
-            #            - name: Test @duckdb/duckdb-wasm on Firefox
-            #              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+
+            #            - name: Test @haybarn/haybarn-wasm on Firefox
+            #              uses: ./.github/actions/haybarn-wasm-ci-env
             #              with:
             #                  script: |-
-            #                      yarn workspace @duckdb/duckdb-wasm test:firefox
+            #                      yarn workspace @haybarn/haybarn-wasm test:firefox
 
-            - name: Test @duckdb/duckdb-wasm on Node.js
+            - name: Test @haybarn/haybarn-wasm on Node.js
               shell: bash
               run: |
-                      yarn workspace @duckdb/duckdb-wasm test:node
+                      yarn workspace @haybarn/haybarn-wasm test:node
 
             - name: Deploy GitHub Page
               if: false
@@ -1028,10 +1147,14 @@ jobs:
                   git fetch origin gh-pages
                   ./scripts/deploy_pages.sh
 
+    # Haybarn: the release job. It runs only for the creation of a haybarn-v2.* tag, so no push to
+    # a branch (haybarn-2.0 included), pull request or manual dispatch can publish. 1.5 releases
+    # come from haybarn-v1.* tags, whose own (1.5) workflow file runs.
     js_libs_loadable_deploy:
         name: Js / Libraries (loadable version) - Deploy
         runs-on: ubuntu-latest
-        permissions: # only this job has permission to upload to npm using trusted publishing
+        if: github.event_name == 'create' && startsWith(github.ref, 'refs/tags/haybarn-v2.')
+        permissions: # provenance for the npm publish
             id-token: write  # Required for OIDC
             contents: read
         needs:
@@ -1112,7 +1235,7 @@ jobs:
                   (cd ./submodules/duckdb && git fetch --all --tags)
 
             - name: Prepare environment
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       git config --global --add safe.directory '*'
@@ -1125,30 +1248,30 @@ jobs:
                       ./scripts/generate_uni.sh
                       ./scripts/npm_version.sh
 
-            - name: Build @duckdb/duckdb-wasm
+            - name: Build @haybarn/haybarn-wasm
               shell: bash
               run: |
                       rm -rf ./packages/duckdb-wasm/dist/
-                      yarn workspace @duckdb/duckdb-wasm build:release
-                      yarn workspace @duckdb/duckdb-wasm docs
+                      yarn workspace @haybarn/haybarn-wasm build:release
+                      yarn workspace @haybarn/haybarn-wasm docs
 
-            - name: Build @duckdb/duckdb-wasm-shell
+            - name: Build @haybarn/haybarn-wasm-shell
               shell: bash
               run: |
                       rm -rf ./packages/duckdb-wasm-shell/dist/
-                      yarn workspace @duckdb/duckdb-wasm-shell install:wasmpack
-                      yarn workspace @duckdb/duckdb-wasm-shell build:release
+                      yarn workspace @haybarn/haybarn-wasm-shell install:wasmpack
+                      yarn workspace @haybarn/haybarn-wasm-shell build:release
 
-            - name: Build @duckdb/duckdb-wasm-app
+            - name: Build @haybarn/haybarn-wasm-app
               shell: bash
               run: |
                       rm -rf ./packages/duckdb-wasm-app/build/
-                      yarn workspace @duckdb/duckdb-wasm-app build:release
+                      yarn workspace @haybarn/haybarn-wasm-app build:release
 
-            #- name: Coverage @duckdb/duckdb-wasm
+            #- name: Coverage @haybarn/haybarn-wasm
             #  shell: bash
             #  run: |
-            #           CHROME_BIN=`which google-chrome` yarn workspace @duckdb/duckdb-wasm test:chrome:coverage
+            #           CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:coverage
 
             - name: Package
               shell: bash
@@ -1158,46 +1281,37 @@ jobs:
               run: |
                   ./scripts/npm_measure_lib.sh
 
-            - name: Test @duckdb/duckdb-wasm on Chrome
+            - name: Test @haybarn/haybarn-wasm on Chrome
               shell: bash
               run: |
-                      CHROME_BIN=`which google-chrome` yarn workspace @duckdb/duckdb-wasm test:chrome
+                      CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome
             
-            #            - name: Test @duckdb/duckdb-wasm on Firefox
-            #              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+            #            - name: Test @haybarn/haybarn-wasm on Firefox
+            #              uses: ./.github/actions/haybarn-wasm-ci-env
             #              with:
             #                  script: |-
-            #                      yarn workspace @duckdb/duckdb-wasm test:firefox
+            #                      yarn workspace @haybarn/haybarn-wasm test:firefox
 
-            - name: Test @duckdb/duckdb-wasm on Node.js
+            - name: Test @haybarn/haybarn-wasm on Node.js
               shell: bash
               run: |
-                      yarn workspace @duckdb/duckdb-wasm test:node
+                      yarn workspace @haybarn/haybarn-wasm test:node
 
-            - name: Publish to NPM
-              env:
-                  TAG: 'next'
-              if: github.ref == 'refs/heads/main'
-              run: |
-                  echo "${TAG}"
-                  ./scripts/npm_publish_lib.sh
-                  ./scripts/npm_publish_shell.sh
-                  ./scripts/npm_publish_react.sh
-
-            - name: Publish to NPM on tag
+            # Publish @haybarn/haybarn-wasm with the org-level HAYBARN_NPM_TOKEN (provenance comes from
+            # the job's id-token permission). The other workspace packages are private and never published.
+            - name: Publish @haybarn/haybarn-wasm to npm
               env:
                   TAG: 'latest'
-              if: github.event_name == 'create'
+                  NODE_AUTH_TOKEN: ${{ secrets.HAYBARN_NPM_TOKEN }}
+              if: github.event_name == 'create' && startsWith(github.ref, 'refs/tags/haybarn-v2.')
               run: |
-                  echo "${TAG}"
+                  echo "TAG=${TAG} ref=${GITHUB_REF}"
                   ./scripts/npm_publish_lib.sh
-                  ./scripts/npm_publish_shell.sh
-                  ./scripts/npm_publish_react.sh
 
     merge_reports:
         name: Merge benchmark reports
         runs-on: ubuntu-latest
-        if: github.ref == 'refs/heads/main'
+        if: inputs.run_benchmarks
         needs:
             - js_libs
         steps:
@@ -1256,7 +1370,7 @@ jobs:
                   retention-days: 1
 
             - name: Merge benchmark reports
-              uses: duckdb/duckdb-wasm-ci-env@f10a0954b7b2b98e8526e0f7bbcb10e614defcbd
+              uses: ./.github/actions/haybarn-wasm-ci-env
               with:
                   script: |-
                       chmod +x ./target/release/dataprep
@@ -1270,8 +1384,9 @@ jobs:
                       ./reports/benchmarks.arrow
                   retention-days: 1
 
+            # Haybarn: no gh-pages branch, so the reports are only uploaded as artifacts.
             - name: Deploy benchmark reports
-              if: github.ref == 'refs/heads/main'
+              if: false
               run: |
                   git config --global user.name 'github-actions[bot]'
                   git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
