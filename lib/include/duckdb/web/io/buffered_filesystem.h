@@ -7,6 +7,7 @@
 #include "duckdb/common/constants.hpp"
 #include "duckdb/common/file_system.hpp"
 #include "duckdb/common/optional_ptr.hpp"
+#include "duckdb/common/shared_ptr.hpp"
 #include "duckdb/common/vector.hpp"
 #include "duckdb/web/io/file_page_buffer.h"
 #include "duckdb/web/utils/parallel.h"
@@ -23,6 +24,8 @@ class BufferedFileHandle : public duckdb::FileHandle {
     std::shared_ptr<FilePageBuffer::FileRef> file_ref_;
     /// The file position
     uint64_t file_position_;
+    /// The client context of the opener, whose interrupt aborts the runtime's HTTP requests for the handle's reads
+    duckdb::weak_ptr<duckdb::ClientContext> request_context_;
 
     /// Close the file
     void Close() override;

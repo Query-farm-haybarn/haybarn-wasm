@@ -1,5 +1,8 @@
 #include "duckdb/web/http_fetch.h"
 
+#include "duckdb/common/file_opener.hpp"
+#include "duckdb/main/client_context.hpp"
+
 #include <atomic>
 #include <chrono>
 #include <climits>
@@ -14,6 +17,45 @@
 
 namespace duckdb {
 namespace web {
+
+namespace {
+thread_local duckdb::weak_ptr<ClientContext> current_request_context;
+}  // namespace
+
+RuntimeRequestContext::Scope::Scope(const duckdb::weak_ptr<ClientContext> &context) {
+    if (context.expired()) return;
+    set_ = true;
+    previous_ = current_request_context;
+    current_request_context = context;
+}
+
+RuntimeRequestContext::Scope::~Scope() {
+    if (set_) current_request_context = previous_;
+}
+
+duckdb::weak_ptr<ClientContext> RuntimeRequestContext::Current() { return current_request_context; }
+
+duckdb::weak_ptr<ClientContext> RuntimeRequestContext::Of(optional_ptr<FileOpener> opener) {
+    auto context = FileOpener::TryGetClientContext(opener);
+    if (!context) return {};
+    return context->shared_from_this();
+}
+
+bool RuntimeRequestContext::Interrupted() {
+    auto context = current_request_context.lock();
+    return context && context->IsInterrupted();
+}
+
+/// Perform a request of the JS runtime (runtime_http.ts) through the fetch helper, on the main thread inside a
+/// runtime call. The request is aborted when the query of the current request context is interrupted. Writes the
+/// FetchOutcome to `outcome` and returns the response buffer for OK; UNAVAILABLE means: use XHR.
+extern "C" char *duckdb_web_http_fetch_runtime(const char *url, const char *method, char **headers, int header_count,
+                                               const char *body, int body_len, int32_t *outcome) {
+    auto result = FetchViaHelper(url, method, headers, header_count, body, body_len,
+                                 [] { return RuntimeRequestContext::Interrupted(); }, 0);
+    *outcome = static_cast<int32_t>(result.outcome);
+    return result.buffer;
+}
 
 #if defined(__EMSCRIPTEN_PTHREADS__)
 namespace {
