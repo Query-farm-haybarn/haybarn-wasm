@@ -5,6 +5,9 @@
 #
 #   ghcr.io/query-farm-haybarn/haybarn-wasm-base:v<engine-version>
 #
+# For the 2.0 line that is haybarn-wasm-base:v2.0.0 (emscripten 6.0.13), built
+# by haybarn-extension-ci-tools haybarn-2.0's publish-build-images.yml.
+#
 # The tag is *derived*, not pinned — see the "Resolve base image" step.
 # The image is rebuilt once per engine release train (v1.5.4, v1.5.5, …)
 # and its tag carries the same `<major>.<minor>.<patch>` as the workspace

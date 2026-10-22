@@ -43,10 +43,6 @@ env:
   # DuckDB >= v2.0 no longer derives its version from git tags, the wasm builds pick this up instead.
   # Haybarn: always the engine release, so extensions resolve under core/v2.0.0/ on every build.
   OVERRIDE_GIT_DESCRIBE: ${{ inputs.override_git_describe || 'v2.0.0' }}
-  # The image the JS and data-prep steps run in (.github/actions/haybarn-wasm-ci-env). Those steps
-  # only need node, yarn, rust and a C toolchain; the wasm modules are compiled on the runner with
-  # the emsdk pinned above, so the 1.5 image is fine until a 2.0 one is published.
-  HAYBARN_WASM_CI_IMAGE: 'ghcr.io/query-farm-haybarn/haybarn-wasm-base:v1.5.6'
   # Placeholder npm token. `actions/setup-node` with `registry-url:` writes an .npmrc containing a
   # literal `${NODE_AUTH_TOKEN}`, and yarn 1.x hard-errors ("Failed to replace env in config") if
   # it is unset. The publish step sets the real HAYBARN_NPM_TOKEN at step level.
