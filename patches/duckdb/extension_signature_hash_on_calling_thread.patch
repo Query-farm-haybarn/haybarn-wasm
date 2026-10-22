@@ -1,0 +1,16 @@
+diff --git a/src/main/extension/extension_load.cpp b/src/main/extension/extension_load.cpp
+index dc5b9ec9c0a..31c69096489 100644
+--- a/src/main/extension/extension_load.cpp
++++ b/src/main/extension/extension_load.cpp
+@@ -320,7 +320,10 @@ static void ComputeSHA256FileSegment(FileHandle *handle, const idx_t start, cons
+ template <typename T, typename F>
+ static void ComputeHashesOnSegments(F ComputeHashFun, T handle, const vector<idx_t> &splits,
+                                     vector<string> &hash_chunks) {
+-#ifndef DUCKDB_NO_THREADS
++	// DuckDB-Wasm: hash on the calling thread. A thread per MiB can exhaust the threads bundle's pthread pool,
++	// and a worker the pool has to add starts only once the main thread returns to its event loop, which it
++	// does not while it serves the load: LOAD of an extension over ~4 MiB with signature checks hangs.
++#if !defined(DUCKDB_NO_THREADS) && !defined(__EMSCRIPTEN__)
+ 	vector<std::thread> threads;
+ 	threads.reserve(hash_chunks.size());
+ 	for (idx_t i = 0; i < hash_chunks.size(); i++) {
