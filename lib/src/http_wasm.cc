@@ -58,7 +58,7 @@ class HTTPWasmClient : public HTTPClient {
         char *exe = NULL;
         exe = (char *)EM_ASM_PTR(
             {
-                var url = (UTF8ToString($0));
+                var url = (UTF8ToString($0 >>> 0));
                 if (typeof XMLHttpRequest === "undefined") {
                     return 0;
                 }
@@ -66,14 +66,14 @@ class HTTPWasmClient : public HTTPClient {
 		if (false && url.startsWith("http://")) {
 			url = "https://" + url.substr(7);
 		}
-                xhr.open(UTF8ToString($3), url, false);
+                xhr.open(UTF8ToString($3 >>> 0), url, false);
                 xhr.responseType = "arraybuffer";
 
                 var i = 0;
                 var len = $1;
                 while (i < len*2) {
-                    var ptr1 = HEAP32[($2)/4 + i ];
-                    var ptr2 = HEAP32[($2)/4 + i + 1];
+                    var ptr1 = HEAPU32[(($2 >>> 0) >>> 2) + i];
+                    var ptr2 = HEAPU32[(($2 >>> 0) >>> 2) + i + 1];
 
                     try {
 			var z = encodeURI(UTF8ToString(ptr1));
@@ -104,7 +104,7 @@ class HTTPWasmClient : public HTTPClient {
                 if (!uInt8Array) uInt8Array = new ArrayBuffer(0);
 
                 var len = uInt8Array.byteLength;
-                var fileOnWasmHeap = _malloc(len + 8);
+                var fileOnWasmHeap = _malloc(len + 8) >>> 0;
 
                 var properArray = new Uint8Array(uInt8Array);
 
@@ -129,7 +129,7 @@ class HTTPWasmClient : public HTTPClient {
 
 		var headers = Uint8Array.from(Array.from(xhr.getAllResponseHeaders()).map(letter => letter.charCodeAt(0)));
 		len = headers.byteLength;
-                var headersOnWasmHeap = _malloc(len + 8);
+                var headersOnWasmHeap = _malloc(len + 8) >>> 0;
                 for (var iii = 0; iii < len; iii++) {
                     Module.HEAPU8[iii + headersOnWasmHeap + 8] = headers[iii];
                 }
@@ -317,7 +317,7 @@ class HTTPWasmClient : public HTTPClient {
         char *exe = NULL;
         exe = (char *)EM_ASM_PTR(
             {
-                var url = (UTF8ToString($0));
+                var url = (UTF8ToString($0 >>> 0));
                 if (typeof XMLHttpRequest === "undefined") {
                     return 0;
                 }
@@ -325,14 +325,14 @@ class HTTPWasmClient : public HTTPClient {
 		if (false && url.startsWith("http://")) {
 			url = "https://" + url.substr(7);
 		}
-                xhr.open(UTF8ToString($3), url, false);
+                xhr.open(UTF8ToString($3 >>> 0), url, false);
                 xhr.responseType = "arraybuffer";
 
                 var i = 0;
                 var len = $1;
                 while (i < len*2) {
-                    var ptr1 = HEAP32[($2)/4 + i ];
-                    var ptr2 = HEAP32[($2)/4 + i + 1];
+                    var ptr1 = HEAPU32[(($2 >>> 0) >>> 2) + i];
+                    var ptr2 = HEAPU32[(($2 >>> 0) >>> 2) + i + 1];
 
                     try {
 			var z = encodeURI(UTF8ToString(ptr1));
@@ -360,7 +360,7 @@ class HTTPWasmClient : public HTTPClient {
                 var uInt8Array = xhr.response;
                 if (!uInt8Array) uInt8Array = new ArrayBuffer(0);
                 var len = uInt8Array.byteLength;
-                var fileOnWasmHeap = _malloc(len + 8);
+                var fileOnWasmHeap = _malloc(len + 8) >>> 0;
 
                 var properArray = new Uint8Array(uInt8Array);
 
@@ -385,7 +385,7 @@ class HTTPWasmClient : public HTTPClient {
 
 		var headers = Uint8Array.from(Array.from(xhr.getAllResponseHeaders()).map(letter => letter.charCodeAt(0)));
 		len = headers.byteLength;
-                var headersOnWasmHeap = _malloc(len + 8);
+                var headersOnWasmHeap = _malloc(len + 8) >>> 0;
                 for (var iii = 0; iii < len; iii++) {
                     Module.HEAPU8[iii + headersOnWasmHeap + 8] = headers[iii];
                 }
@@ -583,7 +583,7 @@ res->headers.Insert(head, tail);
         char *exe = NULL;
         exe = (char *)EM_ASM_PTR(
             {
-                var url = (UTF8ToString($0));
+                var url = (UTF8ToString($0 >>> 0));
                 if (typeof XMLHttpRequest === "undefined") {
                     return 0;
                 }
@@ -591,14 +591,14 @@ res->headers.Insert(head, tail);
 		if (false && url.startsWith("http://")) {
 			url = "https://" + url.substr(7);
 		}
-                xhr.open(UTF8ToString($3), url, false);
+                xhr.open(UTF8ToString($3 >>> 0), url, false);
                 xhr.responseType = "arraybuffer";
 
                 var i = 0;
                 var len = $1;
                 while (i < len*2) {
-                    var ptr1 = HEAP32[($2)/4 + i ];
-                    var ptr2 = HEAP32[($2)/4 + i + 1];
+                    var ptr1 = HEAPU32[(($2 >>> 0) >>> 2) + i];
+                    var ptr2 = HEAPU32[(($2 >>> 0) >>> 2) + i + 1];
 
                     try {
 			var z = encodeURI(UTF8ToString(ptr1));
@@ -622,7 +622,7 @@ res->headers.Insert(head, tail);
 			var post_payload = new Uint8Array($5);
 
 			for (var iii = 0; iii < $5; iii++) {
-				post_payload[iii] = Module.HEAPU8[iii + $4];
+				post_payload[iii] = Module.HEAPU8[iii + ($4 >>> 0)];
 			}
 			xhr.send(post_payload);
                 } catch {
@@ -633,7 +633,7 @@ res->headers.Insert(head, tail);
                 if (!uInt8Array) uInt8Array = new ArrayBuffer(0);
 
                 var len = uInt8Array.byteLength;
-                var fileOnWasmHeap = _malloc(len + 8);
+                var fileOnWasmHeap = _malloc(len + 8) >>> 0;
 
                 var properArray = new Uint8Array(uInt8Array);
 
@@ -758,7 +758,7 @@ res->headers.Insert(head, tail);
         char *exe = NULL;
         exe = (char *)EM_ASM_PTR(
             {
-                var url = (UTF8ToString($0));
+                var url = (UTF8ToString($0 >>> 0));
                 if (typeof XMLHttpRequest === "undefined") {
                     return 0;
                 }
@@ -766,15 +766,15 @@ res->headers.Insert(head, tail);
 		if (false && url.startsWith("http://")) {
 			url = "https://" + url.substr(7);
 		}
-                xhr.open(UTF8ToString($3), url, false);
+                xhr.open(UTF8ToString($3 >>> 0), url, false);
                 xhr.responseType = "arraybuffer";
 
                 var i = 0;
                 var len = $1;
                 var hasContentType = false;
                 while (i < len*2) {
-                    var ptr1 = HEAP32[($2)/4 + i ];
-                    var ptr2 = HEAP32[($2)/4 + i + 1];
+                    var ptr1 = HEAPU32[(($2 >>> 0) >>> 2) + i];
+                    var ptr2 = HEAPU32[(($2 >>> 0) >>> 2) + i + 1];
 
                     try {
 			var z = encodeURI(UTF8ToString(ptr1));
@@ -806,7 +806,7 @@ res->headers.Insert(head, tail);
 			var post_payload = new Uint8Array($5);
 
 			for (var iii = 0; iii < $5; iii++) {
-				post_payload[iii] = Module.HEAPU8[iii + $4];
+				post_payload[iii] = Module.HEAPU8[iii + ($4 >>> 0)];
 			}
 			xhr.send(post_payload);
                 } catch {
@@ -823,7 +823,7 @@ res->headers.Insert(head, tail);
                 }
 
                 var len = uInt8Array.byteLength;
-                var fileOnWasmHeap = _malloc(len + 8);
+                var fileOnWasmHeap = _malloc(len + 8) >>> 0;
 
                 var properArray = new Uint8Array(uInt8Array);
 
@@ -950,7 +950,7 @@ res->headers.Insert(head, tail);
         char *exe = NULL;
         exe = (char *)EM_ASM_PTR(
             {
-                var url = (UTF8ToString($0));
+                var url = (UTF8ToString($0 >>> 0));
                 if (typeof XMLHttpRequest === "undefined") {
                     return 0;
                 }
@@ -958,14 +958,14 @@ res->headers.Insert(head, tail);
 		if (false && url.startsWith("http://")) {
 			url = "https://" + url.substr(7);
 		}
-                xhr.open(UTF8ToString($3), url, false);
+                xhr.open(UTF8ToString($3 >>> 0), url, false);
                 xhr.responseType = "arraybuffer";
 
                 var i = 0;
                 var len = $1;
                 while (i < len*2) {
-                    var ptr1 = HEAP32[($2)/4 + i ];
-                    var ptr2 = HEAP32[($2)/4 + i + 1];
+                    var ptr1 = HEAPU32[(($2 >>> 0) >>> 2) + i];
+                    var ptr2 = HEAPU32[(($2 >>> 0) >>> 2) + i + 1];
 
                     try {
 			var z = encodeURI(UTF8ToString(ptr1));
@@ -993,7 +993,7 @@ res->headers.Insert(head, tail);
                 if (!uInt8Array) uInt8Array = new ArrayBuffer(0);
 
                 var len = uInt8Array.byteLength;
-                var fileOnWasmHeap = _malloc(len + 8);
+                var fileOnWasmHeap = _malloc(len + 8) >>> 0;
 
                 var properArray = new Uint8Array(uInt8Array);
 
