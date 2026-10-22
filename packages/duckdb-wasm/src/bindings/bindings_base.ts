@@ -221,7 +221,7 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
      * nothing was changed.
      */
     private enterSingleThreadedExtensionLoad(conn: number, text: string): number | null {
-        if (this._config?.singleThreadedExtensionLoad === false || !DuckDBBindingsBase.EXTENSION_LOAD_RE.test(text)) {
+        if (this._config?.singleThreadedExtensionLoad !== true || !DuckDBBindingsBase.EXTENSION_LOAD_RE.test(text)) {
             return null;
         }
         const previous = this.readThreadsSetting(conn);

@@ -113,14 +113,13 @@ export interface DuckDBConfig {
     /**
      * Haybarn: run extension `LOAD`/`INSTALL` statements with the task scheduler pinned to a single thread.
      *
-     * On the threads bundle an extension LOAD fetches and opens the side module on the main thread while the
-     * scheduler's worker threads are live, which intermittently deadlocks (roughly one load in three with remote
-     * extensions). When enabled, the bindings bracket each `LOAD`/`INSTALL` with `SET threads=1` ... `SET
-     * threads=<previous>`, so the load runs with no background workers. Autoloads inside other statements are not
-     * covered.
+     * When enabled, the bindings bracket each statement that starts with `LOAD`/`INSTALL` with `SET threads=1` ...
+     * `SET threads=<previous>`. It was the workaround for an intermittent deadlock of extension loads on the threads
+     * bundle: the query thread spun while a scheduler thread ran the load, so it never synced the side module the
+     * main thread opened. The engine now waits instead of spinning (`wait_for_tasks_instead_of_spinning.patch`), and
+     * loads, autoloads inside queries included, no longer need the bracket.
      *
-     * Defaults to enabled. A no-op on the base bundle and whenever `threads` is already 1. Set to `false` to opt
-     * out.
+     * Defaults to disabled. A no-op on the base bundle and whenever `threads` is already 1.
      */
     singleThreadedExtensionLoad?: boolean;
 }
