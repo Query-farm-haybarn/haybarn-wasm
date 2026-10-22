@@ -11,8 +11,8 @@ if [ ! -d ${PAGES_DIR} ]; then
     git worktree add ${PAGES_DIR} origin/gh-pages
 fi
 
-DEFAULT_BRANCH="main"
-CURRENT_BRANCH=${1:-main}
+DEFAULT_BRANCH="haybarn"
+CURRENT_BRANCH=${1:-haybarn}
 
 cd ${PAGES_DIR}
 git fetch origin gh-pages
@@ -40,8 +40,8 @@ if [ "${CURRENT_BRANCH}" = "${DEFAULT_BRANCH}" ]; then
     cp -r ${PROJECT_ROOT}/misc/*.svg ${PAGES_DIR}/misc/
     cp -r ${PROJECT_ROOT}/misc/*.png ${PAGES_DIR}/misc/
 
-    echo "[ RUN ] Install DuckDB version badge to ${TARGET_DIR}/misc"
-    ${PROJECT_ROOT}/scripts/build_duckdb_badge.sh > ${PAGES_DIR}/misc/duckdb_version_badge.svg
+    echo "[ RUN ] Install Haybarn version badge to ${TARGET_DIR}/misc"
+    ${PROJECT_ROOT}/scripts/build_haybarn_badge.sh > ${PAGES_DIR}/misc/haybarn_version_badge.svg
 else
     TARGET_DIR="${PAGES_DIR}/branches/${CURRENT_BRANCH}"
     echo "[ RUN ] Install @haybarn/haybarn-wasm-app to ${TARGET_DIR}/"
