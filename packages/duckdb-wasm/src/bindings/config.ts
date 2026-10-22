@@ -110,4 +110,17 @@ export interface DuckDBConfig {
      * opfs string
      */
     opfs?: DuckDBOPFSConfig;
+    /**
+     * Haybarn: run extension `LOAD`/`INSTALL` statements with the task scheduler pinned to a single thread.
+     *
+     * On the threads bundle an extension LOAD fetches and opens the side module on the main thread while the
+     * scheduler's worker threads are live, which intermittently deadlocks (roughly one load in three with remote
+     * extensions). When enabled, the bindings bracket each `LOAD`/`INSTALL` with `SET threads=1` ... `SET
+     * threads=<previous>`, so the load runs with no background workers. Autoloads inside other statements are not
+     * covered.
+     *
+     * Defaults to enabled. A no-op on the base bundle and whenever `threads` is already 1. Set to `false` to opt
+     * out.
+     */
+    singleThreadedExtensionLoad?: boolean;
 }

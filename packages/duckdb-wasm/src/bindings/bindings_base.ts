@@ -69,6 +69,10 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
     protected _initPromiseResolver: () => void = () => {};
     /** The next UDF id */
     protected _nextUDFId: number;
+    /** The config the database was opened with */
+    protected _config: DuckDBConfig | null = null;
+    /** Haybarn: the thread count to restore per connection once its pending extension load is done */
+    protected _pendingThreadRestores: Map<number, number> = new Map();
 
     constructor(logger: Logger, runtime: DuckDBRuntime) {
         this._logger = logger;
@@ -133,6 +137,7 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
             throw new Error(readString(this.mod, d, n));
         }
         dropResponseBuffers(this.mod);
+        this._config = config;
     }
 
     /** Reset the database */
@@ -191,7 +196,67 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
     }
 
     /** Send a query and return the full result */
+    /**
+     * Haybarn: matches a script that begins with an extension `LOAD`/`INSTALL` (optionally `FORCE INSTALL`), after
+     * whitespace and SQL comments. Anchored, so `load`/`install` as identifiers elsewhere don't match.
+     */
+    private static readonly EXTENSION_LOAD_RE =
+        /^\s*(?:--[^\n]*\n\s*|\/\*[\s\S]*?\*\/\s*)*(?:force\s+)?(?:install|load)\b/i;
+
+    /** Read the `threads` setting, null if it cannot be read */
+    private readThreadsSetting(conn: number): number | null {
+        try {
+            const table = arrow.tableFromIPC(this.runQueryImpl(conn, "SELECT current_setting('threads')"));
+            const value = table.numRows > 0 ? table.getChildAt(0)?.get(0) : null;
+            return value === null || value === undefined ? null : Number(value);
+        } catch (e) {
+            console.warn(`singleThreadedExtensionLoad: failed to read 'threads': ${e}`);
+            return null;
+        }
+    }
+
+    /**
+     * Haybarn: pin the scheduler to one thread for an extension `LOAD`/`INSTALL`, see
+     * `DuckDBConfig.singleThreadedExtensionLoad`. Returns the thread count to restore afterwards, or null when
+     * nothing was changed.
+     */
+    private enterSingleThreadedExtensionLoad(conn: number, text: string): number | null {
+        if (this._config?.singleThreadedExtensionLoad === false || !DuckDBBindingsBase.EXTENSION_LOAD_RE.test(text)) {
+            return null;
+        }
+        const previous = this.readThreadsSetting(conn);
+        if (previous === null || previous <= 1) {
+            return null;
+        }
+        this.runQueryImpl(conn, 'SET threads=1');
+        return previous;
+    }
+
+    /** Restore the thread count an extension load pinned */
+    private leaveSingleThreadedExtensionLoad(conn: number, previous: number | null): void {
+        if (previous !== null) {
+            this.runQueryImpl(conn, `SET threads=${previous}`);
+        }
+    }
+
+    /** Restore the thread count of a pending extension load once it is done */
+    private finishPendingThreadRestore(conn: number): void {
+        const previous = this._pendingThreadRestores.get(conn);
+        if (previous !== undefined) {
+            this._pendingThreadRestores.delete(conn);
+            this.leaveSingleThreadedExtensionLoad(conn, previous);
+        }
+    }
+
     public runQuery(conn: number, text: string): Uint8Array {
+        const previous = this.enterSingleThreadedExtensionLoad(conn, text);
+        try {
+            return this.runQueryImpl(conn, text);
+        } finally {
+            this.leaveSingleThreadedExtensionLoad(conn, previous);
+        }
+    }
+    private runQueryImpl(conn: number, text: string): Uint8Array {
         const BUF = TEXT_ENCODER.encode(text);
         const bufferPtr = (this.mod._malloc(BUF.length) >>> 0);
         const bufferOfs = this.mod.HEAPU8.subarray(bufferPtr, bufferPtr + BUF.length);
@@ -217,6 +282,24 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
      *  Results can then be fetched using `fetchQueryResults`
      */
     public startPendingQuery(conn: number, text: string, allowStreamResult: boolean = false): Uint8Array | null {
+        // A pending load can still be running when the start returns: the thread count is restored only once the
+        // query is done (the start or a poll returns a result or fails, or the query is cancelled)
+        const previous = this.enterSingleThreadedExtensionLoad(conn, text);
+        let result: Uint8Array | null;
+        try {
+            result = this.startPendingQueryImpl(conn, text, allowStreamResult);
+        } catch (e) {
+            this.leaveSingleThreadedExtensionLoad(conn, previous);
+            throw e;
+        }
+        if (result !== null) {
+            this.leaveSingleThreadedExtensionLoad(conn, previous);
+        } else if (previous !== null) {
+            this._pendingThreadRestores.set(conn, previous);
+        }
+        return result;
+    }
+    private startPendingQueryImpl(conn: number, text: string, allowStreamResult: boolean): Uint8Array | null {
         const BUF = TEXT_ENCODER.encode(text);
         const bufferPtr = (this.mod._malloc(BUF.length) >>> 0);
         const bufferOfs = this.mod.HEAPU8.subarray(bufferPtr, bufferPtr + BUF.length);
@@ -242,18 +325,23 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
     public pollPendingQuery(conn: number): Uint8Array | null {
         const [s, d, n] = callSRet(this.mod, 'duckdb_web_pending_query_poll', ['number'], [conn]);
         if (s !== StatusCode.SUCCESS) {
-            throw new Error(readString(this.mod, d, n));
+            const message = readString(this.mod, d, n);
+            this.finishPendingThreadRestore(conn);
+            throw new Error(message);
         }
         if (d == 0) {
             return null;
         }
         const res = copyBuffer(this.mod, d, n);
         dropResponseBuffers(this.mod);
+        this.finishPendingThreadRestore(conn);
         return res;
     }
     /** Cancel a pending query */
     public cancelPendingQuery(conn: number): boolean {
-        return this.mod.ccall('duckdb_web_pending_query_cancel', 'boolean', ['number'], [conn]);
+        const cancelled = this.mod.ccall('duckdb_web_pending_query_cancel', 'boolean', ['number'], [conn]);
+        this.finishPendingThreadRestore(conn);
+        return cancelled;
     }
     /** Fetch query results */
     public fetchQueryResults(conn: number): Uint8Array | null {
