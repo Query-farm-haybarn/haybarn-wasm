@@ -16,6 +16,7 @@ import { ScriptTokens } from '../bindings/tokens';
 import { FileStatistics } from '../bindings/file_stats';
 import { DuckDBConfig } from '../bindings/config';
 import { InstantiationProgress } from '../bindings/progress';
+import { InterruptHandle, interruptConnection } from '../bindings/interrupt';
 import { arrowToSQLField } from '../json_typedef';
 import { WebFile } from '../bindings/web_file';
 import { DuckDBDataProtocol } from '../bindings';
@@ -53,6 +54,10 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
     protected _pendingRequests: Map<number, WorkerTaskVariant> = new Map();
     /** The DuckDBConfig */
     protected _config: DuckDBConfig = {};
+    /** The interrupt flags of the connections, fetched when they connect (threads bundle only) */
+    protected _interruptHandles: Map<ConnectionID, InterruptHandle> = new Map();
+    /** The connections with a pending query */
+    protected _pendingQueries: Set<ConnectionID> = new Set();
 
     constructor(logger: Logger, worker: Worker | null = null) {
         this._logger = logger;
@@ -100,6 +105,7 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
     /** Kill the worker */
     public async terminate(): Promise<void> {
         if (!this._worker) return;
+        this.forgetConnections();
         this._worker.terminate();
         //await this._workerShutdownPromise; TODO deadlocking in karma?
         this._worker = null;
@@ -291,6 +297,12 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
                     return;
                 }
                 break;
+            case WorkerRequestType.GET_INTERRUPT_HANDLE:
+                if (response.type == WorkerResponseType.INTERRUPT_HANDLE) {
+                    task.promiseResolver(response.data);
+                    return;
+                }
+                break;
             case WorkerRequestType.FETCH_QUERY_RESULTS:
                 if (response.type == WorkerResponseType.QUERY_RESULT_CHUNK) {
                     task.promiseResolver(response.data);
@@ -331,6 +343,7 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
 
     /** Reset the duckdb */
     public async reset(): Promise<null> {
+        this.forgetConnections();
         const task = new WorkerTask<WorkerRequestType.RESET, null, null>(WorkerRequestType.RESET, null);
         return await this.postTask(task);
     }
@@ -393,6 +406,7 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
     /** Open a new database */
     public async open(config: DuckDBConfig): Promise<void> {
         this._config = config;
+        this.forgetConnections();
         const task = new WorkerTask<WorkerRequestType.OPEN, DuckDBConfig, null>(WorkerRequestType.OPEN, config);
         await this.postTask(task);
     }
@@ -413,11 +427,18 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
     /** Connect to the database */
     public async connect(): Promise<AsyncDuckDBConnection> {
         const cid = await this.connectInternal();
+        // A cancel must reach a query that runs inside a worker call, which no message does: keep the flag at hand
+        if (typeof SharedArrayBuffer !== 'undefined') {
+            const handle = await this.getInterruptHandle(cid);
+            if (handle !== null) this._interruptHandles.set(cid, handle);
+        }
         return new AsyncDuckDBConnection(this, cid);
     }
 
     /** Disconnect from the database */
     public async disconnect(conn: ConnectionID): Promise<void> {
+        this._interruptHandles.delete(conn);
+        this.endPendingQuery(conn);
         const task = new WorkerTask<WorkerRequestType.DISCONNECT, ConnectionID, null>(
             WorkerRequestType.DISCONNECT,
             conn,
@@ -479,7 +500,8 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
             [ConnectionID, string, boolean],
             Uint8Array | null
         >(WorkerRequestType.START_PENDING_QUERY, [conn, text, allowStreamResult]);
-        return await this.postTask(task);
+        this.beginPendingQuery(conn);
+        return await this.trackPendingQuery(conn, this.postTask(task));
     }
 
     /** Poll a pending query */
@@ -488,15 +510,72 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
             WorkerRequestType.POLL_PENDING_QUERY,
             conn,
         );
-        return await this.postTask(task);
+        return await this.trackPendingQuery(conn, this.postTask(task));
     }
-    /** Cancel a pending query */
+    /**
+     * Cancel a pending query.
+     *
+     * On the threads bundle the worker runs a poll to its end before it reads another message, so the query is
+     * interrupted through shared memory first (getInterruptHandle): a running poll stops at the engine's next check
+     * and fails with an interrupt error, and in-flight HTTP requests of the query are abandoned. The cancel message
+     * then ends the query in the worker, if the poll has not already ended it.
+     */
     public async cancelPendingQuery(conn: ConnectionID): Promise<boolean> {
+        const handle = this._interruptHandles.get(conn);
+        const interrupted = handle !== undefined && this._pendingQueries.has(conn);
+        if (interrupted) {
+            interruptConnection(handle);
+        }
+        this.endPendingQuery(conn);
         const task = new WorkerTask<WorkerRequestType.CANCEL_PENDING_QUERY, ConnectionID, boolean>(
             WorkerRequestType.CANCEL_PENDING_QUERY,
             conn,
         );
+        const cancelled = await this.postTask(task);
+        return cancelled || interrupted;
+    }
+
+    /**
+     * The connection's interrupt flag, or null when the wasm memory is not shared (the base bundle). Then
+     * `interruptConnection(handle)` interrupts what runs on the connection from any thread, also while the worker is
+     * inside the call that runs it and no message reaches it.
+     */
+    public async getInterruptHandle(conn: ConnectionID): Promise<InterruptHandle | null> {
+        const cached = this._interruptHandles.get(conn);
+        if (cached) return cached;
+        const task = new WorkerTask<WorkerRequestType.GET_INTERRUPT_HANDLE, ConnectionID, InterruptHandle | null>(
+            WorkerRequestType.GET_INTERRUPT_HANDLE,
+            conn,
+        );
         return await this.postTask(task);
+    }
+
+    /** A pending query starts on the connection */
+    protected beginPendingQuery(conn: ConnectionID): void {
+        this._pendingQueries.add(conn);
+    }
+    /** The connection's pending query ended (it has a result, failed, or was cancelled) */
+    protected endPendingQuery(conn: ConnectionID): void {
+        this._pendingQueries.delete(conn);
+    }
+    /** Track the end of a pending query through the response to its start or a poll */
+    protected async trackPendingQuery(
+        conn: ConnectionID,
+        response: Promise<Uint8Array | null>,
+    ): Promise<Uint8Array | null> {
+        try {
+            const header = await response;
+            if (header !== null) this.endPendingQuery(conn);
+            return header;
+        } catch (e) {
+            this.endPendingQuery(conn);
+            throw e;
+        }
+    }
+    /** Forget all connections, the database they belonged to is gone */
+    protected forgetConnections(): void {
+        this._interruptHandles.clear();
+        this._pendingQueries.clear();
     }
 
     /** Fetch query results */

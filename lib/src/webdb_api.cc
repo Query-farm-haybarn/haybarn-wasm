@@ -264,6 +264,24 @@ bool duckdb_web_pending_query_cancel(ConnectionHdl connHdl, const char* script) 
     auto c = reinterpret_cast<WebDB::Connection*>(connHdl);
     return query_thread::Run([&] { return c->CancelPendingQuery(); });
 }
+// The engine's interrupt flag is one byte that JS sets with Atomics.compareExchange (interrupt.ts)
+static_assert(sizeof(std::atomic<duckdb::ClientInterruptState>) == 1, "interrupt.ts sets a one-byte flag");
+static_assert(std::atomic<duckdb::ClientInterruptState>::is_always_lock_free, "interrupt.ts sets a lock-free flag");
+static_assert(static_cast<uint8_t>(duckdb::ClientInterruptState::NOT_INTERRUPTED) == 0 &&
+                  static_cast<uint8_t>(duckdb::ClientInterruptState::INTERRUPTED) == 1,
+              "interrupt.ts moves the flag from 0 to 1");
+/// Address of the connection's interrupt flag (ClientContext::interrupt_state) in wasm memory. With threads that
+/// memory is a SharedArrayBuffer, so any thread can interrupt a query that no message reaches: the worker is inside
+/// the call that runs it. Stable for the connection's lifetime. Runs on the calling thread
+uint32_t duckdb_web_connection_interrupt_flag(ConnectionHdl connHdl) {
+    auto c = reinterpret_cast<WebDB::Connection*>(connHdl);
+    return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&c->connection().context->interrupt_state));
+}
+/// Interrupt the query running on the connection. Runs on the calling thread: it only sets the flag
+void duckdb_web_connection_interrupt(ConnectionHdl connHdl) {
+    auto c = reinterpret_cast<WebDB::Connection*>(connHdl);
+    c->Interrupt();
+}
 /// Fetch query results
 void duckdb_web_query_fetch_results(WASMResponse* packed, ConnectionHdl connHdl) {
     auto c = reinterpret_cast<WebDB::Connection*>(connHdl);

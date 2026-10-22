@@ -3,6 +3,7 @@ import { OPFSAccessMode } from './opfs_scratch';
 import { DuckDBConfig } from './config';
 import { Logger } from '../log';
 import { InstantiationProgress } from './progress';
+import { InterruptHandle } from './interrupt';
 import { DuckDBBindings } from './bindings_interface';
 import { DuckDBConnection } from './connection';
 import { StatusCode, IsArrowBuffer, IsDuckDBWasmRetry } from '../status';
@@ -342,6 +343,24 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
         const cancelled = this.mod.ccall('duckdb_web_pending_query_cancel', 'boolean', ['number'], [conn]);
         this.finishPendingThreadRestore(conn);
         return cancelled;
+    }
+    /** The wasm memory, when it is shared (threads bundle) */
+    protected sharedMemory(): SharedArrayBuffer | null {
+        const memory = this.mod.HEAPU8.buffer;
+        if (typeof SharedArrayBuffer === 'undefined' || !(memory instanceof SharedArrayBuffer)) return null;
+        return memory;
+    }
+    /** The connection's interrupt flag, when the wasm memory is shared (threads bundle); null otherwise */
+    public getInterruptHandle(conn: number): InterruptHandle | null {
+        const memory = this.sharedMemory();
+        if (memory === null) return null;
+        // An unsigned wasm32 address, ccall hands it back as a signed i32
+        const offset = this.mod.ccall('duckdb_web_connection_interrupt_flag', 'number', ['number'], [conn]) >>> 0;
+        return { memory, offset };
+    }
+    /** Interrupt the query running on the connection. Reaches only a query that runs between two calls */
+    public interruptQuery(conn: number): void {
+        this.mod.ccall('duckdb_web_connection_interrupt', null, ['number'], [conn]);
     }
     /** Fetch query results */
     public fetchQueryResults(conn: number): Uint8Array | null {

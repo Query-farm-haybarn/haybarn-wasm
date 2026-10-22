@@ -111,6 +111,8 @@ class WebDB {
 
         /// Get a connection
         auto& connection() { return connection_; }
+        /// Interrupt the query running on the connection, as Connection::Interrupt does. Callable from any thread
+        void Interrupt() { connection_.Interrupt(); }
         /// Get the filesystem
         duckdb::FileSystem& filesystem();
 

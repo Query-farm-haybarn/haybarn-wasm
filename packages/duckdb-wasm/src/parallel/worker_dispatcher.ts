@@ -317,6 +317,18 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                     );
                     break;
                 }
+                // The SharedArrayBuffer of a handle is shared by postMessage, not copied
+                case WorkerRequestType.GET_INTERRUPT_HANDLE:
+                    this.postMessage(
+                        {
+                            messageId: this._nextMessageId++,
+                            requestId: request.messageId,
+                            type: WorkerResponseType.INTERRUPT_HANDLE,
+                            data: this._bindings.getInterruptHandle(request.data),
+                        },
+                        [],
+                    );
+                    break;
                 case WorkerRequestType.FETCH_QUERY_RESULTS: {
                     const result = this._bindings.fetchQueryResults(request.data);
                     // An empty batch ends the stream

@@ -1,6 +1,7 @@
 import { Logger } from '../log';
 import { CSVInsertOptions, JSONInsertOptions } from '../bindings/insert_options';
 import { DuckDBDataProtocol } from '../bindings';
+import { InterruptHandle } from '../bindings/interrupt';
 
 /** An interface for the async DuckDB bindings */
 export interface AsyncDuckDBBindings {
@@ -22,6 +23,7 @@ export interface AsyncDuckDBBindings {
     startPendingQuery(conn: number, text: string, allowStreamResult: boolean): Promise<Uint8Array | null>;
     pollPendingQuery(conn: number): Promise<Uint8Array | null>;
     cancelPendingQuery(conn: number): Promise<boolean>;
+    getInterruptHandle(conn: number): Promise<InterruptHandle | null>;
     fetchQueryResults(conn: number): Promise<Uint8Array | null>;
 
     createPrepared(conn: number, text: string): Promise<number>;
