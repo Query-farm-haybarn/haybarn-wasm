@@ -75,8 +75,10 @@ struct ArrowIPCWriter::Impl {
          bool lossless_conversion)
         : context(context),
           config(config),
-          arrow_options("UTC", ArrowOffsetSize::REGULAR, false, false, lossless_conversion, ArrowFormatVersion::V1_0,
-                        &context),
+          // Haybarn: TIMESTAMP WITH TIME ZONE columns carry the session TimeZone, as the engine's own
+          // GetClientProperties() does. The other properties stay pinned for the wasm IPC encoder.
+          arrow_options(context.GetClientProperties().time_zone, ArrowOffsetSize::REGULAR, false, false,
+                        lossless_conversion, ArrowFormatVersion::V1_0, &context),
           types(std::move(types_p)),
           names(std::move(names_p)) {
         for (auto& type : types) {

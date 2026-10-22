@@ -125,6 +125,7 @@ import { longQueries } from './long_queries.test';
 import { testPivot } from './pivot.test';
 import { testSpill } from './spill.test';
 import { testJsBufferFile } from './js_buffer_file.test';
+import { testTimeZone, testTimeZoneAsync } from './timezone.test';
 
 const baseURL = window.location.origin;
 const dataURL = `${baseURL}/data`;
@@ -132,6 +133,8 @@ const dataURL = `${baseURL}/data`;
 testHTTPFS(() => db!);
 testHTTPFSAsync(() => adb!, resolveData, dataURL);
 testUDF(() => db!);
+testTimeZone(() => db!);
+testTimeZoneAsync(() => adb!);
 longQueries(() => adb!);
 testTableNames(() => db!);
 testTableNamesAsync(() => adb!);
