@@ -346,6 +346,11 @@ web::Result<std::shared_ptr<web::Buffer>> WebDB::Connection::PollPendingQuery() 
                 auto err = current_pending_query_result_->GetError();
                 current_pending_query_result_.reset();
                 current_pending_statements_.clear();
+                // The query ended, an interrupt that ended it must not reach the connection's next statement (an
+                // explicit transaction keeps the flag otherwise). Connection::Query clears it the same way
+                if (connection_.context->IsInterrupted()) {
+                    connection_.context->ClearInterrupt();
+                }
                 return web::Status{web::StatusCode::ExecutionError, err};
             }
         }
@@ -359,13 +364,25 @@ bool WebDB::Connection::CancelPendingQuery() {
     // Only reset the pending query if it hasn't completed yet
     if (current_pending_query_result_ != nullptr && current_query_result_ == nullptr &&
         current_query_stream_ == nullptr) {
+        // Interrupt the query, then abandon it. Closing the result aborts the query: autocommit rolls it back, and an
+        // explicit transaction it may have written in is invalidated, as with a native interrupt. The interrupt makes
+        // its tasks on other threads, and its HTTP requests, stop at their next check, instead of the cleanup waiting
+        // for them to run out
+        connection_.Interrupt();
         current_pending_query_was_canceled_ = true;
         current_pending_query_result_.reset();
         current_pending_statements_.clear();
+        // The query has ended, the flag must not interrupt the connection's next statement
+        connection_.context->ClearInterrupt();
         return true;
-    } else {
-        return false;
     }
+    // AsyncDuckDB interrupts a pending query through shared memory before its cancel arrives (on threads, a message
+    // only arrives between two calls). When the query ended before, the flag is left for nothing; clear it unless a
+    // result stream still runs the query
+    if (current_query_stream_ == nullptr && connection_.context->IsInterrupted()) {
+        connection_.context->ClearInterrupt();
+    }
+    return false;
 }
 
 DuckDBWasmResultsWrapper WebDB::Connection::FetchQueryResults() {
