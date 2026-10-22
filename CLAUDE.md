@@ -39,14 +39,16 @@ are satisfied by the package name and branding strings.
 
 ## Versioning and releases
 
-Workspace versions are `<duckdb-version>-rc<N>` (currently `2.0.0-rc1`),
+Workspace versions are `<duckdb-version>-rc<N>` (currently `2.0.0-rc3`),
 dropping `-rc<N>` for a stable release. Cutting an rc bumps the nine
 `package.json` version fields, the two workspace entries in `yarn.lock`,
 `app.tsx`'s `HAYBARN_WASM_VERSION` and `_worker.js`'s engine path, then a
 `haybarn-v<version>` tag. Only the creation of a `haybarn-v2.*` tag runs the
 release job in `main.yml` (npm publish of `@haybarn/haybarn-wasm`, the threads
 wasm to R2, the shell to Cloudflare Pages); branch pushes, PRs and manual
-dispatches never publish.
+dispatches never publish. An `-rcN` tag publishes under the npm dist-tag `rc`
+and deploys the shell as the Pages preview `haybarn-2-0-rc.haybarn-shell.pages.dev`;
+only a stable tag takes `latest` and production `shell.haybarn.query.farm`.
 
 ## Bundles and extension platforms
 

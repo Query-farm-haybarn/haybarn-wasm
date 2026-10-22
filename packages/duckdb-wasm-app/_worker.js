@@ -15,7 +15,7 @@
 //      static `_headers` file is ignored, so the headers are set here.
 //
 // All other requests fall through to the static assets (env.ASSETS).
-const THREADS_WASM_UPSTREAM = 'https://haybarn-extensions.query.farm/engine/2.0.0-rc1/duckdb-threads.wasm';
+const THREADS_WASM_UPSTREAM = 'https://haybarn-extensions.query.farm/engine/2.0.0-rc3/duckdb-threads.wasm';
 
 function withCoiHeaders(resp, extra) {
     const h = new Headers(resp.headers);
