@@ -32,7 +32,8 @@ upstream base, one concern per commit.
 | **Package rebrand**           | `package.json` (all workspaces), npm imports, Makefile, scripts, Rust shell crate `wasm_bindgen` module strings |
 | **Engine submodule swap**     | `.gitmodules` (URL → `Query-farm-haybarn/haybarn`), `submodules/duckdb` pointer, `libhaybarn_static.a`, default version `v2.0.0` (`lib/cmake/duckdb.cmake`) |
 | **Extension provider**        | `lib/src/extension_provider.cc`: https for `haybarn-extensions.query.farm`, `INSTALL … VERSION` pins |
-| **Threads bundle loading**    | `patches/duckdb/extension_signature_hash_on_calling_thread.patch` (signature hashing without a thread per MiB); bindings bracket `LOAD`/`INSTALL` with `SET threads=1` (`DuckDBConfig.singleThreadedExtensionLoad`) |
+| **Threads bundle loading**    | `patches/duckdb/extension_signature_hash_on_calling_thread.patch` (signature hashing without a thread per MiB); `patches/duckdb/wait_for_tasks_instead_of_spinning.patch` (a query thread that spun while a scheduler thread ran a `LOAD` never synced the side module, so the load deadlocked); the `SET threads=1` bracket around `LOAD`/`INSTALL` is opt-in (`DuckDBConfig.singleThreadedExtensionLoad`) |
+| **Threads bundle pthread pool** | `lib/src/main_thread.cc`: strict pool (`PTHREAD_POOL_SIZE_STRICT=2`, a thread beyond it fails with `EAGAIN` instead of hanging), refilled between calls with the live threads plus 4 idle workers (at most 64) |
 | **Toolchain**                 | emscripten 6.0.13 (same as the Haybarn 2.0 extension builds) |
 | **Shell + app**               | Haybarn banner, default extensions at startup, Haybarn branding, Cloudflare Pages hosting (`_worker.js`, `_headers`) |
 | **Docs**                      | `README.md`, `NOTICE`, `HAYBARN.md`, `CLAUDE.md`, package README |
