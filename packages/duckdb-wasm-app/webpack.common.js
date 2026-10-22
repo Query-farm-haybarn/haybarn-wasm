@@ -23,6 +23,9 @@ export function configure(params) {
         resolve: {
             extensions: ['.ts', '.tsx', '.js', '.mjs', '.jsx', '.css', '.wasm'],
             alias: {
+                // Haybarn: aliasing the package to its directory bypasses its `exports` map, so the `./vgi` subpath
+                // export is spelled out, first: the first matching alias wins.
+                '@haybarn/haybarn-wasm/vgi': path.resolve(__dirname, '../duckdb-wasm/dist/duckdb-browser-vgi.mjs'),
                 '@haybarn/haybarn-wasm': path.resolve(__dirname, '../duckdb-wasm'),
                 // Haybarn: like the engine package, bundle the freshly built shell from its workspace dir rather
                 // than the copy yarn made into node_modules at install time, before the shell was built.
@@ -178,6 +181,19 @@ export function configure(params) {
                         // COOP/COEP to every response. Must sit at the deploy root.
                         from: './_worker.js',
                         to: './_worker.js',
+                        toType: 'file',
+                    },
+                    {
+                        // Haybarn: the redirect target of the VGI OAuth popup (installVgiOAuthBridge). At the root
+                        // and unhashed, so an IdP can register a stable redirect URI, and same-origin, so it can relay
+                        // the code over BroadcastChannel('vgi-oauth').
+                        from: './static/oauth-callback.html',
+                        to: './oauth-callback.html',
+                        toType: 'file',
+                    },
+                    {
+                        from: './static/oauth-logo.png',
+                        to: './oauth-logo.png',
                         toType: 'file',
                     },
                 ],

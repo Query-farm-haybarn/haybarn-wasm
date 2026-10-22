@@ -14,6 +14,9 @@ type DuckDBProps = {
     children: React.ReactElement | ReactElement[];
     config?: duckdb.DuckDBConfig;
     value?: duckdb.AsyncDuckDB;
+    /** Called with the engine Worker right after it is created, before instantiate, so the app can install the
+     *  page bridges of `@haybarn/haybarn-wasm/vgi` (OAuth popup, VGI worker:) without this provider knowing them. */
+    onWorkerCreated?: (worker: Worker) => void;
 };
 
 export const DuckDBProvider: React.FC<DuckDBProps> = (props: DuckDBProps) => {
@@ -51,6 +54,7 @@ export const DuckDBProvider: React.FC<DuckDBProps> = (props: DuckDBProps) => {
             let next: duckdb.AsyncDuckDB;
             try {
                 worker = new Worker(bundle.mainWorker!);
+                props.onWorkerCreated?.(worker);
                 next = new duckdb.AsyncDuckDB(logger, worker);
             } catch (e: any) {
                 updateSetup(s => s.failWith(e));

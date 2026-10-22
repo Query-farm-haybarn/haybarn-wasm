@@ -13,6 +13,7 @@ import 'xterm/css/xterm.css';
 import 'react-popper-tooltip/dist/styles.css';
 
 import * as duckdb from '@haybarn/haybarn-wasm';
+import { installVgiOAuthBridge } from '@haybarn/haybarn-wasm/vgi';
 
 // Haybarn: the wasm engine binaries are not bundled. The base one loads at runtime from the jsDelivr copy of the
 // published @haybarn/haybarn-wasm package, pinned to the release the shell ships with. The worker glue is bundled
@@ -52,7 +53,7 @@ const element = document.getElementById('root');
 const root = createRoot(element!);
 root.render(
     <DuckDBPlatform logger={logger} bundles={DUCKDB_BUNDLES}>
-        <DuckDBProvider>
+        <DuckDBProvider onWorkerCreated={installVgiOAuthBridge}>
             <DuckDBConnectionProvider>
                 <BrowserRouter basename={basename}>
                     <Routes>
