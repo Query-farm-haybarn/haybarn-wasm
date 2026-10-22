@@ -27,6 +27,7 @@ char *duckdb_wasm_open_auth_url_js(const char *url, int timeout_ms);
 char *duckdb_wasm_get_auth_error_js(int unused);
 char *duckdb_wasm_get_page_origin_js(void);
 void duckdb_wasm_crypto_random(void *buf, int len);
+int vgi_wasm_ensure_worker_js(const char *location, int region_offset);
 
 /// Open an OAuth authorization URL in a popup on the page and wait up to timeout_ms (0: no limit) for the
 /// authorization code. Returns the code (malloc'd, the caller frees it) or nullptr, see duckdb_wasm_get_auth_error.
@@ -42,6 +43,12 @@ EMSCRIPTEN_KEEPALIVE char *duckdb_wasm_get_auth_error(int unused) {
 /// The origin of the page (malloc'd), or nullptr for a blob: or opaque origin
 EMSCRIPTEN_KEEPALIVE char *duckdb_wasm_get_page_origin(void) {
     return main_thread::OnMainThread([] { return duckdb_wasm_get_page_origin_js(); });
+}
+
+/// VGI worker: transport: make sure the page runs the VGI Web Worker for `location`, serving the channel region at
+/// region_offset. 0 or -1. The ring operations (vgi_wasm_slot_*) are in js-stubs.js and run on the calling thread.
+EMSCRIPTEN_KEEPALIVE int vgi_wasm_ensure_worker(const char *location, int region_offset) {
+    return main_thread::OnMainThread([&] { return vgi_wasm_ensure_worker_js(location, region_offset); });
 }
 
 /// SHA-256 of len bytes at data into the 32 bytes at out_hash, with the engine's mbedtls
