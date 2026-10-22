@@ -11,8 +11,9 @@ namespace duckdb {
 namespace web {
 
 /// Loads external extensions in DuckDB-Wasm.
-/// There is no local extension directory: INSTALL only remembers the repository an extension should come from,
-/// LOAD fetches the extension from its repository, verifies it and opens it as a side module.
+/// There is no local extension directory: INSTALL only remembers the repository (and the version, for
+/// INSTALL ... VERSION) an extension should come from, LOAD fetches the extension from its repository, verifies it
+/// and opens it as a side module.
 class WasmExtensionProvider : public ExternalExtensionProvider {
    public:
     string GetName() const override;
@@ -32,6 +33,8 @@ class WasmExtensionProvider : public ExternalExtensionProvider {
     std::mutex mutex_;
     /// The repository each installed extension is to be loaded from
     std::unordered_map<string, ExtensionRepository> installed_repositories_;
+    /// The version each installed extension is pinned to (Haybarn INSTALL ... VERSION)
+    std::unordered_map<string, string> installed_versions_;
 };
 
 }  // namespace web

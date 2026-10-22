@@ -73,7 +73,8 @@ export interface DuckDBConfig {
      */
     homeDirectory?: string;
     /**
-     * The repository extensions are loaded from (custom_extension_repository), extensions.duckdb.org by default
+     * The repository extensions are loaded from (custom_extension_repository), the Haybarn core repository
+     * (haybarn-extensions.query.farm/core) by default
      */
     extensionRepository?: string;
     /**

@@ -96,17 +96,36 @@ void* OpenFetchedExtension(const FetchedExtension& extension, const string& path
     return handle;
 }
 
-/// The repositories maintained by DuckDB are also served over https, which is required on https sites
+/// The repositories maintained by DuckDB are also served over https, which is required on https sites. So is the
+/// Haybarn repository: the engine names it with http:// so the native bootstrap install of httpfs works without TLS,
+/// but a page cannot fetch a http:// subresource, and a cross-origin isolated one blocks it outright.
 string UpgradeToHTTPS(const string& url) {
     const string prefix = "http://";
     if (!StringUtil::StartsWith(url, prefix)) {
         return url;
     }
     auto host = url.substr(prefix.size(), url.find('/', prefix.size()) - prefix.size());
-    if (!StringUtil::EndsWith(host, ".duckdb.org")) {
+    if (!StringUtil::EndsWith(host, ".duckdb.org") && host != "haybarn-extensions.query.farm") {
         return url;
     }
     return "https://" + url.substr(prefix.size());
+}
+
+/// The URL template of an extension in a repository. The layout is the engine's (Haybarn puts a pinned version
+/// below the platform: ${REVISION}/${PLATFORM}/${NAME}/<version>/), but DuckDB is built without
+/// WASM_LOADABLE_EXTENSIONS and names the gzipped native file, so its suffix is swapped for the wasm one.
+string ExtensionUrlTemplate(DatabaseInstance& db, const ExtensionRepository& repository, const string& version) {
+    ExtensionRepository https_repository = repository;
+    https_repository.path = UpgradeToHTTPS(repository.path);
+    auto url_template = ExtensionHelper::ExtensionUrlTemplate(&db, https_repository, version);
+    if (StringUtil::EndsWith(url_template, EXTENSION_SUFFIX)) {
+        return url_template;
+    }
+    const string native_suffix = ".duckdb_extension.gz";
+    if (!StringUtil::EndsWith(url_template, native_suffix)) {
+        throw InternalException("Unexpected extension URL template \"%s\"", url_template);
+    }
+    return url_template.substr(0, url_template.size() - native_suffix.size()) + EXTENSION_SUFFIX;
 }
 
 }  // namespace
@@ -121,11 +140,20 @@ unique_ptr<ExtensionInstallInfo> WasmExtensionProvider::Install(DatabaseInstance
                                                                 const string& local_path, const string& extension,
                                                                 ExtensionInstallOptions& options,
                                                                 optional_ptr<ClientContext> context) {
-    // Nothing is stored, but an explicit repository is remembered for when the extension is loaded
-    if (options.repository && !ExtensionHelper::IsFullPath(extension)) {
-        auto extension_name = ExtensionHelper::ApplyExtensionAlias(StringUtil::Lower(extension));
-        std::lock_guard<std::mutex> guard{mutex_};
+    // Nothing is stored, but an explicit repository is remembered for when the extension is loaded, and so is a
+    // version pin. Installing again without a version drops the pin, as a native reinstall would.
+    if (ExtensionHelper::IsFullPath(extension)) {
+        return nullptr;
+    }
+    auto extension_name = ExtensionHelper::ApplyExtensionAlias(StringUtil::Lower(extension));
+    std::lock_guard<std::mutex> guard{mutex_};
+    if (options.repository) {
         installed_repositories_[extension_name] = *options.repository;
+    }
+    if (options.version.empty()) {
+        installed_versions_.erase(extension_name);
+    } else {
+        installed_versions_[extension_name] = options.version;
     }
     return nullptr;
 }
@@ -137,6 +165,7 @@ bool WasmExtensionProvider::TryInitialLoad(DatabaseInstance& db, FileSystem& fs,
     string extension_name;
     string url;
     ExtensionRepository repository;
+    string version;
 
     if (direct_load) {
         if (!repository_name.empty()) {
@@ -169,7 +198,14 @@ bool WasmExtensionProvider::TryInitialLoad(DatabaseInstance& db, FileSystem& fs,
                 repository = ExtensionHelper::GetAutoinstallRepository(db);
             }
         }
-        auto url_template = UpgradeToHTTPS(repository.path) + "/${REVISION}/${PLATFORM}/${NAME}" + EXTENSION_SUFFIX;
+        {
+            std::lock_guard<std::mutex> guard{mutex_};
+            auto pinned = installed_versions_.find(extension_name);
+            if (pinned != installed_versions_.end()) {
+                version = pinned->second;
+            }
+        }
+        auto url_template = ExtensionUrlTemplate(db, repository, version);
         url = ExtensionHelper::ExtensionFinalizeUrlTemplate(url_template, extension_name);
     }
 
@@ -237,6 +273,7 @@ bool WasmExtensionProvider::TryInitialLoad(DatabaseInstance& db, FileSystem& fs,
         result.install_info->repository_url = repository.path;
         result.install_info->repository_type = repository.type;
         result.install_info->repository_name = repository.name;
+        result.install_info->pinned_version = version;
     }
     return true;
 }
