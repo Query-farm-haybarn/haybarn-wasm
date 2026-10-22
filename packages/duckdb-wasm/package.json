@@ -111,6 +111,13 @@
         "./dist/duckdb-browser-threads.pthread.worker.js": "./dist/duckdb-browser-threads.pthread.worker.js",
         "./dist/duckdb-browser-threads.worker.js": "./dist/duckdb-browser-threads.worker.js",
         "./dist/duckdb-browser-base.worker.js": "./dist/duckdb-browser-base.worker.js",
+        "./dist/duckdb-browser-vgi.mjs": "./dist/duckdb-browser-vgi.mjs",
+        "./dist/duckdb-browser-vgi.cjs": "./dist/duckdb-browser-vgi.cjs",
+        "./vgi": {
+            "types": "./dist/duckdb-browser-vgi.d.ts",
+            "import": "./dist/duckdb-browser-vgi.mjs",
+            "require": "./dist/duckdb-browser-vgi.cjs"
+        },
         "./dist/duckdb-node": "./dist/duckdb-node.cjs",
         "./dist/duckdb-node.cjs": "./dist/duckdb-node.cjs",
         "./dist/duckdb-node-blocking": "./dist/duckdb-node-blocking.cjs",

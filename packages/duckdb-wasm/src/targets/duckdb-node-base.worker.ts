@@ -3,6 +3,7 @@ import { DuckDBBindings } from '../bindings';
 import { DuckDB } from '../bindings/bindings_node_base';
 import { NODE_RUNTIME } from '../bindings/runtime_node';
 import { InstantiationProgress } from '../bindings/progress';
+import { handlePreInitMessage } from '../parallel/worker_globals';
 
 /** The duckdb worker API for node.js workers */
 class NodeWorker extends AsyncDuckDBDispatcher {
@@ -26,6 +27,7 @@ class NodeWorker extends AsyncDuckDBDispatcher {
 export function registerWorker(): void {
     const api = new NodeWorker();
     globalThis.onmessage = async (event: MessageEvent<WorkerRequestVariant>) => {
+        if (handlePreInitMessage(event.data)) return;
         await api.onMessage(event.data);
     };
 }
