@@ -22,6 +22,7 @@ import { execSync } from 'child_process';
 // Bundles:
 //   duckdb-browser.mjs                           - ESM Default Browser Bundle
 //   duckdb-browser-blocking.mjs                  - ESM Blocking Browser Bundle (synchronous API, unstable)
+//   duckdb-browser-vgi.{mjs,cjs}                 - Page bridges for extensions (OAuth, VGI worker:), the ./vgi export
 //   duckdb-browser-base.worker.js                - IIFE Web Worker
 //   duckdb-browser-threads.worker.js             - IIFE Web Worker with threads
 //   duckdb-browser-threads.pthread.worker.js     - Compatibility alias for the threads worker
@@ -168,6 +169,26 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-threads.wasm'), path.resolve(d
             'process.env.NODE_ENV': '"production"',
         },
     });
+
+    // Haybarn: the page halves of the engine's platform functions for extensions, the `./vgi` export
+    for (const [format, ext] of [
+        ['esm', 'mjs'],
+        ['cjs', 'cjs'],
+    ]) {
+        console.log(`[ ESBUILD ] duckdb-browser-vgi.${ext}`);
+        await esbuild.build({
+            entryPoints: ['./src/targets/duckdb-browser-vgi.ts'],
+            outfile: `dist/duckdb-browser-vgi.${ext}`,
+            platform: 'browser',
+            format,
+            target: TARGET_BROWSER,
+            bundle: true,
+            minify: !is_debug,
+            sourcemap: is_debug ? 'inline' : true,
+            external: EXTERNALS_BROWSER,
+            define: { 'process.release.name': '"browser"' },
+        });
+    }
 
     console.log('[ ESBUILD ] duckdb-browser-base.worker.js');
     await esbuild.build({
@@ -387,6 +408,11 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-threads.wasm'), path.resolve(d
     await fs.promises.writeFile(
         path.join(dist, 'duckdb-browser-blocking.d.ts'),
         "export * from './types/src/targets/duckdb-browser-blocking';",
+    );
+
+    await fs.promises.writeFile(
+        path.join(dist, 'duckdb-browser-vgi.d.ts'),
+        "export * from './types/src/targets/duckdb-browser-vgi';",
     );
 
     // Node declarations

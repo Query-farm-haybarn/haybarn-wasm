@@ -170,6 +170,11 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
             }
         }
 
+        // Haybarn: a message of the engine's platform functions (open-auth-url, vgi-ensure-worker), for the page
+        // bridges that listen on the same Worker
+        if (typeof response.requestId !== 'number') {
+            return;
+        }
         // Get associated task
         const task = this._pendingRequests.get(response.requestId);
         if (!task) {
