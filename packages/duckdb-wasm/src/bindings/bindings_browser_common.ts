@@ -33,6 +33,60 @@ export abstract class DuckDBBrowserBindings extends DuckDBBindingsBase {
         throw new Error(`WASM instantiation requested unexpected file: prefix=${prefix} path=${path}`);
     }
 
+    /** Fetch the wasm module */
+    protected fetchWasm(): Promise<Response> {
+        return fetch(new Request(this.mainModuleURL));
+    }
+
+    /** Report download progress by reading a clone of the wasm response */
+    protected trackProgress(response: Response, handlers: ((p: InstantiationProgress) => void)[]): void {
+        let body: ReadableStream<Uint8Array> | null = null;
+        try {
+            body = response.clone().body;
+        } catch (e) {
+            return;
+        }
+        if (!body) {
+            return;
+        }
+        // Content-Length is the encoded size, while the stream yields decoded bytes: only trust it for unencoded
+        // responses. 0 means the total is unknown.
+        const contentLengthHdr = response.headers.get('content-length');
+        const encoded = !!response.headers.get('content-encoding');
+        const start = new Date();
+        const progress: InstantiationProgress = {
+            startedAt: start,
+            updatedAt: start,
+            bytesTotal: encoded || !contentLengthHdr ? 0 : parseInt(contentLengthHdr, 10) || 0,
+            bytesLoaded: 0,
+        };
+        const reader = body.getReader();
+        const read = async () => {
+            for (;;) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                progress.bytesLoaded += value.byteLength;
+                // Cross-origin responses may hide Content-Encoding
+                if (progress.bytesLoaded > progress.bytesTotal) {
+                    progress.bytesTotal = 0;
+                }
+                const now = new Date();
+                if (now.getTime() - progress.updatedAt.getTime() < 20) {
+                    continue;
+                }
+                progress.updatedAt = now;
+                for (const p of handlers) {
+                    p(progress);
+                }
+            }
+            progress.updatedAt = new Date();
+            for (const p of handlers) {
+                p(progress);
+            }
+        };
+        read().catch(() => {});
+    }
+
     /** Instantiate the wasm module */
     protected instantiateWasm(
         // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
@@ -52,53 +106,19 @@ export abstract class DuckDBBrowserBindings extends DuckDBBindingsBase {
 
         // Does the browser support streaming instantiation?
         if (WebAssembly.instantiateStreaming) {
-            // Does the browser support transform streams?
-            if (typeof TransformStream === 'function') {
-                const fetchWithProgress = async () => {
-                    // Try to determine file size
-                    const request = new Request(this.mainModuleURL);
-                    const response = await fetch(request);
-                    const contentLengthHdr = response.headers.get('content-length');
-                    const contentLength = contentLengthHdr ? parseInt(contentLengthHdr, 10) || 0 : 0;
-
-                    // Transform the stream
-                    const start = new Date();
-                    const progress: InstantiationProgress = {
-                        startedAt: start,
-                        updatedAt: start,
-                        bytesTotal: contentLength || 0,
-                        bytesLoaded: 0,
-                    };
-                    const tracker = {
-                        transform(chunk: any, ctrl: TransformStreamDefaultController) {
-                            progress.bytesLoaded += chunk.byteLength;
-                            const now = new Date();
-                            if (now.getTime() - progress.updatedAt.getTime() < 20) {
-                                progress.updatedAt = now;
-                                ctrl.enqueue(chunk);
-                                return;
-                            }
-                            for (const p of handlers) {
-                                p(progress);
-                            }
-                            ctrl.enqueue(chunk);
-                        },
-                    };
-                    const ts = new TransformStream(tracker);
-                    return new Response(response.body?.pipeThrough(ts), response);
-                };
-                // Instantiate streaming
-                const response = fetchWithProgress();
-                WebAssembly.instantiateStreaming(response, imports).then(output => {
-                    success(output.instance, output.module);
-                });
-            } else {
-                console.warn('instantiating without progress handler since transform streams are unavailable');
-                const request = new Request(this.mainModuleURL);
-                WebAssembly.instantiateStreaming(fetch(request), imports).then(output => {
-                    success(output.instance, output.module);
-                });
-            }
+            // Haybarn: hand the fetch() Response to instantiateStreaming untouched. Browsers only code-cache a module
+            // compiled from a Response that came straight from fetch(), so re-wrapping its body (as a byte-counting
+            // TransformStream did) recompiled the engine on every page load. Progress is counted on a clone, and
+            // only if someone is listening.
+            const response = this.fetchWasm().then(fetched => {
+                if (handlers.length > 0) {
+                    this.trackProgress(fetched, handlers);
+                }
+                return fetched;
+            });
+            WebAssembly.instantiateStreaming(response, imports).then(output => {
+                success(output.instance, output.module);
+            });
         } else if (typeof XMLHttpRequest == 'function') {
             // Otherwise we fall back to XHRs
             const xhr = new XMLHttpRequest();
@@ -128,9 +148,9 @@ export abstract class DuckDBBrowserBindings extends DuckDBBindingsBase {
                 progress.bytesLoaded = e.loaded;
                 const now = new Date();
                 if (now.getTime() - progress.updatedAt.getTime() < 20) {
-                    progress.updatedAt = now;
                     return;
                 }
+                progress.updatedAt = now;
                 for (const p of handlers) {
                     p(progress);
                 }

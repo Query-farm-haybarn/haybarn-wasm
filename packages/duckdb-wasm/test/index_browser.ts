@@ -126,6 +126,7 @@ import { testPivot } from './pivot.test';
 import { testSpill } from './spill.test';
 import { testJsBufferFile } from './js_buffer_file.test';
 import { testTimeZone, testTimeZoneAsync } from './timezone.test';
+import { testInstantiateWasm } from './instantiate_wasm.test';
 
 const baseURL = window.location.origin;
 const dataURL = `${baseURL}/data`;
@@ -135,6 +136,7 @@ testHTTPFSAsync(() => adb!, resolveData, dataURL);
 testUDF(() => db!);
 testTimeZone(() => db!);
 testTimeZoneAsync(() => adb!);
+testInstantiateWasm(DUCKDB_BUNDLES);
 longQueries(() => adb!);
 testTableNames(() => db!);
 testTableNamesAsync(() => adb!);
