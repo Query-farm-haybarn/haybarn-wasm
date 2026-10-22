@@ -4,9 +4,39 @@
 #include <stdexcept>
 
 #if defined(__EMSCRIPTEN_PTHREADS__)
+#include <emscripten.h>
+#include <emscripten/console.h>
 #include <emscripten/proxying.h>
 #include <emscripten/threading.h>
+#include <errno.h>
 #include <pthread.h>
+#endif
+
+#if defined(__EMSCRIPTEN_PTHREADS__)
+/// Refill emscripten's pthread pool, see main_thread::TopUpPool
+// clang-format off
+EM_JS(void, duckdb_web_pthread_pool_top_up, (int spare, int max_workers), {
+    // Threads that ended but were not cleaned up yet still hold their worker, it returns to the pool in the event loop
+    var alive = 0;
+    for (var ptr of Object.keys(PThread.pthreads)) {
+        if (!PThread.finishedThreads || !PThread.finishedThreads.has(Number(ptr))) alive++;
+    }
+    PThread.haybarnLoadingWorkers = PThread.haybarnLoadingWorkers || 0;
+    var total = PThread.unusedWorkers.length + PThread.haybarnLoadingWorkers + Object.keys(PThread.pthreads).length;
+    while (PThread.unusedWorkers.length + PThread.haybarnLoadingWorkers < alive + spare && total < max_workers) {
+        // A new worker loads (its script is fetched by this thread) only while this thread is in its event loop:
+        // it joins the pool once loaded, a thread started on it during a call before that would wait for the call
+        const worker = PThread.allocateUnusedWorker();
+        PThread.unusedWorkers.splice(PThread.unusedWorkers.indexOf(worker), 1);
+        PThread.haybarnLoadingWorkers++;
+        total++;
+        PThread.loadWasmModuleToWorker(worker).then(() => {
+            PThread.haybarnLoadingWorkers--;
+            PThread.unusedWorkers.push(worker);
+        });
+    }
+});
+// clang-format on
 #endif
 
 namespace duckdb {
@@ -16,6 +46,11 @@ namespace main_thread {
 #if defined(__EMSCRIPTEN_PTHREADS__)
 
 namespace {
+/// Idle workers kept beyond the threads that are alive
+constexpr int POOL_SPARE_WORKERS = 4;
+/// No more workers than this, idle or not
+constexpr int POOL_MAX_WORKERS = 64;
+
 /// The queue of calls for the main thread
 emscripten::ProxyingQueue &Queue() {
     static emscripten::ProxyingQueue queue;
@@ -61,6 +96,12 @@ void RunSync(const std::function<void()> &fn) {
     if (error) std::rethrow_exception(error);
 }
 
+void TopUpPool() {
+    if (IsMainThread()) {
+        duckdb_web_pthread_pool_top_up(POOL_SPARE_WORKERS, POOL_MAX_WORKERS);
+    }
+}
+
 void ServeUntil(std::atomic<int> &done) {
     while (done.load() == 0) {
         main_wake.store(0);
@@ -77,6 +118,7 @@ void ServeUntil(std::atomic<int> &done) {
 
 bool IsMainThread() { return true; }
 void Wake() {}
+void TopUpPool() {}
 void RunSync(const std::function<void()> &fn) { fn(); }
 void ServeUntil(std::atomic<int> &done) {
     while (done.load() == 0) {
@@ -95,6 +137,17 @@ void ServeUntil(std::atomic<int> &done) {
 /// thread). Linked with --wrap=pthread_create: the creation itself is proxied to the main thread.
 extern "C" int __real_pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start)(void *), void *arg);
 extern "C" int __wrap_pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start)(void *), void *arg) {
-    return duckdb::web::main_thread::OnMainThread([&] { return __real_pthread_create(thread, attr, start, arg); });
+    return duckdb::web::main_thread::OnMainThread([&] {
+        auto rc = __real_pthread_create(thread, attr, start, arg);
+        // The pool is strict (PTHREAD_POOL_SIZE_STRICT=2): no idle worker left fails with EAGAIN instead of
+        // creating a worker that would only start after the call
+        static bool warned = false;
+        if (rc == EAGAIN && !warned) {
+            warned = true;
+            emscripten_console_warn(
+                "pthread_create: the pthread pool is exhausted for this call, the thread was not started (EAGAIN)");
+        }
+        return rc;
+    });
 }
 #endif

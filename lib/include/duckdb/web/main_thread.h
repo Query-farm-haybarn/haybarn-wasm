@@ -24,6 +24,14 @@ void RunSync(const std::function<void()> &fn);
 void ServeUntil(std::atomic<int> &done);
 /// Wake the main thread out of ServeUntil, after setting its `done` or after queueing work for it
 void Wake();
+/// Keep idle workers in emscripten's pthread pool, called on the main thread after a call. A pthread can only be
+/// created synchronously on a worker the pool already holds, and a new worker loads only while the main thread is
+/// in its event loop, so the pool is refilled between calls: with the threads that are alive plus a few more idle, a
+/// call can relaunch the scheduler at the same size (the old threads are joined, but their workers return to the
+/// pool only in the event loop) and extensions can start threads of their own. New workers join the pool once they
+/// have loaded, which takes a moment: right after a call that exhausted the pool, the next ones may still find it
+/// short. A no-op without pthreads and off the main thread.
+void TopUpPool();
 
 /// Run a callable on the main thread and return its result
 template <typename F> auto OnMainThread(F &&fn) -> decltype(fn()) {

@@ -69,6 +69,8 @@ void RunJob(const std::function<void()> &job) {
     }
     state.work.notify_one();
     main_thread::ServeUntil(state.done);
+    // The main thread returns to its event loop next, where new workers start
+    main_thread::TopUpPool();
 }
 
 void Stop() {

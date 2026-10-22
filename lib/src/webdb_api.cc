@@ -5,6 +5,7 @@
 
 #include "duckdb/web/config.h"
 #include "duckdb/web/io/web_filesystem.h"
+#include "duckdb/web/main_thread.h"
 #include "duckdb/web/query_thread.h"
 #include "duckdb/web/status.h"
 #include "duckdb/web/utils/wasm_response.h"
@@ -75,6 +76,8 @@ void duckdb_web_flush_file(const char* path) {
 void duckdb_web_open(WASMResponse* packed, const char* args) {
     GET_WEBDB(*packed);
     WASMResponseBuffer::Get().Store(*packed, webdb.Open(args));
+    // Opening started the scheduler's threads from the pool
+    main_thread::TopUpPool();
 }
 /// Lookup global file info
 void duckdb_web_get_global_file_info(WASMResponse* packed, size_t cache_epoch) {

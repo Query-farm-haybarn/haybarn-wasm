@@ -142,8 +142,11 @@ if(EMSCRIPTEN)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -sUSE_PTHREADS=1 -DWEBDB_THREADS=1")
     set(DUCKDB_CXX_FLAGS "${CMAKE_CXX_FLAGS} -sUSE_PTHREADS=1")
     # The pool: the query thread, DuckDB's workers (maximum_threads - 1) and room for SET threads; pthread_create
-    # is wrapped, see main_thread.cc
-    set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -sUSE_PTHREADS=1 -sPTHREAD_POOL_SIZE=8 -pthread -Wl,--wrap=pthread_create")
+    # is wrapped, see main_thread.cc. main_thread::TopUpPool refills it between calls. A worker added
+    # during a call only starts once the call is done, so a thread beyond the pool fails with EAGAIN
+    # (PTHREAD_POOL_SIZE_STRICT=2) rather than hanging whatever waits for it: the scheduler then runs with the
+    # threads it has, a std::thread throws.
+    set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -sUSE_PTHREADS=1 -sPTHREAD_POOL_SIZE=8 -sPTHREAD_POOL_SIZE_STRICT=2 -pthread -Wl,--wrap=pthread_create")
     set(DUCKDB_PLATFORM "wasm_threads")
   else()
     set(CMAKE_CXX_FLAGS
