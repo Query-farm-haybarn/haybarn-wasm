@@ -1128,6 +1128,12 @@ jobs:
               run: |
                       CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:threads:smoke
 
+            # Haybarn: install and load signed core extensions from haybarn-extensions.query.farm with
+            # both loadable bundles, the way a user's page does (no local repository, signatures checked)
+            - name: Test the Haybarn extension repository on Chrome
+              shell: bash
+              run: |
+                      CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:haybarn-repository
 
             #            - name: Test @haybarn/haybarn-wasm on Firefox
             #              uses: ./.github/actions/haybarn-wasm-ci-env
