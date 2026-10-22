@@ -83,7 +83,7 @@ class HTTPWasmClient : public HTTPClient {
                         	xhr.setRequestHeader(z, UTF8ToString(ptr2));
 			} else {
 
-                        	xhr.setRequestHeader(z, encodeURI(UTF8ToString(ptr2)));
+                        	xhr.setRequestHeader(z, UTF8ToString(ptr2));
 			}
                     } catch (error) {
                 console.warn("Error while performing XMLHttpRequest.setRequestHeader()", error);
@@ -342,7 +342,7 @@ class HTTPWasmClient : public HTTPClient {
                         	xhr.setRequestHeader(z, UTF8ToString(ptr2));
 			} else {
 				
-                        	xhr.setRequestHeader(z, encodeURI(UTF8ToString(ptr2)));
+                        	xhr.setRequestHeader(z, UTF8ToString(ptr2));
 			}
                     } catch (error) {
                 console.warn("Error while performing XMLHttpRequest.setRequestHeader()", error);
@@ -608,7 +608,7 @@ res->headers.Insert(head, tail);
                         	xhr.setRequestHeader(z, UTF8ToString(ptr2));
 			} else {
 				
-                        	xhr.setRequestHeader(z, encodeURI(UTF8ToString(ptr2)));
+                        	xhr.setRequestHeader(z, UTF8ToString(ptr2));
 			}
                     } catch (error) {
                 console.warn("Error while performing XMLHttpRequest.setRequestHeader()", error);
@@ -785,7 +785,7 @@ res->headers.Insert(head, tail);
                         	xhr.setRequestHeader(z, UTF8ToString(ptr2));
 			} else {
 				
-                        	xhr.setRequestHeader(z, encodeURI(UTF8ToString(ptr2)));
+                        	xhr.setRequestHeader(z, UTF8ToString(ptr2));
 			}
                     } catch (error) {
                 console.warn("Error while performing XMLHttpRequest.setRequestHeader()", error);
@@ -975,7 +975,7 @@ res->headers.Insert(head, tail);
                         	xhr.setRequestHeader(z, UTF8ToString(ptr2));
 			} else {
 				
-                        	xhr.setRequestHeader(z, encodeURI(UTF8ToString(ptr2)));
+                        	xhr.setRequestHeader(z, UTF8ToString(ptr2));
 			}
                     } catch (error) {
                 console.warn("Error while performing XMLHttpRequest.setRequestHeader()", error);
