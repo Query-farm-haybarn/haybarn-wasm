@@ -24,6 +24,9 @@ export function configure(params) {
             extensions: ['.ts', '.tsx', '.js', '.mjs', '.jsx', '.css', '.wasm'],
             alias: {
                 '@haybarn/haybarn-wasm': path.resolve(__dirname, '../duckdb-wasm'),
+                // Haybarn: like the engine package, bundle the freshly built shell from its workspace dir rather
+                // than the copy yarn made into node_modules at install time, before the shell was built.
+                '@haybarn/haybarn-wasm-shell': path.resolve(__dirname, '../duckdb-wasm-shell'),
             },
         },
         module: {
@@ -137,7 +140,10 @@ export function configure(params) {
         plugins: [
             new HtmlWebpackPlugin({
                 template: './static/index.html',
-                filename: './original.html',
+                // Haybarn: emit index.html so the app is served at `/`. Upstream emits original.html for the
+                // GitHub Pages coi-serviceworker trick (a service worker re-serves it with COOP/COEP); the Haybarn
+                // shell is hosted on Cloudflare Pages, where _worker.js sets those headers.
+                filename: './index.html',
             }),
             new MiniCssExtractPlugin({
                 filename: './static/css/[id].[contenthash].css',
@@ -160,6 +166,19 @@ export function configure(params) {
                     {
                         from: '../duckdb-wasm/docs',
                         to: './docs',
+                    },
+                    {
+                        // Cloudflare Pages reads _headers from the deploy root (COOP/COEP + asset caching)
+                        from: './static/_headers',
+                        to: './_headers',
+                        toType: 'file',
+                    },
+                    {
+                        // Cloudflare Pages advanced-mode worker: serves the threads wasm same-origin and applies
+                        // COOP/COEP to every response. Must sit at the deploy root.
+                        from: './_worker.js',
+                        to: './_worker.js',
+                        toType: 'file',
                     },
                 ],
             }),

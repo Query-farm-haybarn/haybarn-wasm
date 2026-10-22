@@ -13,16 +13,25 @@ import 'xterm/css/xterm.css';
 import 'react-popper-tooltip/dist/styles.css';
 
 import * as duckdb from '@haybarn/haybarn-wasm';
-import duckdb_wasm_base from '@haybarn/haybarn-wasm/dist/duckdb-base.wasm';
-import duckdb_wasm_threads from '@haybarn/haybarn-wasm/dist/duckdb-threads.wasm';
+
+// Haybarn: the wasm engine binaries are not bundled. The base one loads at runtime from the jsDelivr copy of the
+// published @haybarn/haybarn-wasm package, pinned to the release the shell ships with. The worker glue is bundled
+// and served same-origin: a Worker cannot be constructed from a cross-origin script, and each worker fetches its
+// mainModule with CORS (jsDelivr sends access-control-allow-origin: * and a cross-origin CORP header, so it also
+// loads under COEP: require-corp).
+const HAYBARN_WASM_VERSION = '2.0.0-rc1';
+const CDN = `https://cdn.jsdelivr.net/npm/@haybarn/haybarn-wasm@${HAYBARN_WASM_VERSION}/dist`;
 
 const DUCKDB_BUNDLES: duckdb.DuckDBBundles = {
     base: {
-        mainModule: duckdb_wasm_base,
+        mainModule: `${CDN}/duckdb-base.wasm`,
         mainWorker: new URL('@haybarn/haybarn-wasm/dist/duckdb-browser-base.worker.js', import.meta.url).toString(),
     },
     threads: {
-        mainModule: duckdb_wasm_threads,
+        // The threads wasm exceeds Cloudflare Pages' 25 MiB static-file limit and has to be same-origin for its
+        // shared memory: _worker.js streams it from Haybarn's R2 at /wasm/duckdb-threads.wasm. The path is the
+        // same for every release and served immutable, so the version query gives each release its own cache entry.
+        mainModule: `${window.location.origin}/wasm/duckdb-threads.wasm?v=${HAYBARN_WASM_VERSION}`,
         mainWorker: new URL('@haybarn/haybarn-wasm/dist/duckdb-browser-threads.worker.js', import.meta.url).toString(),
         pthreadWorker: new URL(
             '@haybarn/haybarn-wasm/dist/duckdb-browser-threads.pthread.worker.js',

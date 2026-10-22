@@ -1303,6 +1303,28 @@ jobs:
               run: |
                       yarn workspace @haybarn/haybarn-wasm test:node
 
+            # Publish the threads wasm to Haybarn R2 (served at haybarn-extensions.query.farm) under a
+            # version-pinned key; the shell's _worker.js streams it same-origin from there. The version
+            # comes from the worker's own URL, the single source of truth for the path it requests.
+            - name: Publish threads wasm to R2
+              if: github.event_name == 'create' && startsWith(github.ref, 'refs/tags/haybarn-v2.')
+              env:
+                  AWS_ENDPOINT_URL: ${{ secrets.R2_ENDPOINT }}
+                  AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+                  AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY_ID }}
+                  AWS_DEFAULT_REGION: auto
+                  AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+                  AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+              run: |
+                  VERSION=$(grep -oE 'engine/[^/]+/duckdb-threads\.wasm' packages/duckdb-wasm-app/_worker.js | head -1 | sed -E 's|engine/(.+)/duckdb-threads\.wasm|\1|')
+                  test -n "$VERSION" || { echo "could not parse engine version from _worker.js"; exit 1; }
+                  WASM=./packages/duckdb-wasm/src/bindings/duckdb-threads.wasm
+                  test -f "$WASM" || { echo "missing $WASM"; exit 1; }
+                  echo "Uploading $WASM -> s3://${{ secrets.R2_BUCKET }}/engine/${VERSION}/duckdb-threads.wasm"
+                  aws s3 cp "$WASM" "s3://${{ secrets.R2_BUCKET }}/engine/${VERSION}/duckdb-threads.wasm" \
+                      --content-type application/wasm \
+                      --cache-control "public, max-age=31536000, immutable"
+
             # Publish @haybarn/haybarn-wasm with the org-level HAYBARN_NPM_TOKEN (provenance comes from
             # the job's id-token permission). The other workspace packages are private and never published.
             - name: Publish @haybarn/haybarn-wasm to npm
@@ -1313,6 +1335,21 @@ jobs:
               run: |
                   echo "TAG=${TAG} ref=${GITHUB_REF}"
                   ./scripts/npm_publish_lib.sh
+
+            # Deploy the Haybarn shell to Cloudflare Pages (shell.haybarn.query.farm), after the npm
+            # publish: the shell loads the base wasm from the published package. Pinned wrangler, and
+            # the account id is stripped of stray whitespace (wrangler >= 4.119 rejects it), as on 1.5.
+            - name: Deploy Haybarn shell to Cloudflare Pages
+              if: github.event_name == 'create' && startsWith(github.ref, 'refs/tags/haybarn-v2.')
+              env:
+                  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+                  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+              run: |
+                  export CLOUDFLARE_ACCOUNT_ID="$(printf '%s' "${CLOUDFLARE_ACCOUNT_ID}" | tr -d '[:space:]')"
+                  npx --yes wrangler@4.119.0 pages deploy \
+                      packages/duckdb-wasm-app/build/release \
+                      --project-name haybarn-shell \
+                      --branch production
 
     merge_reports:
         name: Merge benchmark reports
