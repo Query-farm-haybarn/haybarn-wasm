@@ -1,6 +1,9 @@
 #ifndef INCLUDE_DUCKDB_WEB_WEBDB_H_
 #define INCLUDE_DUCKDB_WEB_WEBDB_H_
 
+#include <atomic>
+#include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <duckdb/main/prepared_statement.hpp>
 #include <duckdb/main/query_result.hpp>
@@ -46,6 +49,27 @@ struct DuckDBWasmResultsWrapper {
     ResponseStatus status;
 };
 
+/// The progress of a connection's query, in wasm memory where any thread can read it. The thread that runs the
+/// query writes it whenever the engine updates its progress (only with `SET enable_progress_bar = true`), without a
+/// call into JS, so it is safe on a pthread. A seqlock: `sequence` is odd while a write is under way, a reader takes
+/// the fields when `sequence` was even and unchanged around them. The layout is read by progress.ts.
+struct alignas(8) QueryProgressSlot {
+    /// Bumped twice per write
+    std::atomic<uint32_t> sequence{0};
+    /// 1 while a query reports progress, 0 once it finished
+    uint32_t running = 0;
+    /// Percentage done in [0, 100], -1 when the engine cannot estimate it
+    double percentage = -1;
+    /// Rows processed so far
+    double rows_processed = 0;
+    /// Rows to process in total
+    double total_rows = 0;
+
+    /// Store a progress update, single writer
+    void Write(bool running, double percentage, double rows_processed, double total_rows);
+};
+static_assert(offsetof(QueryProgressSlot, percentage) == 8, "progress.ts reads the slot at fixed offsets");
+
 class WebDB {
    public:
     /// A connection
@@ -55,6 +79,9 @@ class WebDB {
        protected:
         /// The webdb
         WebDB& webdb_;
+        /// The progress of the connection's query, shared with the progress display of each query, which the client
+        /// context can outlive the connection with
+        std::shared_ptr<QueryProgressSlot> progress_slot_;
         /// The connection
         duckdb::Connection connection_;
 
@@ -111,6 +138,8 @@ class WebDB {
 
         /// Get a connection
         auto& connection() { return connection_; }
+        /// The progress of the connection's query
+        QueryProgressSlot& progress_slot() { return *progress_slot_; }
         /// Interrupt the query running on the connection, as Connection::Interrupt does. Callable from any thread
         void Interrupt() { connection_.Interrupt(); }
         /// Get the filesystem

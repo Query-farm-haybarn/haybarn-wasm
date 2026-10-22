@@ -329,6 +329,28 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                         [],
                     );
                     break;
+                case WorkerRequestType.GET_PROGRESS_HANDLE:
+                    this.postMessage(
+                        {
+                            messageId: this._nextMessageId++,
+                            requestId: request.messageId,
+                            type: WorkerResponseType.PROGRESS_HANDLE,
+                            data: this._bindings.getProgressHandle(request.data),
+                        },
+                        [],
+                    );
+                    break;
+                case WorkerRequestType.GET_QUERY_PROGRESS:
+                    this.postMessage(
+                        {
+                            messageId: this._nextMessageId++,
+                            requestId: request.messageId,
+                            type: WorkerResponseType.QUERY_PROGRESS,
+                            data: this._bindings.getQueryProgress(request.data),
+                        },
+                        [],
+                    );
+                    break;
                 case WorkerRequestType.FETCH_QUERY_RESULTS: {
                     const result = this._bindings.fetchQueryResults(request.data);
                     // An empty batch ends the stream

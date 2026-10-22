@@ -122,7 +122,8 @@ web::Result<std::reference_wrapper<WebDB>> WebDB::Get() {
 }
 
 /// Constructor
-WebDB::Connection::Connection(WebDB& webdb) : webdb_(webdb), connection_(*webdb.database_) {}
+WebDB::Connection::Connection(WebDB& webdb)
+    : webdb_(webdb), progress_slot_(std::make_shared<QueryProgressSlot>()), connection_(*webdb.database_) {}
 /// Constructor
 WebDB::Connection::~Connection() = default;
 
@@ -1006,24 +1007,56 @@ bool WebDB::QueriesInFlight() const {
 /// Get the version
 std::string_view WebDB::GetVersion() { return database_->LibraryVersion(); }
 
+void QueryProgressSlot::Write(bool running_now, double percentage_now, double rows_now, double total_now) {
+    auto seq = sequence.load(std::memory_order_relaxed);
+    sequence.store(seq + 1, std::memory_order_relaxed);
+    std::atomic_thread_fence(std::memory_order_release);
+    running = running_now ? 1 : 0;
+    percentage = percentage_now;
+    rows_processed = rows_now;
+    total_rows = total_now;
+    sequence.store(seq + 2, std::memory_order_release);
+}
+
 class ProgressBarCustom : public ProgressBarDisplay {
     double value{0.0};
     double times{0.0};
     double to_send{1.0};
+    /// The last percentage the engine reported
+    double last{-1.0};
+    /// The connection's progress slot
+    std::shared_ptr<QueryProgressSlot> slot;
+    /// The client context of the query
+    ClientContext& context;
 
    public:
-    ProgressBarCustom() {
+    ProgressBarCustom(std::shared_ptr<QueryProgressSlot> slot, ClientContext& context)
+        : slot(std::move(slot)), context(context) {
         value = 0.0;
         times = 0.0;
         to_send = 1.0;
+        this->slot->Write(true, -1, 0, 0);
     }
     ~ProgressBarCustom() {}
     static void SendMessage(double end, double percentage, double times) {
-        emscripten::val::global("DUCKDB_RUNTIME").call<void>("progressUpdate", end ? 1.0 : 0.0, percentage, times);
+        // The runtime lives on the main thread; with pthreads the query runs on a thread of its own, whose
+        // DUCKDB_RUNTIME cannot post to the page
+        main_thread::OnMainThread([&] {
+            emscripten::val::global("DUCKDB_RUNTIME").call<void>("progressUpdate", end ? 1.0 : 0.0, percentage, times);
+        });
+    }
+    /// Store the progress in the slot. The rows are those of the engine's previous update: the display is told
+    /// before the context records the new ones
+    void Store(bool running, double percentage) {
+        auto progress = context.GetQueryProgress();
+        slot->Write(running, percentage, static_cast<double>(progress.GetRowsProcessed()),
+                    static_cast<double>(progress.GetTotalRowsToProcess()));
     }
 
    public:
     void Update(double percentage) {
+        last = percentage;
+        Store(true, percentage);
         if (percentage >= value + 1.0) {
             value = percentage;
             times = 1.0;
@@ -1038,12 +1071,12 @@ class ProgressBarCustom : public ProgressBarDisplay {
         }
     }
     void Finish() {
+        Store(false, last);
         SendMessage(true, value, times);
         value = 0.0;
         times = 0.0;
         to_send = 1.0;
     }
-    static unique_ptr<ProgressBarDisplay> GetProgressBar() { return make_uniq<ProgressBarCustom>(); }
 };
 
 /// Create a session
@@ -1052,7 +1085,10 @@ WebDB::Connection* WebDB::Connect() {
     auto conn_ptr = conn.get();
     connections_.insert({conn_ptr, std::move(conn)});
     ClientConfig::GetConfig(*conn_ptr->connection_.context).wait_time = 1;
-    ClientConfig::GetConfig(*conn_ptr->connection_.context).display_create_func = ProgressBarCustom::GetProgressBar;
+    auto& context = *conn_ptr->connection_.context;
+    ClientConfig::GetConfig(context).display_create_func = [slot = conn_ptr->progress_slot_, &context] {
+        return unique_ptr<ProgressBarDisplay>(make_uniq<ProgressBarCustom>(slot, context));
+    };
     return conn_ptr;
 }
 

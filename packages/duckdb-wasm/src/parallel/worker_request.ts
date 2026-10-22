@@ -5,7 +5,7 @@ import { ScriptTokens } from '../bindings/tokens';
 import { FileStatistics } from '../bindings/file_stats';
 import { DuckDBConfig } from '../bindings/config';
 import { WebFile } from '../bindings/web_file';
-import { InstantiationProgress } from '../bindings/progress';
+import { InstantiationProgress, QueryProgress, QueryProgressHandle } from '../bindings/progress';
 import { InterruptHandle } from '../bindings/interrupt';
 import { DuckDBDataProtocol } from '../bindings';
 
@@ -29,6 +29,8 @@ export enum WorkerRequestType {
     FLUSH_FILES = 'FLUSH_FILES',
     GET_FEATURE_FLAGS = 'GET_FEATURE_FLAGS',
     GET_INTERRUPT_HANDLE = 'GET_INTERRUPT_HANDLE',
+    GET_PROGRESS_HANDLE = 'GET_PROGRESS_HANDLE',
+    GET_QUERY_PROGRESS = 'GET_QUERY_PROGRESS',
     GET_TABLE_NAMES = 'GET_TABLE_NAMES',
     GET_VERSION = 'GET_VERSION',
     GLOB_FILE_INFOS = 'GLOB_FILE_INFOS',
@@ -61,10 +63,12 @@ export enum WorkerResponseType {
     INSTANTIATE_PROGRESS = 'INSTANTIATE_PROGRESS',
     INTERRUPT_HANDLE = 'INTERRUPT_HANDLE',
     LOG = 'LOG',
+    PROGRESS_HANDLE = 'PROGRESS_HANDLE',
     PROGRESS_UPDATE = 'PROGRESS_UPDATE',
     OK = 'OK',
     PREPARED_STATEMENT_ID = 'PREPARED_STATEMENT_ID',
     QUERY_PLAN = 'QUERY_PLAN',
+    QUERY_PROGRESS = 'QUERY_PROGRESS',
     QUERY_RESULT = 'QUERY_RESULT',
     QUERY_RESULT_CHUNK = 'QUERY_RESULT_CHUNK',
     QUERY_RESULT_HEADER = 'QUERY_RESULT_HEADER',
@@ -128,6 +132,8 @@ export type WorkerRequestVariant =
     | WorkerRequest<WorkerRequestType.FLUSH_FILES, null>
     | WorkerRequest<WorkerRequestType.GET_FEATURE_FLAGS, null>
     | WorkerRequest<WorkerRequestType.GET_INTERRUPT_HANDLE, number>
+    | WorkerRequest<WorkerRequestType.GET_PROGRESS_HANDLE, number>
+    | WorkerRequest<WorkerRequestType.GET_QUERY_PROGRESS, number>
     | WorkerRequest<WorkerRequestType.GET_TABLE_NAMES, [number, string]>
     | WorkerRequest<WorkerRequestType.GET_VERSION, null>
     | WorkerRequest<WorkerRequestType.GLOB_FILE_INFOS, string>
@@ -162,10 +168,12 @@ export type WorkerResponseVariant =
     | WorkerResponse<WorkerResponseType.INSTANTIATE_PROGRESS, InstantiationProgress>
     | WorkerResponse<WorkerResponseType.INTERRUPT_HANDLE, InterruptHandle | null>
     | WorkerResponse<WorkerResponseType.LOG, LogEntryVariant>
+    | WorkerResponse<WorkerResponseType.PROGRESS_HANDLE, QueryProgressHandle | null>
     | WorkerResponse<WorkerResponseType.PROGRESS_UPDATE, ProgressEntry>
     | WorkerResponse<WorkerResponseType.OK, null>
     | WorkerResponse<WorkerResponseType.PREPARED_STATEMENT_ID, number>
     | WorkerResponse<WorkerResponseType.QUERY_PLAN, Uint8Array>
+    | WorkerResponse<WorkerResponseType.QUERY_PROGRESS, QueryProgress | null>
     | WorkerResponse<WorkerResponseType.QUERY_RESULT, Uint8Array>
     | WorkerResponse<WorkerResponseType.QUERY_RESULT_CHUNK, Uint8Array | null>
     | WorkerResponse<WorkerResponseType.QUERY_RESULT_HEADER, Uint8Array>
@@ -192,6 +200,8 @@ export type WorkerTaskVariant =
     | WorkerTask<WorkerRequestType.FLUSH_FILES, null, null>
     | WorkerTask<WorkerRequestType.GET_FEATURE_FLAGS, null, number>
     | WorkerTask<WorkerRequestType.GET_INTERRUPT_HANDLE, ConnectionID, InterruptHandle | null>
+    | WorkerTask<WorkerRequestType.GET_PROGRESS_HANDLE, ConnectionID, QueryProgressHandle | null>
+    | WorkerTask<WorkerRequestType.GET_QUERY_PROGRESS, ConnectionID, QueryProgress | null>
     | WorkerTask<WorkerRequestType.GET_TABLE_NAMES, [number, string], string[]>
     | WorkerTask<WorkerRequestType.GET_VERSION, null, string>
     | WorkerTask<

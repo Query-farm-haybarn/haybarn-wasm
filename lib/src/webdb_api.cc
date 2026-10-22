@@ -282,6 +282,22 @@ void duckdb_web_connection_interrupt(ConnectionHdl connHdl) {
     auto c = reinterpret_cast<WebDB::Connection*>(connHdl);
     c->Interrupt();
 }
+/// Address of the connection's query progress (QueryProgressSlot) in wasm memory, read by progress.ts
+uint32_t duckdb_web_connection_progress_slot(ConnectionHdl connHdl) {
+    auto c = reinterpret_cast<WebDB::Connection*>(connHdl);
+    return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&c->progress_slot()));
+}
+/// The percentage done of the connection's query in [0, 100], -1 when unknown. Runs on the calling thread
+double duckdb_web_get_query_progress(ConnectionHdl connHdl) {
+    auto c = reinterpret_cast<WebDB::Connection*>(connHdl);
+    auto& slot = c->progress_slot();
+    while (true) {
+        auto before = slot.sequence.load(std::memory_order_acquire);
+        double percentage = slot.percentage;
+        std::atomic_thread_fence(std::memory_order_acquire);
+        if ((before & 1) == 0 && slot.sequence.load(std::memory_order_relaxed) == before) return percentage;
+    }
+}
 /// Fetch query results
 void duckdb_web_query_fetch_results(WASMResponse* packed, ConnectionHdl connHdl) {
     auto c = reinterpret_cast<WebDB::Connection*>(connHdl);

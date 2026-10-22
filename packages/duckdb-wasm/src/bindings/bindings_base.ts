@@ -2,7 +2,7 @@ import { DuckDBModule, PThread } from './duckdb_module';
 import { OPFSAccessMode } from './opfs_scratch';
 import { DuckDBConfig } from './config';
 import { Logger } from '../log';
-import { InstantiationProgress } from './progress';
+import { InstantiationProgress, QueryProgress, QueryProgressHandle, readQueryProgress } from './progress';
 import { InterruptHandle } from './interrupt';
 import { DuckDBBindings } from './bindings_interface';
 import { DuckDBConnection } from './connection';
@@ -361,6 +361,19 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
     /** Interrupt the query running on the connection. Reaches only a query that runs between two calls */
     public interruptQuery(conn: number): void {
         this.mod.ccall('duckdb_web_connection_interrupt', null, ['number'], [conn]);
+    }
+    /** The connection's query progress slot, when the wasm memory is shared (threads bundle); null otherwise */
+    public getProgressHandle(conn: number): QueryProgressHandle | null {
+        const memory = this.sharedMemory();
+        if (memory === null) return null;
+        return { memory, offset: this.progressSlot(conn) };
+    }
+    /** The progress of the connection's query, as last reported by the engine */
+    public getQueryProgress(conn: number): QueryProgress | null {
+        return readQueryProgress({ memory: this.mod.HEAPU8.buffer, offset: this.progressSlot(conn) });
+    }
+    private progressSlot(conn: number): number {
+        return this.mod.ccall('duckdb_web_connection_progress_slot', 'number', ['number'], [conn]) >>> 0;
     }
     /** Fetch query results */
     public fetchQueryResults(conn: number): Uint8Array | null {

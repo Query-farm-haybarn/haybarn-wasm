@@ -15,7 +15,7 @@ import { CSVInsertOptions, JSONInsertOptions, ArrowInsertOptions } from '../bind
 import { ScriptTokens } from '../bindings/tokens';
 import { FileStatistics } from '../bindings/file_stats';
 import { DuckDBConfig } from '../bindings/config';
-import { InstantiationProgress } from '../bindings/progress';
+import { InstantiationProgress, QueryProgress, QueryProgressHandle } from '../bindings/progress';
 import { InterruptHandle, interruptConnection } from '../bindings/interrupt';
 import { arrowToSQLField } from '../json_typedef';
 import { WebFile } from '../bindings/web_file';
@@ -313,6 +313,18 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
                     return;
                 }
                 break;
+            case WorkerRequestType.GET_PROGRESS_HANDLE:
+                if (response.type == WorkerResponseType.PROGRESS_HANDLE) {
+                    task.promiseResolver(response.data);
+                    return;
+                }
+                break;
+            case WorkerRequestType.GET_QUERY_PROGRESS:
+                if (response.type == WorkerResponseType.QUERY_PROGRESS) {
+                    task.promiseResolver(response.data);
+                    return;
+                }
+                break;
             case WorkerRequestType.FETCH_QUERY_RESULTS:
                 if (response.type == WorkerResponseType.QUERY_RESULT_CHUNK) {
                     task.promiseResolver(response.data);
@@ -559,6 +571,31 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
         if (cached) return cached;
         const task = new WorkerTask<WorkerRequestType.GET_INTERRUPT_HANDLE, ConnectionID, InterruptHandle | null>(
             WorkerRequestType.GET_INTERRUPT_HANDLE,
+            conn,
+        );
+        return await this.postTask(task);
+    }
+
+    /**
+     * The connection's query progress slot, or null when the wasm memory is not shared (the base bundle). Read it
+     * with `readQueryProgress(handle)`, also while a query runs. The engine reports progress only with
+     * `SET enable_progress_bar = true`.
+     */
+    public async getProgressHandle(conn: ConnectionID): Promise<QueryProgressHandle | null> {
+        const task = new WorkerTask<WorkerRequestType.GET_PROGRESS_HANDLE, ConnectionID, QueryProgressHandle | null>(
+            WorkerRequestType.GET_PROGRESS_HANDLE,
+            conn,
+        );
+        return await this.postTask(task);
+    }
+
+    /**
+     * The progress of the connection's query as the engine last reported it, on every bundle. The worker answers
+     * between two calls only: on the threads bundle, read a running query's progress with getProgressHandle.
+     */
+    public async getQueryProgress(conn: ConnectionID): Promise<QueryProgress | null> {
+        const task = new WorkerTask<WorkerRequestType.GET_QUERY_PROGRESS, ConnectionID, QueryProgress | null>(
+            WorkerRequestType.GET_QUERY_PROGRESS,
             conn,
         );
         return await this.postTask(task);

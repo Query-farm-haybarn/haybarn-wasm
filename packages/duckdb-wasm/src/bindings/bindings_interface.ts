@@ -2,6 +2,7 @@ import { DuckDBConfig, DuckDBConnection, DuckDBDataProtocol, FileStatistics, Ins
 import { CSVInsertOptions, JSONInsertOptions, ArrowInsertOptions } from './insert_options';
 import { ScriptTokens } from './tokens';
 import { InterruptHandle } from './interrupt';
+import { QueryProgress, QueryProgressHandle } from './progress';
 import { WebFile } from './web_file';
 import { OPFSAccessMode } from './opfs_scratch';
 import * as arrow from 'apache-arrow';
@@ -23,6 +24,8 @@ export interface DuckDBBindings {
     cancelPendingQuery(conn: number): boolean;
     getInterruptHandle(conn: number): InterruptHandle | null;
     interruptQuery(conn: number): void;
+    getProgressHandle(conn: number): QueryProgressHandle | null;
+    getQueryProgress(conn: number): QueryProgress | null;
     fetchQueryResults(conn: number): Uint8Array | null;
     getTableNames(conn: number, text: string): string[];
 
