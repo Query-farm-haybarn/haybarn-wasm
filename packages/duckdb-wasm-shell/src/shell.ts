@@ -73,6 +73,19 @@ interface ShellProps {
     resolveDatabase: (p: duckdb.InstantiationProgressHandler) => Promise<duckdb.AsyncDuckDB>;
     backgroundColor?: string;
     fontFamily?: string;
+    /**
+     * Extensions to silently `LOAD` at shell startup, just after the
+     * "Connected to Haybarn..." banner and before the first prompt.
+     *
+     * - Omit (or pass `undefined`) to use the shell's built-in default
+     *   (currently `["icu", "json", "parquet", "iceberg", "ducklake"]`).
+     * - Pass `[]` to opt out entirely — no LOADs are issued at startup.
+     * - Pass a custom list to tailor (e.g. a parquet-only viewer).
+     *
+     * Failures don't break boot; the shell prints one dim `(skipped: <ext>)` notice per failure
+     * and logs the engine error via `console.warn`.
+     */
+    defaultExtensions?: string[];
 }
 
 function formatBytes(value: number): string {
@@ -110,6 +123,11 @@ export async function embed(props: ShellProps) {
         fontFamily: props.fontFamily ?? 'monospace',
         backgroundColor: props.backgroundColor ?? '#333',
         withWebGL: hasWebGL(),
+        // Pass through only when the caller explicitly provided a value — the
+        // Rust side has its own fallback to the built-in default when this
+        // field is `undefined`, which keeps the haybarn-shell app working
+        // without needing to know the list.
+        defaultExtensions: props.defaultExtensions,
     });
     props.container.onresize = runtime.resizeHandler;
 
@@ -129,9 +147,9 @@ export async function embed(props: ShellProps) {
     };
 
     // Attach to the database
-    shell.writeln(`${TERM_BOLD}[ RUN ]${TERM_NORMAL} Instantiating DuckDB`);
+    shell.writeln(`${TERM_BOLD}[ RUN ]${TERM_NORMAL} Instantiating Haybarn`);
     runtime.database = await props.resolveDatabase(progressHandler);
-    shell.writeln(`${TERM_CLEAR}${TERM_BOLD}[ OK  ]${TERM_NORMAL} Instantiating DuckDB`);
+    shell.writeln(`${TERM_CLEAR}${TERM_BOLD}[ OK  ]${TERM_NORMAL} Instantiating Haybarn`);
 
     // Additional steps
     const step = async (label: string, work: () => Promise<void>) => {

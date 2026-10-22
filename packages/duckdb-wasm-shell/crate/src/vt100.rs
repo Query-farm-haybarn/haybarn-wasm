@@ -75,6 +75,7 @@ pub const CLEAR_SCREEN: &str = "\x1b[2J";
 
 pub const MODES_OFF: &str = "\x1b[m";
 pub const MODE_BOLD: &str = "\x1b[1m";
+pub const MODE_DIM: &str = "\x1b[2m";
 pub const MODE_UNDERLINE: &str = "\x1b[4m";
 pub const MODE_BLINK: &str = "\x1b[6m";
 pub const MODE_REVERSE: &str = "\x1b[7m";
