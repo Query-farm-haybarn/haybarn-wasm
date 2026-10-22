@@ -1,23 +1,33 @@
-<img src="https://raw.githubusercontent.com/duckdb/duckdb-wasm/main/misc/duckdb_wasm.svg" height="64">
+<p align="center">
+  <a href="https://query.farm/products/haybarn/"><img src="https://raw.githubusercontent.com/Query-farm-haybarn/.github/haybarn/profile/assets/haybarn-icon.png" alt="Haybarn" width="120" height="120"></a>
+</p>
+<p align="center">
+  <a href="https://query.farm"><img src="https://query.farm/media-kit/logo/wordmark-light.png" alt="Query.Farm" height="28"></a>
+</p>
 
-[![Main](https://github.com/duckdb/duckdb-wasm/actions/workflows/main.yml/badge.svg)](https://github.com/duckdb/duckdb-wasm/actions/workflows/main.yml)
-[![Benchmarks](https://github.com/duckdb/duckdb-wasm/actions/workflows/benchmarks.yml/badge.svg)](https://github.com/duckdb/duckdb-wasm/actions/workflows/benchmarks.yml)
-[![duckdb](https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@latest/dist/img/duckdb_version_badge.svg)](https://github.com/duckdb/duckdb)
-[![npm](https://img.shields.io/npm/v/@duckdb/duckdb-wasm?logo=npm)](https://www.npmjs.com/package/@duckdb/duckdb-wasm/v/latest)
-[![JSDevlivr](https://data.jsdelivr.com/v1/package/npm/@duckdb/duckdb-wasm/badge?style=rounded)](https://www.jsdelivr.com/package/npm/@duckdb/duckdb-wasm)
+[![npm](https://img.shields.io/npm/v/@haybarn/haybarn-wasm?logo=npm)](https://www.npmjs.com/package/@haybarn/haybarn-wasm/v/latest)
+[![Main](https://github.com/Query-farm-haybarn/haybarn-wasm/actions/workflows/main.yml/badge.svg?branch=haybarn-2.0)](https://github.com/Query-farm-haybarn/haybarn-wasm/actions/workflows/main.yml)
+[![status](https://img.shields.io/badge/build-haybarn--status.query.farm-58a6ff)](https://haybarn-status.query.farm)
 
-**DuckDB-Wasm**
+**Haybarn-Wasm**
 
-DuckDB-Wasm is an in-process analytical SQL database for the browser. It is powered by WebAssembly, speaks Arrow fluently, reads Parquet, CSV and JSON files backed by Filesystem APIs or HTTP requests and has been tested with Chrome, Firefox, Safari and Node.js. Read the [launch blog post](https://duckdb.org/2021/10/29/duckdb-wasm.html).
+Haybarn-Wasm is Query Farm LLC's WebAssembly distribution of [Haybarn](https://query.farm/products/haybarn/) — a derived distribution of [DuckDB](https://duckdb.org) ("Haybarn, powered by DuckDB"). This is the 2.0 line, built on DuckDB v2.0.0. The wasm binary is built against the Haybarn engine fork, so `INSTALL <extension>` resolves to the Haybarn extension repository at [`haybarn-extensions.query.farm`](https://haybarn-status.query.farm) and validates against the Haybarn signing trust root.
 
-Try it out at [shell.duckdb.org](https://shell.duckdb.org) and on [Observable](https://observablehq.com/@cmudig/duckdb) and read the [API documentation](https://shell.duckdb.org/docs/modules/index.html).
+The public API mirrors `@duckdb/duckdb-wasm` 2.0. Existing duckdb-wasm code ports by rewriting the import:
 
-_DuckDB-Wasm is fast! If you're here for performance numbers, head over to [our benchmarks](https://shell.duckdb.org/versus)._
+```ts
+// before
+import * as duckdb from '@duckdb/duckdb-wasm';
+// after
+import * as duckdb from '@haybarn/haybarn-wasm';
+```
+
+This is a hard fork of [duckdb/duckdb-wasm](https://github.com/duckdb/duckdb-wasm). See [HAYBARN.md](https://github.com/Query-farm-haybarn/haybarn-wasm/blob/haybarn-2.0/HAYBARN.md) for the relationship to upstream.
 
 ## Instantiation
 cdn(jsdelivr)  
 ```ts
-import * as duckdb from '@duckdb/duckdb-wasm';
+import * as duckdb from '@haybarn/haybarn-wasm';
 
 const JSDELIVR_BUNDLES = duckdb.getJsDelivrBundles();
 
@@ -28,7 +38,7 @@ const worker_url = URL.createObjectURL(
   new Blob([`importScripts("${bundle.mainWorker!}");`], {type: 'text/javascript'})
 );
 
-// Instantiate the asynchronous version of DuckDB-wasm
+// Instantiate the asynchronous version of Haybarn-Wasm
 const worker = new Worker(worker_url);
 const logger = new duckdb.ConsoleLogger();
 const db = new duckdb.AsyncDuckDB(logger, worker);
@@ -38,17 +48,17 @@ URL.revokeObjectURL(worker_url);
 
 webpack  
 ```ts
-import * as duckdb from '@duckdb/duckdb-wasm';
-import duckdb_wasm from '@duckdb/duckdb-wasm/dist/duckdb-base.wasm';
+import * as duckdb from '@haybarn/haybarn-wasm';
+import duckdb_wasm from '@haybarn/haybarn-wasm/dist/duckdb-base.wasm';
 const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
     base: {
         mainModule: duckdb_wasm,
-        mainWorker: new URL('@duckdb/duckdb-wasm/dist/duckdb-browser-base.worker.js', import.meta.url).toString(),
+        mainWorker: new URL('@haybarn/haybarn-wasm/dist/duckdb-browser-base.worker.js', import.meta.url).toString(),
     },
 };
 // Select a bundle based on browser checks
 const bundle = await duckdb.selectBundle(MANUAL_BUNDLES);
-// Instantiate the asynchronous version of DuckDB-wasm
+// Instantiate the asynchronous version of Haybarn-Wasm
 const worker = new Worker(bundle.mainWorker!);
 const logger = new duckdb.ConsoleLogger();
 const db = new duckdb.AsyncDuckDB(logger, worker);
@@ -56,9 +66,9 @@ await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
 ```
 vite  
 ```ts
-import * as duckdb from '@duckdb/duckdb-wasm';
-import duckdb_wasm from '@duckdb/duckdb-wasm/dist/duckdb-base.wasm?url';
-import duckdb_worker from '@duckdb/duckdb-wasm/dist/duckdb-browser-base.worker.js?url';
+import * as duckdb from '@haybarn/haybarn-wasm';
+import duckdb_wasm from '@haybarn/haybarn-wasm/dist/duckdb-base.wasm?url';
+import duckdb_worker from '@haybarn/haybarn-wasm/dist/duckdb-browser-base.worker.js?url';
 
 const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
     base: {
@@ -68,15 +78,15 @@ const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
 };
 // Select a bundle based on browser checks
 const bundle = await duckdb.selectBundle(MANUAL_BUNDLES);
-// Instantiate the asynchronous version of DuckDB-wasm
+// Instantiate the asynchronous version of Haybarn-Wasm
 const worker = new Worker(bundle.mainWorker!);
 const logger = new duckdb.ConsoleLogger();
 const db = new duckdb.AsyncDuckDB(logger, worker);
 await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
 ```
-static served (manually download the files from https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm/dist/)
+static served (manually download the files from https://cdn.jsdelivr.net/npm/@haybarn/haybarn-wasm/dist/)
 ```ts
-import * as duckdb from '@duckdb/duckdb-wasm';
+import * as duckdb from '@haybarn/haybarn-wasm';
 
 const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
     base: {
@@ -86,12 +96,30 @@ const MANUAL_BUNDLES: duckdb.DuckDBBundles = {
 };
 // Select a bundle based on browser checks
 const bundle = await duckdb.selectBundle(MANUAL_BUNDLES);
-// Instantiate the asynchronous version of DuckDB-wasm
+// Instantiate the asynchronous version of Haybarn-Wasm
 const worker = new Worker(bundle.mainWorker!);
 const logger = new duckdb.ConsoleLogger();
 const db = new duckdb.AsyncDuckDB(logger, worker);
 await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
 ```  
+
+## Loading extensions
+
+Extensions are fetched from `https://haybarn-extensions.query.farm/{core,community}/v2.0.0/<platform>/`, where the
+platform is `wasm_eh` for the `base` bundle and `wasm_threads` for the `threads` bundle. Every extension is checked
+against the Haybarn signing key before it is loaded.
+
+```sql
+INSTALL httpfs;             -- core/v2.0.0/wasm_eh/httpfs.duckdb_extension.wasm
+LOAD httpfs;
+
+INSTALL h3 FROM community;  -- community/v2.0.0/wasm_eh/h3.duckdb_extension.wasm
+LOAD h3;
+```
+
+Parquet, JSON and ICU autoload on first use. For the catalog and per-platform availability, see
+[haybarn-status.query.farm](https://haybarn-status.query.farm).
+
 
 ## Data Import
 
@@ -215,3 +243,9 @@ await stmt.close();
 // Closing the connection will release statements as well
 await conn.close();
 ```
+
+## Trademark
+
+DuckDB is a trademark of the DuckDB Foundation. Haybarn is an independent derived distribution published by
+Query Farm LLC and is not affiliated with, endorsed by, or sponsored by the DuckDB Foundation. "Haybarn, powered by
+DuckDB" is the canonical tagline.
