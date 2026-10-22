@@ -23,6 +23,13 @@ string(REPLACE ";" "$<SEMICOLON>" DUCKDB_EXTENSIONS_PACKED "${DUCKDB_EXTENSIONS}
 if(NOT DUCKDB_EXPLICIT_VERSION AND DEFINED ENV{OVERRIDE_GIT_DESCRIBE})
   set(DUCKDB_EXPLICIT_VERSION "$ENV{OVERRIDE_GIT_DESCRIBE}")
 endif()
+# Haybarn: default to the release the engine submodule is cut from. Left to DuckDB, a build without
+# OVERRIDE_GIT_DESCRIBE reports v2.0.0-devN and resolves extensions under a commit hash, which the Haybarn
+# extension repository does not serve (it publishes per release: core/v2.0.0/wasm_eh/...). Bump with the
+# submodule.
+if(NOT DUCKDB_EXPLICIT_VERSION)
+  set(DUCKDB_EXPLICIT_VERSION "v2.0.0")
+endif()
 
 # The duckdb-nanoarrow checkout that is built and linked statically, the submodule unless given otherwise
 if(NOT DUCKDB_NANOARROW_DIR AND DEFINED ENV{DUCKDB_NANOARROW_DIR})
@@ -71,7 +78,7 @@ ExternalProject_Add(
              -DSMALLER_BINARY=1
              -DSMALLER_BINARY_EXCEPT=between_select
   BUILD_BYPRODUCTS
-    <INSTALL_DIR>/lib/libduckdb_static.a
+    <INSTALL_DIR>/lib/libhaybarn_static.a
     <INSTALL_DIR>/lib/libduckdb_fmt.a
     <INSTALL_DIR>/lib/libduckdb_utf8proc.a
     <INSTALL_DIR>/lib/libduckdb_fastpforlib.a
@@ -94,7 +101,7 @@ set(DUCKDB_UTF8PROC_INCLUDE_DIR
 set(DUCKDB_RE2_INCLUDE_DIR
     "${DUCKDB_SOURCE_DIR}/third_party/re2")
 set(DUCKDB_FMT_INCLUDE_DIR "${DUCKDB_SOURCE_DIR}/third_party/fmt/include")
-set(DUCKDB_LIBRARY_PATH "${install_dir}/lib/libduckdb_static.a")
+set(DUCKDB_LIBRARY_PATH "${install_dir}/lib/libhaybarn_static.a")
 file(MAKE_DIRECTORY ${DUCKDB_INCLUDE_DIR})
 
 add_library(duckdb STATIC IMPORTED)

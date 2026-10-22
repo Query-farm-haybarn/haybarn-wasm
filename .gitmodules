@@ -1,6 +1,6 @@
 [submodule "submodules/duckdb"]
 	path = submodules/duckdb
-	url = https://github.com/duckdb/duckdb
+	url = https://github.com/Query-farm-haybarn/haybarn
 	update = rebase
 	shallow = true
 	ignore = dirty
