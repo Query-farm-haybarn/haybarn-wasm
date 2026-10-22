@@ -25,6 +25,12 @@ import { ProgressEntry } from '../log';
 
 const TEXT_ENCODER = new TextEncoder();
 
+/**
+ * How often the flag of `registerCancelSAB` is checked while a pending query runs. A check costs one atomic load, so
+ * the interval only bounds the latency of a cancel that arrives while the page waits for a poll.
+ */
+const CANCEL_SAB_POLL_MS = 50;
+
 export class AsyncDuckDB implements AsyncDuckDBBindings {
     /** The message handler */
     protected readonly _onMessageHandler: (event: MessageEvent) => void;
@@ -56,8 +62,12 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
     protected _config: DuckDBConfig = {};
     /** The interrupt flags of the connections, fetched when they connect (threads bundle only) */
     protected _interruptHandles: Map<ConnectionID, InterruptHandle> = new Map();
-    /** The connections with a pending query */
+    /** The connections with a pending query, in the order the queries started */
     protected _pendingQueries: Set<ConnectionID> = new Set();
+    /** The flag of registerCancelSAB */
+    protected _cancelFlag: Int32Array | null = null;
+    /** The interval that checks the flag of registerCancelSAB while a pending query runs */
+    protected _cancelWatcher: ReturnType<typeof setInterval> | null = null;
 
     constructor(logger: Logger, worker: Worker | null = null) {
         this._logger = logger;
@@ -506,6 +516,10 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
 
     /** Poll a pending query */
     public async pollPendingQuery(conn: ConnectionID): Promise<Uint8Array | null> {
+        if (this.takeCancelFlag() && this._pendingQueries.has(conn)) {
+            // Cancelled through registerCancelSAB before this poll was sent: the poll reports the cancel
+            await this.cancelPendingQuery(conn);
+        }
         const task = new WorkerTask<WorkerRequestType.POLL_PENDING_QUERY, ConnectionID, Uint8Array | null>(
             WorkerRequestType.POLL_PENDING_QUERY,
             conn,
@@ -550,13 +564,40 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
         return await this.postTask(task);
     }
 
+    /**
+     * Register a SharedArrayBuffer of at least 4 bytes through which any thread can cancel the most recently started
+     * pending query: `Atomics.store(new Int32Array(sab), 0, 1)`. The flag is checked before each poll and every
+     * 50 ms while a pending query runs; a cancel resets it to 0 and goes through `cancelPendingQuery`, so on the
+     * threads bundle it also interrupts a poll that is running. For a specific connection use `cancelSent()` or
+     * `getInterruptHandle`. Registering again replaces the buffer.
+     */
+    public registerCancelSAB(sab: SharedArrayBuffer): void {
+        if (typeof SharedArrayBuffer === 'undefined') {
+            throw new TypeError(
+                'registerCancelSAB requires SharedArrayBuffer support (cross-origin isolation must be enabled)',
+            );
+        }
+        if (!(sab instanceof SharedArrayBuffer)) {
+            throw new TypeError('registerCancelSAB requires a SharedArrayBuffer (got a non-shared buffer)');
+        }
+        if (sab.byteLength < 4) {
+            throw new RangeError(`registerCancelSAB requires at least 4 bytes for the Int32 flag (got ${sab.byteLength})`);
+        }
+        this._cancelFlag = new Int32Array(sab, 0, 1);
+        this.updateCancelWatcher();
+    }
+
     /** A pending query starts on the connection */
     protected beginPendingQuery(conn: ConnectionID): void {
+        // Re-added at the end: the most recently started query is the one registerCancelSAB cancels
+        this._pendingQueries.delete(conn);
         this._pendingQueries.add(conn);
+        this.updateCancelWatcher();
     }
     /** The connection's pending query ended (it has a result, failed, or was cancelled) */
     protected endPendingQuery(conn: ConnectionID): void {
         this._pendingQueries.delete(conn);
+        this.updateCancelWatcher();
     }
     /** Track the end of a pending query through the response to its start or a poll */
     protected async trackPendingQuery(
@@ -576,6 +617,27 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
     protected forgetConnections(): void {
         this._interruptHandles.clear();
         this._pendingQueries.clear();
+        this.updateCancelWatcher();
+    }
+    /** Consume a cancel requested through registerCancelSAB */
+    protected takeCancelFlag(): boolean {
+        if (this._cancelFlag === null) return false;
+        return Atomics.compareExchange(this._cancelFlag, 0, 1, 0) === 1;
+    }
+    /** Watch the flag of registerCancelSAB while a pending query runs */
+    protected updateCancelWatcher(): void {
+        const watch = this._cancelFlag !== null && this._pendingQueries.size > 0;
+        if (watch && this._cancelWatcher === null) {
+            this._cancelWatcher = setInterval(() => {
+                let latest: ConnectionID | undefined;
+                for (const conn of this._pendingQueries) latest = conn;
+                if (latest === undefined || !this.takeCancelFlag()) return;
+                this.cancelPendingQuery(latest).catch(e => console.error('[cancel-sab] cancelPendingQuery failed:', e));
+            }, CANCEL_SAB_POLL_MS);
+        } else if (!watch && this._cancelWatcher !== null) {
+            clearInterval(this._cancelWatcher);
+            this._cancelWatcher = null;
+        }
     }
 
     /** Fetch query results */
