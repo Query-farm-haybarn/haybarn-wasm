@@ -303,7 +303,9 @@ endif()
      # --pre-js "/Users/carlo/databricks/duckdb_delta/file_system_packager.js" \
 #
 if(EMSCRIPTEN)
-  add_executable(duckdb_wasm ${CMAKE_SOURCE_DIR}/src/wasm_main.cc)
+  # Haybarn: platform_stubs.cc goes into the executable, not an archive: only extensions call its functions
+  add_executable(duckdb_wasm ${CMAKE_SOURCE_DIR}/src/wasm_main.cc ${CMAKE_SOURCE_DIR}/src/platform_stubs.cc)
+  target_include_directories(duckdb_wasm PRIVATE ${DUCKDB_SOURCE_DIR}/third_party/mbedtls/include)
   target_link_libraries(duckdb_wasm duckdb_web ${THREAD_LIBS})
   message(STATUS "WASM_LINK_FLAGS=${WASM_LINK_FLAGS}")
   set_target_properties(
@@ -319,6 +321,8 @@ if(EMSCRIPTEN)
       -s EXPORT_NAME='DuckDB' \
       -s EXPORTED_RUNTIME_METHODS='[\"ccall\", \"stackSave\", \"stackAlloc\", \"stackRestore\", \"stringToUTF8\", \"lengthBytesUTF8\", \"HEAPU8\", \"HEAP32\", \"HEAPF64\", \"wasmMemory\"]' \
       --js-library=${CMAKE_SOURCE_DIR}/js-stubs.js")
+  # --js-library is a plain link flag, so editing js-stubs.js would not relink without this
+  set_target_properties(duckdb_wasm PROPERTIES LINK_DEPENDS ${CMAKE_SOURCE_DIR}/js-stubs.js)
 
 endif()
 
