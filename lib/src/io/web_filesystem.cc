@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "duckdb/common/file_system.hpp"
+#include "duckdb/web/http_fetch.h"
 #include "duckdb/web/io/glob.h"
 #include "duckdb/web/io/web_filesystem.h"
 #include "duckdb/web/main_thread.h"
@@ -168,8 +169,13 @@ RT_FN(void duckdb_web_fs_file_remove(const char *path, size_t pathLen), {
 });
 #undef RT_FN
 
-/// Runtime calls are served by the main thread, see main_thread.h
-#define RT_CALL(FN, ...) ::duckdb::web::main_thread::OnMainThread([&] { return FN(__VA_ARGS__); })
+/// Runtime calls are served by the main thread, see main_thread.h. They carry the calling thread's request context,
+/// whose interrupt aborts the HTTP requests the runtime makes for them (http_fetch.h)
+#define RT_CALL(FN, ...)                                                                    \
+    ::duckdb::web::main_thread::OnMainThread([&, request_context = RuntimeRequestContext::Current()] { \
+        RuntimeRequestContext::Scope request_scope{request_context};                       \
+        return FN(__VA_ARGS__);                                                             \
+    })
 
 extern "C" void duckdb_web_fs_glob_add_path(const char *path) { GLOB_RESULTS.push_back(std::string{path}); }
 /// The runtime reports a directory entry while duckdb_web_fs_directory_list_files runs
@@ -673,6 +679,8 @@ void WebFileSystem::IncrementCacheEpoch() {
 duckdb::unique_ptr<duckdb::FileHandle> WebFileSystem::OpenFile(const string &url, duckdb::FileOpenFlags flags,
                                                                optional_ptr<FileOpener> opener) {
     DEBUG_TRACE();
+    auto request_context = RuntimeRequestContext::Of(opener);
+    RuntimeRequestContext::Scope request_scope{request_context};
     std::unique_lock<LightMutex> fs_guard{fs_mutex_};
 
     // New file?
@@ -696,6 +704,7 @@ duckdb::unique_ptr<duckdb::FileHandle> WebFileSystem::OpenFile(const string &url
         file = iter->second;
     }
     auto handle = std::make_unique<WebFileHandle>(file);
+    handle->request_context_ = std::move(request_context);
 
     // Lock the file
     fs_guard.unlock();
@@ -789,6 +798,7 @@ duckdb::unique_ptr<duckdb::FileHandle> WebFileSystem::OpenFile(const string &url
 
 int64_t WebFileSystem::ReadAt(WebFileHandle &file_hdl, void *buffer, int64_t nr_bytes, duckdb::idx_t position) {
     DEBUG_TRACE();
+    RuntimeRequestContext::Scope request_scope{file_hdl.request_context_};
     assert(nr_bytes < std::numeric_limits<size_t>::max());
     // Get the file handle
     assert(file_hdl.file_);
@@ -1124,6 +1134,7 @@ void WebFileSystem::CopyFileContent(const std::string &source, const std::string
 
 /// Check if a file exists
 bool WebFileSystem::FileExists(const std::string &filename, optional_ptr<FileOpener> opener) {
+    RuntimeRequestContext::Scope request_scope{RuntimeRequestContext::Of(opener)};
     auto iter = files_by_name_.find(filename);
     if (iter != files_by_name_.end()) return true;
     return RT_CALL(duckdb_web_fs_file_exists, filename.c_str(), filename.size());
@@ -1142,6 +1153,7 @@ void WebFileSystem::FileSync(duckdb::FileHandle &handle) {
 
 /// Runs a glob on the file system, returning a list of matching files
 vector<OpenFileInfo> WebFileSystem::Glob(const std::string &path, FileOpener *opener) {
+    RuntimeRequestContext::Scope request_scope{RuntimeRequestContext::Of(opener)};
     std::vector<string> results;
     {
         std::unique_lock<LightMutex> fs_guard{fs_mutex_};

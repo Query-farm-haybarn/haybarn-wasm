@@ -10,6 +10,7 @@
 #include "duckdb/common/string_util.hpp"
 #include "duckdb/main/client_context.hpp"
 #include "duckdb/web/io/buffered_filesystem.h"
+#include "duckdb/web/http_fetch.h"
 #include "duckdb/web/io/file_page_buffer.h"
 #include "duckdb/web/io/web_filesystem.h"
 #include "duckdb/web/utils/parallel.h"
@@ -97,13 +98,18 @@ duckdb::unique_ptr<duckdb::FileHandle> BufferedFileSystem::OpenFile(const string
         return filesystem_.OpenFile(path, flags, opener);
     }
 
-    // Open in page buffer
+    // Open in page buffer. A remote file is opened through the JS runtime, whose HTTP requests the opener's query
+    // can interrupt
+    auto request_context = RuntimeRequestContext::Of(opener);
+    RuntimeRequestContext::Scope request_scope{request_context};
     auto file = file_page_buffer_->OpenFile(std::string_view{path}, flags, opener);  // XXX compression?
     if (!file) {
         return nullptr;
     }
 
-    return std::make_unique<BufferedFileHandle>(*this, std::move(file));
+    auto handle = std::make_unique<BufferedFileHandle>(*this, std::move(file));
+    handle->request_context_ = std::move(request_context);
+    return handle;
 }
 
 /// Read exactly nr_bytes from the specified location in the file. Fails if nr_bytes could not be read.
@@ -116,6 +122,7 @@ void BufferedFileSystem::Read(duckdb::FileHandle &handle, void *buffer, int64_t 
 
     // Read page-wise
     auto &file_hdl = static_cast<BufferedFileHandle &>(handle);
+    RuntimeRequestContext::Scope request_scope{file_hdl.request_context_};
     auto &file = file_hdl.GetFile();
     auto reader = static_cast<char *>(buffer);
     auto file_size = file->GetSize();
@@ -164,6 +171,7 @@ int64_t BufferedFileSystem::Read(duckdb::FileHandle &handle, void *buffer, int64
 
     // Read manually at position
     auto &file_hdl = static_cast<BufferedFileHandle &>(handle);
+    RuntimeRequestContext::Scope request_scope{file_hdl.request_context_};
     auto &file = file_hdl.GetFile();
     auto n = file->Read(buffer, nr_bytes, file_hdl.file_position_);
     file_hdl.file_position_ += n;

@@ -4,6 +4,14 @@
 #include <functional>
 #include <string>
 
+#include "duckdb/common/optional_ptr.hpp"
+#include "duckdb/common/shared_ptr.hpp"
+
+namespace duckdb {
+class ClientContext;
+class FileOpener;
+}  // namespace duckdb
+
 namespace duckdb {
 namespace web {
 
@@ -37,6 +45,7 @@ namespace web {
 // The response buffer uses the XHR wire format ParseWasmResponse reads:
 //   [status:2 LE][headers len:4 LE][headers][body len:4 LE][body]
 
+// The numbers are read by bindings/runtime_http.ts.
 enum class FetchOutcome : int32_t {
     // No helper (not started, no shared memory, or every slot busy): use XHR.
     UNAVAILABLE = 0,
@@ -60,6 +69,37 @@ struct FetchResult {
 FetchResult FetchViaHelper(const std::string &url, const char *method, char **headers, int header_count,
                            const char *body, int body_len, const std::function<bool()> &cancelled,
                            uint64_t timeout_seconds);
+
+// The query whose remote file I/O the current thread performs, for the HTTP
+// requests of the JS runtime (remote files read without httpfs). Those run on
+// the main thread inside a runtime call, so the file systems make the client
+// context of the handle being read current on the calling thread, and the
+// runtime call carries it over to the main thread. On the threads bundle the
+// runtime performs the requests through the fetch helper
+// (duckdb_web_http_fetch_runtime), which aborts them when that query is
+// interrupted.
+class RuntimeRequestContext {
+   public:
+    // Make `context` current for this thread while the scope lives; an empty
+    // context keeps the current one.
+    class Scope {
+       public:
+        explicit Scope(const duckdb::weak_ptr<ClientContext> &context);
+        ~Scope();
+        Scope(const Scope &) = delete;
+        Scope &operator=(const Scope &) = delete;
+
+       private:
+        bool set_ = false;
+        duckdb::weak_ptr<ClientContext> previous_;
+    };
+    // The client context current on this thread
+    static duckdb::weak_ptr<ClientContext> Current();
+    // The client context of a file opener, empty for database-level openers
+    static duckdb::weak_ptr<ClientContext> Of(optional_ptr<FileOpener> opener);
+    // Whether the query of the current client context was interrupted
+    static bool Interrupted();
+};
 
 }  // namespace web
 }  // namespace duckdb
