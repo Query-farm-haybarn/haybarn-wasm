@@ -34,6 +34,7 @@ upstream base, one concern per commit.
 | **Extension provider**        | `lib/src/extension_provider.cc`: https for `haybarn-extensions.query.farm`, `INSTALL … VERSION` pins |
 | **Threads bundle loading**    | `patches/duckdb/extension_signature_hash_on_calling_thread.patch` (signature hashing without a thread per MiB); `patches/duckdb/wait_for_tasks_instead_of_spinning.patch` (a query thread that spun while a scheduler thread ran a `LOAD` never synced the side module, so the load deadlocked); the `SET threads=1` bracket around `LOAD`/`INSTALL` is opt-in (`DuckDBConfig.singleThreadedExtensionLoad`) |
 | **Threads bundle pthread pool** | `lib/src/main_thread.cc`: strict pool (`PTHREAD_POOL_SIZE_STRICT=2`, a thread beyond it fails with `EAGAIN` instead of hanging), refilled between calls with the live threads plus 4 idle workers (at most 64) |
+| **Platform functions for extensions** | `lib/js-stubs.js`, `lib/src/platform_stubs.cc`: the 1.5 ABI for side modules (vgi, grainlift): `duckdb_wasm_open_auth_url`/`get_auth_error`/`get_page_origin`/`crypto_random`/`sha256` and the eight `vgi_wasm_*` functions of the VGI `worker:` SAB transport. The ones that read the worker's globals or post to the page run on the main runtime thread, wherever the extension calls them. The base bundle's sleeps block in `Atomics.wait` (`--wrap=emscripten_thread_sleep`). Page halves in `packages/duckdb-wasm/src/vgi/` (`@haybarn/haybarn-wasm/vgi`: `installVgiOAuthBridge`, `installVgiWebWorkerBridge`, `composeWorkerBridges`), react `onWorkerCreated`, the shell's `/oauth-callback.html`. Tested through `lib/test/extensions/haybarn_platform_test` (`test:chrome:platform`) |
 | **Toolchain**                 | emscripten 6.0.13 (same as the Haybarn 2.0 extension builds) |
 | **Shell + app**               | Haybarn banner, default extensions at startup, Haybarn branding, Cloudflare Pages hosting (`_worker.js`, `_headers`) |
 | **Docs**                      | `README.md`, `NOTICE`, `HAYBARN.md`, `CLAUDE.md`, package README |
@@ -57,15 +58,13 @@ The 1.5 line carries Haybarn runtime features that upstream 2.0 rewrote
 the ground under (HTTP client, threading model, extension loading). They
 are not ported yet:
 
-* the VGI runtime: `worker:` SharedArrayBuffer transport, OAuth popup API,
-  page-origin / Web Crypto js-stubs, the Iroh/httpi browser adapters, and the
-  app's VGI bridges
 * the EM_JS HTTP client rewrite with in-flight abort and the query interrupt flag
 * SAB query cancellation, query progress binding (the single-threaded
   extension LOAD from the same series is ported)
 * the dynamic-linking glue patches (lazy exports, global mutability, freeing
   side-module bytes), extension prefetch, code caching of the engine wasm
-* the emscripten_yield override and the 1.5 COI pthread worker rewrite
+* the 1.5 COI pthread worker rewrite (obsolete: emscripten 6 runs the pthreads
+  from the main worker script)
 
 Upstream 2.0 covers some of the same ground differently (extension loading
 on the main thread, pending-query cancellation, the HTTP client registered
