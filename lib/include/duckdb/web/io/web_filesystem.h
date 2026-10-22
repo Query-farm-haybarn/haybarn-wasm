@@ -9,6 +9,7 @@
 
 #include "duckdb/common/constants.hpp"
 #include "duckdb/common/file_system.hpp"
+#include "duckdb/common/shared_ptr.hpp"
 #include "duckdb/common/vector.hpp"
 #include "duckdb/web/config.h"
 #include "duckdb/web/io/file_stats.h"
@@ -133,6 +134,8 @@ class WebFileSystem : public duckdb::FileSystem {
         std::atomic<uint64_t> position_;
         /// Does the handle only pin the registration?
         bool pin_ = false;
+        /// The client context of the opener, whose interrupt aborts the runtime's HTTP requests for the handle
+        duckdb::weak_ptr<duckdb::ClientContext> request_context_;
 
         /// Close the file
         void Close() override;

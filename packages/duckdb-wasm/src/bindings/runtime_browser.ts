@@ -19,6 +19,7 @@ import {
 } from './runtime';
 import { DuckDBModule } from './duckdb_module';
 import * as udf from './udf_runtime';
+import { runtimeHTTPRequest } from './runtime_http';
 
 /** Send a synchronous XHR and return its binary body.
  *
@@ -312,7 +313,7 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
                         );
                     } else if (flags & FileFlags.FILE_FLAGS_WRITE) {
                         // We send a HEAD request to try to determine if we can write to data_url
-                        const xhr = new XMLHttpRequest();
+                        const xhr = runtimeHTTPRequest(mod);
                         if (file.dataProtocol == DuckDBDataProtocol.S3) {
                             xhr.open('HEAD', getHTTPUrl(file.s3Config, file.dataUrl!), false);
                             addS3Headers(xhr, file.s3Config, file.dataUrl!, 'HEAD');
@@ -354,7 +355,7 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
                         try {
                             // Send a dummy HEAD request with range protocol
                             //          -> good IFF status is 206 and contentLenght is present
-                            const xhr = new XMLHttpRequest();
+                            const xhr = runtimeHTTPRequest(mod);
                             if (file.dataProtocol == DuckDBDataProtocol.S3) {
                                 xhr.open('HEAD', getHTTPUrl(file.s3Config, file.dataUrl!), false);
                                 addS3Headers(xhr, file.s3Config, file.dataUrl!, 'HEAD');
@@ -389,7 +390,7 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
                             //          -> good IFF status is 206 and contentLenght2 is 1
                             //          -> otherwise, iff 200 and contentLenght2 == contentLenght
                             //                 we just downloaded the file, save it and move further
-                            const xhr = new XMLHttpRequest();
+                            const xhr = runtimeHTTPRequest(mod);
                             if (file.dataProtocol == DuckDBDataProtocol.S3) {
                                 xhr.open('GET', getHTTPUrl(file.s3Config, file.dataUrl!), false);
                                 addS3Headers(xhr, file.s3Config, file.dataUrl!, 'GET');
@@ -409,7 +410,7 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
                             } else if (!file.reliableHeadRequests) {
                                 // Send a dummy HEAD request with range protocol
                                 //          -> good IFF status is 206 and contentLenght is present
-                                const head = new XMLHttpRequest();
+                                const head = runtimeHTTPRequest(mod);
                                 if (file.dataProtocol == DuckDBDataProtocol.S3) {
                                     head.open('HEAD', getHTTPUrl(file.s3Config, file.dataUrl!), false);
                                     addS3Headers(head, file.s3Config, file.dataUrl!, 'HEAD');
@@ -461,7 +462,7 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
                             console.warn(`falling back to full HTTP read for: ${file.dataUrl}`);
                         }
                         // 3. Send non-range request
-                        const xhr = new XMLHttpRequest();
+                        const xhr = runtimeHTTPRequest(mod);
                         if (file.dataProtocol == DuckDBDataProtocol.S3) {
                             xhr.open('GET', getHTTPUrl(file.s3Config, file.dataUrl!), false);
                             addS3Headers(xhr, file.s3Config, file.dataUrl!, 'GET');
@@ -579,7 +580,7 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
             // Try a HTTP HEAD request
             if (path.startsWith('http') || path.startsWith('s3://')) {
                 // Send a dummy range request querying the first byte of the file
-                const xhr = new XMLHttpRequest();
+                const xhr = runtimeHTTPRequest(mod);
                 if (path.startsWith('s3://')) {
                     const globalInfo = BROWSER_RUNTIME.getGlobalFileInfo(mod);
                     xhr.open('HEAD', getHTTPUrl(globalInfo?.s3Config, path), false);
@@ -596,7 +597,7 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
                         console.log(`HEAD request failed: ${path}, with full http reads are disabled`);
                         return 0;
                     }
-                    const xhr2 = new XMLHttpRequest();
+                    const xhr2 = runtimeHTTPRequest(mod);
                     if (path.startsWith('s3://')) {
                         const globalInfo = BROWSER_RUNTIME.getGlobalFileInfo(mod);
                         xhr2.open('GET', getHTTPUrl(globalInfo?.s3Config, path), false);
@@ -644,7 +645,7 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
             // Try a HTTP HEAD request
             if (path.startsWith('http') || path.startsWith('s3://')) {
                 // Send a dummy range request querying the first byte of the file
-                const xhr = new XMLHttpRequest();
+                const xhr = runtimeHTTPRequest(mod);
                 if (path.startsWith('s3://')) {
                     const globalInfo = BROWSER_RUNTIME.getGlobalFileInfo(mod);
                     xhr.open('HEAD', getHTTPUrl(globalInfo?.s3Config, path), false);
@@ -780,7 +781,7 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
                         throw new Error(`Missing data URL for file ${fileId}`);
                     }
                     try {
-                        const xhr = new XMLHttpRequest();
+                        const xhr = runtimeHTTPRequest(mod);
                         if (file.dataProtocol == DuckDBDataProtocol.S3) {
                             xhr.open('GET', getHTTPUrl(file?.s3Config, file.dataUrl!), false);
                             addS3Headers(xhr, file?.s3Config, file.dataUrl!, 'GET');
@@ -857,7 +858,7 @@ export const BROWSER_RUNTIME: DuckDBRuntime & {
                 return 0;
             case DuckDBDataProtocol.S3: {
                 const buffer = mod.HEAPU8.subarray(buf, buf + bytes);
-                const xhr = new XMLHttpRequest();
+                const xhr = runtimeHTTPRequest(mod);
                 xhr.open('PUT', getHTTPUrl(file?.s3Config, file.dataUrl!), false);
                 addS3Headers(xhr, file?.s3Config, file.dataUrl!, 'PUT', '', buffer);
                 xhr.send(buffer);
