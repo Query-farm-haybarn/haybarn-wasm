@@ -584,9 +584,11 @@ jobs:
                   git -C "$RUNNER_TEMP/haybarn-httpfs" checkout "$ref"
                   echo "DUCKDB_HTTPFS_DIRECTORY=$RUNNER_TEMP/haybarn-httpfs" >> "$GITHUB_ENV"
 
+            # Haybarn: HAYBARN_WASM_TEST_EXTENSIONS adds the test extension of the platform functions to the local
+            # repository (extension_config_wasm.cmake), for test:chrome:platform
             - name: Build Wasm module
               run: |
-                  USE_GENERATED_EXPORTED_LIST="$DEFAULT_USE_GENERATED_EXPORTED_LIST" DUCKDB_PLATFORM="wasm_eh" DUCKDB_WASM_LOADABLE_EXTENSIONS=1 GEN=ninja ./scripts/wasm_build_lib.sh relsize base
+                  HAYBARN_WASM_TEST_EXTENSIONS=1 USE_GENERATED_EXPORTED_LIST="$DEFAULT_USE_GENERATED_EXPORTED_LIST" DUCKDB_PLATFORM="wasm_eh" DUCKDB_WASM_LOADABLE_EXTENSIONS=1 GEN=ninja ./scripts/wasm_build_lib.sh relsize base
 
             - name: Check the wasm name section
               run: |
@@ -681,7 +683,7 @@ jobs:
 
             - name: Build Wasm module
               run: |
-                  USE_GENERATED_EXPORTED_LIST="$DEFAULT_USE_GENERATED_EXPORTED_LIST" DUCKDB_PLATFORM="wasm_threads" DUCKDB_WASM_LOADABLE_EXTENSIONS="signed" GEN=ninja ./scripts/wasm_build_lib.sh relsize threads
+                  HAYBARN_WASM_TEST_EXTENSIONS=1 USE_GENERATED_EXPORTED_LIST="$DEFAULT_USE_GENERATED_EXPORTED_LIST" DUCKDB_PLATFORM="wasm_threads" DUCKDB_WASM_LOADABLE_EXTENSIONS="signed" GEN=ninja ./scripts/wasm_build_lib.sh relsize threads
 
             - name: Check the wasm name section
               run: |
@@ -1178,6 +1180,13 @@ jobs:
               shell: bash
               run: |
                       CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:interrupt
+
+            # Haybarn: the platform functions for extensions (OAuth popup, page origin, Web Crypto, SHA-256, the VGI
+            # worker: transport) through the test extension, called from the engine's threads, on both bundles
+            - name: Test platform functions for extensions on Chrome
+              shell: bash
+              run: |
+                      CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:platform
 
             # Haybarn: install and load signed core extensions from haybarn-extensions.query.farm with
             # both loadable bundles, the way a user's page does (no local repository, signatures checked)

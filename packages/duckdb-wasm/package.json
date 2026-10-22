@@ -81,6 +81,7 @@
         "test:chrome:haybarn-repository": "karma start ./karma/haybarn-repository-chrome.cjs",
         "test:chrome:threads-pool": "karma start ./karma/threads-pool-chrome.cjs",
         "test:chrome:interrupt": "karma start ./karma/interrupt-chrome.cjs",
+        "test:chrome:platform": "karma start ./karma/platform-chrome.cjs",
         "test:chrome:coverage": "karma start ./karma/tests-chrome-coverage.cjs",
         "test:browser": "karma start ./karma/tests-all.cjs",
         "test:browser:debug": "karma start ./karma/tests-debug.cjs",
