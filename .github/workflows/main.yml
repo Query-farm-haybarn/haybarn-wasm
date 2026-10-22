@@ -1140,6 +1140,12 @@ jobs:
               run: |
                       CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:threads:smoke
 
+            # Haybarn: interrupting a running query and reading its progress, on both bundles
+            - name: Test query interrupt and progress on Chrome
+              shell: bash
+              run: |
+                      CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:interrupt
+
             # Haybarn: install and load signed core extensions from haybarn-extensions.query.farm with
             # both loadable bundles, the way a user's page does (no local repository, signatures checked)
             - name: Test the Haybarn extension repository on Chrome
