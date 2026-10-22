@@ -55,3 +55,29 @@ EMSCRIPTEN_KEEPALIVE void duckdb_wasm_sha256(const void *data, int len, void *ou
 __attribute__((used)) static void *const haybarn_platform_stubs[] = {
     reinterpret_cast<void *>(&duckdb_wasm_crypto_random),
 };
+
+#if !defined(__EMSCRIPTEN_PTHREADS__)
+// Without pthreads emscripten has no futex to sleep on, so emscripten_thread_sleep (usleep, nanosleep,
+// std::this_thread::sleep_for) spins at full CPU for the whole sleep: vgi's device-code login polls the token endpoint
+// every few seconds. The base bundle links with --wrap=emscripten_thread_sleep, and the sleep blocks in Atomics.wait
+// instead, which a worker may do when the page is cross-origin isolated (SharedArrayBuffer exists). Otherwise it
+// spins as before. With pthreads the real sleep already waits on a futex.
+// clang-format off
+EM_JS(int, haybarn_block_for, (double msecs), {
+    if (typeof SharedArrayBuffer === 'undefined') return 0;
+    try {
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, msecs);
+        return 1;
+    } catch (e) {
+        return 0;
+    }
+});
+// clang-format on
+
+extern "C" void __real_emscripten_thread_sleep(double msecs);
+extern "C" void __wrap_emscripten_thread_sleep(double msecs) {
+    if (!haybarn_block_for(msecs)) {
+        __real_emscripten_thread_sleep(msecs);
+    }
+}
+#endif

@@ -153,7 +153,8 @@ if(EMSCRIPTEN)
         "${CMAKE_CXX_FLAGS} -sUSE_PTHREADS=0 -DDUCKDB_NO_THREADS=1")
     set(DUCKDB_CXX_FLAGS
         "${CMAKE_CXX_FLAGS} -sUSE_PTHREADS=0 -DDUCKDB_NO_THREADS=1")
-    set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -sUSE_PTHREADS=0")
+    # Haybarn: sleeps block instead of spinning, see platform_stubs.cc
+    set(WASM_LINK_FLAGS "${WASM_LINK_FLAGS} -sUSE_PTHREADS=0 -Wl,--wrap=emscripten_thread_sleep")
     set(THREAD_LIBS)
   endif()
   set(DUCKDB_CXX_FLAGS "${DUCKDB_CXX_FLAGS} -DDUCKDB_CUSTOM_PLATFORM=${DUCKDB_PLATFORM}")
