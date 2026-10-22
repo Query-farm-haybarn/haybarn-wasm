@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Authentication</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 2rem; text-align: center;
+  }
+  @media (prefers-color-scheme: light) { body { background:#faf8f0; color:#2c2c1e; } .sub{ color:#6b6b5a; } }
+  @media (prefers-color-scheme: dark)  { body { background:#1a1a0e; color:#f5f0e0; } .sub{ color:#b8b0a0; } }
+  .logo { width: 96px; height: 96px; border-radius: 50%; margin-bottom: 1.25rem; }
+  h1 { font-size: 1.25rem; font-weight: 600; margin-bottom: .5rem; }
+  .sub { font-size: .95rem; line-height: 1.5; max-width: 32rem; word-break: break-word; }
+  .ok { color:#4a7c23; } .err { color:#c53030; }
+</style>
+</head>
+<body>
+  <img class="logo" src="/oauth-logo.png" alt="VGI">
+  <h1 id="title">Completing authentication…</h1>
+  <p class="sub" id="message"></p>
+<script>
+(function () {
+  // OAuth (Entra / Google / Okta …) PKCE redirect lands here as a popup with
+  // ?code=…&state=… or ?error=…. The Haybarn shell only opens this page as a
+  // popup (the VGI extension's reactive open_auth_url flow), so we always relay
+  // the result to the main thread over BroadcastChannel("vgi-oauth") (with a
+  // window.opener.postMessage fallback for contexts where BroadcastChannel
+  // delivery fails), then close.
+  //
+  // This file is intentionally version-free (served at /oauth-callback.html,
+  // not under a hashed path) so the IdP app registration can pin a stable
+  // redirect URI that survives shell deploys.
+  var params = new URLSearchParams(window.location.search);
+  var code = params.get("code");
+  var state = params.get("state");
+  var error = params.get("error");
+  var errorDescription = params.get("error_description");
+
+  var msg = error
+    ? { type: "oauth-callback", error: error, errorDescription: errorDescription, state: state }
+    : code
+    ? { type: "oauth-callback", code: code, state: state }
+    : { type: "oauth-callback", error: "no_code", errorDescription: "No authorization code received", state: state };
+
+  try {
+    if (typeof BroadcastChannel !== "undefined") {
+      var bc = new BroadcastChannel("vgi-oauth");
+      bc.postMessage(msg);
+      bc.close();
+    }
+  } catch (e) { /* BroadcastChannel unavailable */ }
+  try {
+    if (window.opener && !window.opener.closed) {
+      window.opener.postMessage(msg, window.location.origin);
+    }
+  } catch (e) { /* opener access blocked by cross-origin policy */ }
+
+  var title = document.getElementById("title");
+  var message = document.getElementById("message");
+  if (error || !code) {
+    title.textContent = "Authentication Failed";
+    title.className = "err";
+    message.textContent = errorDescription || error || "No authorization code received";
+  } else {
+    title.textContent = "Authentication Successful";
+    title.className = "ok";
+    message.textContent = "You can close this window.";
+    setTimeout(function () { try { window.close(); } catch (e) {} }, 1500);
+  }
+})();
+</script>
+</body>
+</html>
