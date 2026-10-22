@@ -8,6 +8,7 @@
 #include "duckdb/common/http_util.hpp"
 #include "duckdb/main/database.hpp"
 #include "duckdb/web/config.h"
+#include "duckdb/web/http_fetch.h"
 #include "duckdb_static_extension.h"
 
 namespace duckdb {
@@ -112,7 +113,7 @@ struct WasmHeaderArray {
 };
 
 //===--------------------------------------------------------------------===//
-// Synchronous XHR
+// Synchronous XHR, the path of the base bundle, and of the threads bundle until the fetch helper runs
 //
 // One helper for every method; it returns the response buffer ParseWasmResponse reads, or 0. Header rules:
 //   - `Host` is sent as `X-Host-Override` (browsers forbid setting Host), `User-Agent` is dropped (forbidden too)
@@ -220,7 +221,10 @@ class HTTPWasmClient : public HTTPClient {
 
    private:
     /// Every method goes through here. A request whose query was interrupted (HTTPUtil::CancellationRequested) is not
-    /// sent, and a cancelled response is terminal: the retry loop does not repeat it.
+    /// sent, and a cancelled response is terminal: the retry loop does not repeat it. On the threads bundle the fetch
+    /// helper performs the request, and an interrupt or the request timeout (http_timeout, one of inactivity) aborts it
+    /// in flight. Otherwise (base bundle, helper not running, every mailbox slot busy) it is a synchronous XHR, which
+    /// nothing ends early.
     unique_ptr<HTTPResponse> Perform(BaseRequest &info, const char *method, const char *body = nullptr,
                                      idx_t body_len = 0, const HTTPHeaders *headers = nullptr) {
         if (HTTPUtil::CancellationRequested(info)) {
@@ -228,6 +232,25 @@ class HTTPWasmClient : public HTTPClient {
         }
         auto url = NormalizeUrl(info.url, host_port);
         WasmHeaderArray h(headers ? *headers : info.headers);
+        auto fetched =
+            web::FetchViaHelper(url, method, h.ptrs, h.count, body, static_cast<int>(body_len),
+                                [&info] { return HTTPUtil::CancellationRequested(info); }, info.params.timeout);
+        switch (fetched.outcome) {
+            case web::FetchOutcome::OK:
+                return ParseWasmResponse(fetched.buffer);
+            case web::FetchOutcome::FAILED:
+                return ParseWasmResponse(nullptr);
+            case web::FetchOutcome::CANCELLED:
+                return Cancelled(method);
+            case web::FetchOutcome::TIMED_OUT: {
+                auto res = make_uniq<HTTPResponse>(HTTPStatusCode::INVALID);
+                res->request_error = StringUtil::Format("HTTP %s request timed out after %llu seconds", method,
+                                                        static_cast<unsigned long long>(info.params.timeout));
+                return res;
+            }
+            case web::FetchOutcome::UNAVAILABLE:
+                break;
+        }
         return ParseWasmResponse(
             duckdb_web_http_xhr(url.c_str(), method, h.count, h.ptrs, body, static_cast<int>(body_len)));
     }

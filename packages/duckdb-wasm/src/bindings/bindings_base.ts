@@ -4,6 +4,7 @@ import { DuckDBConfig } from './config';
 import { Logger } from '../log';
 import { InstantiationProgress, QueryProgress, QueryProgressHandle, readQueryProgress } from './progress';
 import { InterruptHandle } from './interrupt';
+import { startHttpFetchHelper } from './http_fetch_helper';
 import { DuckDBBindings } from './bindings_interface';
 import { DuckDBConnection } from './connection';
 import { StatusCode, IsArrowBuffer, IsDuckDBWasmRetry } from '../status';
@@ -126,6 +127,13 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
         await this._initPromise;
         this._initPromise = null;
         installHeapAccessors(this._instance);
+        // Haybarn: the Worker that performs HTTP requests abortably on the threads bundle. It must start before any
+        // query: a Worker cannot start while the thread that creates it is blocked. Never fails instantiate
+        try {
+            await startHttpFetchHelper(this._instance);
+        } catch (e) {
+            console.warn('[http] fetch helper unavailable, using synchronous XHR:', e);
+        }
         // Remove own progress callback
         this.onInstantiationProgress = this.onInstantiationProgress.filter(x => x != onProgress);
         (globalThis as any).DUCKDB_BINDINGS = this;
