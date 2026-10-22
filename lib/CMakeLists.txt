@@ -258,7 +258,7 @@ add_library(
   ${CMAKE_SOURCE_DIR}/src/webdb_api.cc)
 
 # The HTTP client is its own archive, registered like duckdb's httplib capability, which is not linked
-add_library(duckdb_web_httplib STATIC ${CMAKE_SOURCE_DIR}/src/http_wasm.cc)
+add_library(duckdb_web_httplib STATIC ${CMAKE_SOURCE_DIR}/src/http_wasm.cc ${CMAKE_SOURCE_DIR}/src/http_fetch.cc)
 target_link_libraries(duckdb_web_httplib duckdb rapidjson)
 target_link_libraries(duckdb_web duckdb_web_httplib)
 
