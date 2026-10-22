@@ -65,6 +65,12 @@ jobs:
               with:
                   submodules: true
 
+            # Haybarn: the VGI worker: ring stubs of lib/js-stubs.js and their reference model, in Node
+            - name: Test the VGI shared-memory host ABI
+              run: |
+                  node lib/vgi-sab-ring.test.js
+                  node lib/vgi-sab-publication.test.js
+
             - name: Cache node_modules
               uses: actions/cache@v5
               with:
