@@ -421,6 +421,10 @@ jobs:
               run: |
                   DUCKDB_PLATFORM="wasm_eh" ./scripts/wasm_build_lib.sh relperf base
 
+            - name: Check the wasm name section
+              run: |
+                  node ./scripts/test_wasm_name_section.cjs ./packages/duckdb-wasm/src/bindings/duckdb-base.wasm
+
             - name: Upload artifact
               uses: actions/upload-artifact@v7
               with:
@@ -489,6 +493,10 @@ jobs:
             - name: Build Wasm module
               run: |
                   DUCKDB_PLATFORM="wasm_threads" ./scripts/wasm_build_lib.sh relperf threads
+
+            - name: Check the wasm name section
+              run: |
+                  node ./scripts/test_wasm_name_section.cjs ./packages/duckdb-wasm/src/bindings/duckdb-threads.wasm
 
             - name: Upload artifact
               uses: actions/upload-artifact@v7
@@ -563,6 +571,10 @@ jobs:
             - name: Build Wasm module
               run: |
                   USE_GENERATED_EXPORTED_LIST="$DEFAULT_USE_GENERATED_EXPORTED_LIST" DUCKDB_PLATFORM="wasm_eh" DUCKDB_WASM_LOADABLE_EXTENSIONS=1 GEN=ninja ./scripts/wasm_build_lib.sh relsize base
+
+            - name: Check the wasm name section
+              run: |
+                  node ./scripts/test_wasm_name_section.cjs ./packages/duckdb-wasm/src/bindings/duckdb-base.wasm
 
             - name: Upload artifact
               uses: actions/upload-artifact@v7
@@ -644,6 +656,10 @@ jobs:
             - name: Build Wasm module
               run: |
                   USE_GENERATED_EXPORTED_LIST="$DEFAULT_USE_GENERATED_EXPORTED_LIST" DUCKDB_PLATFORM="wasm_threads" DUCKDB_WASM_LOADABLE_EXTENSIONS="signed" GEN=ninja ./scripts/wasm_build_lib.sh relsize threads
+
+            - name: Check the wasm name section
+              run: |
+                  node ./scripts/test_wasm_name_section.cjs ./packages/duckdb-wasm/src/bindings/duckdb-threads.wasm
 
             - name: Test pthread completion handler
               run: |

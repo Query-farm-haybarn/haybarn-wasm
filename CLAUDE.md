@@ -79,6 +79,16 @@ CHROME_BIN=$(which google-chrome) yarn workspace @haybarn/haybarn-wasm test:chro
 emsdk 6 needs Python >= 3.10 (`EMSDK_PYTHON`); Arrow is gone in 2.0, so no
 CMake >= 3.25 requirement from it.
 
+## Stack-trace symbol names (`-g2`)
+
+Release builds link with `-g2` (`lib/CMakeLists.txt`), so the engine wasm
+carries a *name* section and traps or aborts show (mangled) function names
+instead of `wasm-function[N]`; pipe traces through `llvm-cxxfilt`. It is
+metadata only and does not change the generated code. CI checks every built
+module with `scripts/test_wasm_name_section.cjs`. Extensions carry the same flag
+(haybarn-extension-ci-tools for C-API/Rust ones, the engine's
+`extension_build_tools.cmake` for C++ ones).
+
 ## Out-of-tree references
 
 | What                          | Where                                                |
