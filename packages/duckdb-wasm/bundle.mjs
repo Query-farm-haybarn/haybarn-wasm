@@ -311,6 +311,18 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-threads.wasm'), path.resolve(d
         external: EXTERNALS_TEST_BROWSER,
     });
 
+    console.log('[ ESBUILD ] tests-threads-pool.js');
+    await esbuild.build({
+        entryPoints: ['./test/index_threads_pool.ts'],
+        outfile: 'dist/tests-threads-pool.js',
+        platform: 'browser',
+        format: 'iife',
+        target: TARGET_BROWSER_TEST,
+        bundle: true,
+        sourcemap: is_debug ? 'inline' : true,
+        external: EXTERNALS_TEST_BROWSER,
+    });
+
     console.log('[ ESBUILD ] tests-threads-smoke.js');
     await esbuild.build({
         entryPoints: ['./test/index_threads_smoke.ts'],

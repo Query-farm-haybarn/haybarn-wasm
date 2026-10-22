@@ -1147,6 +1147,13 @@ jobs:
               run: |
                       CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:haybarn-repository
 
+            # Haybarn: remote extension loads with the scheduler's threads live (20 fresh instances, no SET threads=1
+            # bracket, autoloads inside queries), pthread pool exhaustion and failing parallel queries on the threads bundle
+            - name: Test extension loads and the pthread pool on the threads bundle
+              shell: bash
+              run: |
+                      CHROME_BIN=`which google-chrome` POOL_ITERATIONS=20 yarn workspace @haybarn/haybarn-wasm test:chrome:threads-pool
+
             #            - name: Test @haybarn/haybarn-wasm on Firefox
             #              uses: ./.github/actions/haybarn-wasm-ci-env
             #              with:
