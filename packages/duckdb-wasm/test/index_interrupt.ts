@@ -235,3 +235,167 @@ for (const variant of ['base', 'threads']) {
         });
     });
 }
+
+// Haybarn: HTTP requests of an interrupted query. The karma middleware (karma/interrupt-chrome.cjs) serves a CSV
+// slowly and logs whether the client went away before the response ended. On the threads bundle the requests run in
+// the fetch helper, which aborts them in flight; the base bundle's synchronous XHR cannot be aborted.
+
+interface SlowRequest {
+    method: string;
+    path: string;
+    query: string;
+    headers: Record<string, string>;
+    aborted: boolean;
+}
+const slowLog = async () => (await (await fetch('/haybarn-slow/log')).json()) as SlowRequest[];
+let slowFile = 0;
+/** A URL of the slow server no cache has seen */
+const slowURL = (params: string) => `${location.origin}/haybarn-slow/f${++slowFile}.csv?${params}`;
+
+describe('HTTP requests of an interrupted query (threads)', () => {
+    let worker: Worker;
+    let db: duckdb.AsyncDuckDB;
+    let conn: duckdb.AsyncDuckDBConnection;
+    const id = () => conn.useUnsafe((_, c) => c);
+
+    beforeAll(async () => {
+        worker = new Worker(BUNDLES.threads.mainWorker!);
+        db = new duckdb.AsyncDuckDB(new duckdb.VoidLogger(), worker);
+        await db.instantiate(BUNDLES.threads.mainModule, BUNDLES.threads.pthreadWorker);
+        await db.open({
+            extensionRepository: new URL('/extensions', location.href).href,
+            allowUnsignedExtensions: true,
+        });
+    });
+    afterAll(async () => {
+        await db.terminate();
+    });
+    beforeEach(async () => {
+        await fetch('/haybarn-slow/reset');
+        conn = await db.connect();
+    });
+    afterEach(async () => {
+        await conn.close();
+    });
+
+    /** Load httpfs and mark its requests with a header, so the log tells them from the runtime's own */
+    const loadHttpfs = async () => {
+        await conn.query('INSTALL httpfs');
+        await conn.query('LOAD httpfs');
+        await conn.query('SET enable_external_file_cache = false');
+        await conn.query('SET http_retries = 0');
+        await conn.query(`CREATE OR REPLACE SECRET slow_marker (
+            TYPE HTTP, SCOPE '${location.origin}/haybarn-slow/', EXTRA_HTTP_HEADERS MAP {'X-Haybarn-Client': 'httpfs'}
+        )`);
+    };
+
+    it('httpfs: an interrupt aborts the GET in flight', async () => {
+        await loadHttpfs();
+        const handle = await db.getInterruptHandle(id());
+        const url = slowURL('delay=10000');
+        let interruptedAt = 0;
+        const query = settle(conn.query(`SELECT count(*) FROM read_csv('${url}')`), () => interruptedAt);
+        // Wait until the GET is in flight
+        for (let i = 0; i < 100 && !(await slowLog()).some(r => r.method === 'GET'); ++i) await sleep(50);
+        await sleep(300);
+        interruptedAt = performance.now();
+        duckdb.interruptConnection(handle!);
+        const [result, error, ms] = await query;
+        expect(result).toBeNull();
+        expect(String(error)).toMatch(INTERRUPTED);
+        // The engine is free long before the server would have answered
+        expect(ms).toBeLessThan(1000);
+        const gets = (await slowLog()).filter(r => r.method === 'GET');
+        expect(gets.length).toEqual(1);
+        expect(gets[0].headers['x-haybarn-client']).toEqual('httpfs');
+        // The request was aborted, not waited out
+        await sleep(200);
+        expect((await slowLog()).filter(r => r.method === 'GET')[0].aborted).toBeTrue();
+        expect(Number((await conn.query('SELECT 42 AS a')).getChildAt(0)!.get(0))).toEqual(42);
+    });
+
+    it('httpfs: cancelSent aborts the GET of a pending query', async () => {
+        await loadHttpfs();
+        const url = slowURL('delay=10000');
+        let cancelledAt = 0;
+        const query = settle(runPending(db, id(), `SELECT count(*) FROM read_csv('${url}')`), () => cancelledAt);
+        for (let i = 0; i < 100 && !(await slowLog()).some(r => r.method === 'GET'); ++i) await sleep(50);
+        await sleep(300);
+        cancelledAt = performance.now();
+        expect(await conn.cancelSent()).toBeTrue();
+        const [result, error, ms] = await query;
+        expect(result).toBeNull();
+        expect(String(error)).toMatch(/INTERRUPT|canceled/i);
+        expect(ms).toBeLessThan(1000);
+        await sleep(200);
+        expect((await slowLog()).filter(r => r.method === 'GET')[0].aborted).toBeTrue();
+    });
+
+    it('httpfs: http_timeout ends a stalled response, a trickle is not a stall', async () => {
+        await loadHttpfs();
+        await conn.query('SET http_timeout = 2');
+        // One byte every 0.7 s for 4 s: the timeout is one of inactivity
+        expect(Number((await conn.query(`SELECT count(*) FROM read_csv('${slowURL('trickle=700')}')`)).getChildAt(0)!.get(0))).toEqual(2);
+        const started = performance.now();
+        await expectAsync(conn.query(`SELECT count(*) FROM read_csv('${slowURL('stall=1')}')`)).toBeRejectedWithError(
+            /timed out/i,
+        );
+        const ms = performance.now() - started;
+        expect(ms).toBeGreaterThan(1500);
+        expect(ms).toBeLessThan(6000);
+        await sleep(200);
+        expect((await slowLog()).filter(r => r.path.endsWith(`f${slowFile}.csv`) && r.method === 'GET')[0].aborted).toBeTrue();
+        await conn.query('RESET http_timeout');
+    });
+});
+
+describe('HTTP requests of the JS runtime of an interrupted query (threads)', () => {
+    // Without httpfs, remote files are read by the JS runtime on the worker's main thread
+    let worker: Worker;
+    let db: duckdb.AsyncDuckDB;
+    let conn: duckdb.AsyncDuckDBConnection;
+    const id = () => conn.useUnsafe((_, c) => c);
+
+    beforeAll(async () => {
+        worker = new Worker(BUNDLES.threads.mainWorker!);
+        db = new duckdb.AsyncDuckDB(new duckdb.VoidLogger(), worker);
+        await db.instantiate(BUNDLES.threads.mainModule, BUNDLES.threads.pthreadWorker);
+        await db.open({});
+    });
+    afterAll(async () => {
+        await db.terminate();
+    });
+    beforeEach(async () => {
+        await fetch('/haybarn-slow/reset');
+        conn = await db.connect();
+    });
+    afterEach(async () => {
+        await conn.close();
+    });
+
+    it('reads remote files without httpfs', async () => {
+        expect(Number((await conn.query(`SELECT count(*) FROM read_csv('${slowURL('delay=0')}')`)).getChildAt(0)!.get(0))).toEqual(2);
+        expect(Number(await conn.query("SELECT count(*) FROM duckdb_extensions() WHERE extension_name = 'httpfs' AND loaded").then(t => t.getChildAt(0)!.get(0)))).toEqual(0);
+    });
+
+    it('an interrupt aborts the range read in flight', async () => {
+        const handle = await db.getInterruptHandle(id());
+        const url = slowURL('delay=10000');
+        let interruptedAt = 0;
+        const query = settle(conn.query(`SELECT count(*) FROM read_csv('${url}')`), () => interruptedAt);
+        for (let i = 0; i < 100 && !(await slowLog()).some(r => r.method === 'GET'); ++i) await sleep(50);
+        await sleep(300);
+        interruptedAt = performance.now();
+        duckdb.interruptConnection(handle!);
+        const [result, error, ms] = await query;
+        expect(result).toBeNull();
+        expect(String(error)).toMatch(/INTERRUPT/i);
+        expect(ms).toBeLessThan(1000);
+        await sleep(200);
+        const gets = (await slowLog()).filter(r => r.method === 'GET');
+        expect(gets.length).toBeGreaterThan(0);
+        expect(gets[0].headers['x-haybarn-client']).toBeUndefined();
+        expect(gets[0].aborted).toBeTrue();
+        expect(Number((await conn.query('SELECT 42 AS a')).getChildAt(0)!.get(0))).toEqual(42);
+    });
+});

@@ -568,6 +568,16 @@ jobs:
               run: |
                   git submodule status > git_submodule_status.txt
 
+            # Haybarn: httpfs from the fork, at the commit the engine pins, built into the local extension repository,
+            # so the loadable suites test the browser HTTP client against an httpfs of the same engine (the published
+            # one may have been built against another engine commit)
+            - name: Check out httpfs
+              run: |
+                  ref=$(sed -n 's/^ *GIT_TAG *\([0-9a-f]*\).*/\1/p' submodules/duckdb/.github/config/haybarn/extensions/httpfs.cmake)
+                  git clone --filter=blob:none https://github.com/Query-farm-haybarn/haybarn-httpfs "$RUNNER_TEMP/haybarn-httpfs"
+                  git -C "$RUNNER_TEMP/haybarn-httpfs" checkout "$ref"
+                  echo "DUCKDB_HTTPFS_DIRECTORY=$RUNNER_TEMP/haybarn-httpfs" >> "$GITHUB_ENV"
+
             - name: Build Wasm module
               run: |
                   USE_GENERATED_EXPORTED_LIST="$DEFAULT_USE_GENERATED_EXPORTED_LIST" DUCKDB_PLATFORM="wasm_eh" DUCKDB_WASM_LOADABLE_EXTENSIONS=1 GEN=ninja ./scripts/wasm_build_lib.sh relsize base
@@ -652,6 +662,16 @@ jobs:
             - name: Git submodule status
               run: |
                   git submodule status > git_submodule_status.txt
+
+            # Haybarn: httpfs from the fork, at the commit the engine pins, built into the local extension repository,
+            # so the loadable suites test the browser HTTP client against an httpfs of the same engine (the published
+            # one may have been built against another engine commit)
+            - name: Check out httpfs
+              run: |
+                  ref=$(sed -n 's/^ *GIT_TAG *\([0-9a-f]*\).*/\1/p' submodules/duckdb/.github/config/haybarn/extensions/httpfs.cmake)
+                  git clone --filter=blob:none https://github.com/Query-farm-haybarn/haybarn-httpfs "$RUNNER_TEMP/haybarn-httpfs"
+                  git -C "$RUNNER_TEMP/haybarn-httpfs" checkout "$ref"
+                  echo "DUCKDB_HTTPFS_DIRECTORY=$RUNNER_TEMP/haybarn-httpfs" >> "$GITHUB_ENV"
 
             - name: Build Wasm module
               run: |
@@ -1140,7 +1160,14 @@ jobs:
               run: |
                       CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:threads:smoke
 
-            # Haybarn: interrupting a running query and reading its progress, on both bundles
+            # Haybarn: httpfs from the local repository on both bundles: remote reads, secrets, S3 through the
+            # browser HTTP client
+            - name: Test HTTPFS on Chrome
+              shell: bash
+              run: |
+                      CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:httpfs
+
+            # Haybarn: interrupting a running query, its HTTP requests and reading its progress, on both bundles
             - name: Test query interrupt and progress on Chrome
               shell: bash
               run: |
