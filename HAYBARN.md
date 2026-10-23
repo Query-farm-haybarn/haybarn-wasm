@@ -36,6 +36,7 @@ upstream base, one concern per commit.
 | **Threads bundle pthread pool** | `lib/src/main_thread.cc`: strict pool (`PTHREAD_POOL_SIZE_STRICT=2`, a thread beyond it fails with `EAGAIN` instead of hanging), refilled between calls with the live threads plus 4 idle workers (at most 64) |
 | **Platform functions for extensions** | `lib/js-stubs.js`, `lib/src/platform_stubs.cc`: the 1.5 ABI for side modules (vgi, grainlift): `duckdb_wasm_open_auth_url`/`get_auth_error`/`get_page_origin`/`crypto_random`/`sha256` and the eight `vgi_wasm_*` functions of the VGI `worker:` SAB transport. The ones that read the worker's globals or post to the page run on the main runtime thread, wherever the extension calls them. The base bundle's sleeps block in `Atomics.wait` (`--wrap=emscripten_thread_sleep`). Page halves in `packages/duckdb-wasm/src/vgi/` (`@haybarn/haybarn-wasm/vgi`: `installVgiOAuthBridge`, `installVgiWebWorkerBridge`, `composeWorkerBridges`), react `onWorkerCreated`, the shell's `/oauth-callback.html`. Tested through `lib/test/extensions/haybarn_platform_test` (`test:chrome:platform`) |
 | **Dynamic-linking glue**      | `scripts/patch_dylink_glue.cjs`, run by `wasm_build_lib.sh` on every loadable build after the threads `markAsFinished` guard: main-module exports resolved on first use (Node cold start 1.2 s → 0.8 s), side-module bytes freed after compiling (until emscripten 6.0.14, #28002), exported-global mutability read from the bytes (until #28006), dlopen takes a module armed for that file. It checks the exact 6.0.13 glue (`-g2` keeps its shape) and fails the build when emscripten changes it: re-validate after an emsdk bump. `scripts/test_dylink_glue.cjs` (fixtures in `scripts/dylink_fixtures/`) is the semantic gate, in CI |
+| **Extension loading**         | `lib/src/extension_provider.cc`: the download goes into emscripten's file system without a heap copy, the signature hash streams it in 1 MiB chunks (`ExtensionHelper::CheckExtensionHashSignature`), and on the base bundle dlopen takes a module compiled from the file's bytes, so no copy stays on the heap (on threads emscripten's dlopen keeps one for the running pthreads). `AsyncDuckDB.prefetchExtensions(names, timeoutMs?)` (`src/parallel/extension_prefetch.ts`): parallel downloads, WebCrypto hash, `compileStreaming`; LOAD takes the entry and arms the module after the signature check. Tested by `test:chrome:prefetch` (local extensions signed with a throwaway key) and `scripts/test_extension_load_memory.cjs` |
 | **Toolchain**                 | emscripten 6.0.13 (same as the Haybarn 2.0 extension builds) |
 | **Shell + app**               | Haybarn banner, default extensions at startup, Haybarn branding, Cloudflare Pages hosting (`_worker.js`, `_headers`) |
 | **Docs**                      | `README.md`, `NOTICE`, `HAYBARN.md`, `CLAUDE.md`, package README |
@@ -62,7 +63,7 @@ are not ported yet:
 * the EM_JS HTTP client rewrite with in-flight abort and the query interrupt flag
 * SAB query cancellation, query progress binding (the single-threaded
   extension LOAD from the same series is ported)
-* extension prefetch, code caching of the engine wasm
+* code caching of the engine wasm
 * the 1.5 COI pthread worker rewrite (obsolete: emscripten 6 runs the pthreads
   from the main worker script)
 
