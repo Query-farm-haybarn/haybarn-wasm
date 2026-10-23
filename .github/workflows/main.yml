@@ -1186,6 +1186,14 @@ jobs:
               run: |
                       yarn workspace @haybarn/haybarn-wasm test:node
 
+            - name: Test dynamic linking on Node.js
+              shell: bash
+              run: |
+                      for f in base threads; do
+                          node -e 'const { isPatched } = require("./scripts/patch_dylink_glue.cjs"); const f = process.argv[1]; if (!isPatched(require("fs").readFileSync(f, "utf8"))) { console.error(f + ": dylink glue not patched"); process.exit(1); }' packages/duckdb-wasm/src/bindings/duckdb-$f.js
+                      done
+                      node scripts/test_dylink_glue.cjs packages/duckdb-wasm/dist
+
             - name: Deploy GitHub Page
               if: false
               run: |
