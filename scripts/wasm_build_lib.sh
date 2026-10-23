@@ -118,6 +118,15 @@ open(path, "w").write(src)
 EOF_PATCH
 fi
 
+# Loadable builds export every symbol for extensions to link against. Make the dynamic-linking glue resolve those
+# exports on first use instead of walking all of them at startup, free side-module bytes after compiling them, read
+# exported-global mutability from the bytes, and let dlopen take a module the worker already compiled. The patcher
+# checks the exact glue it rewrites and fails the build when emscripten changes it. It runs after the
+# markAsFinished guard above, and accepts its own output when the link step had nothing to do.
+if [ "$LOADABLE_EXTENSIONS" = "1" ]; then
+    node ${PROJECT_ROOT}/scripts/patch_dylink_glue.cjs ${BUILD_DIR}/duckdb_wasm.js ${BUILD_DIR}/duckdb_wasm.js
+fi
+
 cp ${BUILD_DIR}/duckdb_wasm.wasm ${DUCKDB_LIB_DIR}/duckdb${SUFFIX}.wasm
 sed \
   -e "s/duckdb_wasm\.wasm/.\/duckdb${SUFFIX}.wasm/g" \
