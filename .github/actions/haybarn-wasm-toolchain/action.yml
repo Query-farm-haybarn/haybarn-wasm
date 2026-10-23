@@ -4,7 +4,8 @@
 #
 #   * Fails unless emcc on PATH is the image's emsdk at the version the image declares
 #     (HAYBARN_EMSCRIPTEN_VERSION). The image is the only place the emscripten version is set.
-#   * Points ccache at <workspace>/.ccache (which the job caches with actions/cache) with the
+#   * Points ccache at <workspace>/.ccache (which the job restores with actions/cache before this
+#     action, so the zeroed stats count this job only) with the
 #     workspace as base dir. The image's defaults (/ccache_dir, an anonymous volume, and
 #     /duckdb_build_dir) are for `docker run -v` callers. Inside a container job the workspace is
 #     /__w/<repo>/<repo> on every run, and emsdk is /emsdk, so cache keys are stable across runs.

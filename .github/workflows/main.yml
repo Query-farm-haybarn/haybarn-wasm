@@ -392,9 +392,7 @@ jobs:
                   make apply_patches
                   cd submodules/duckdb && git tag ${{ inputs.override_git_describe }}
 
-            - name: Check the toolchain, configure ccache
-              uses: ./.github/actions/haybarn-wasm-toolchain
-
+            # Before the toolchain action, which zeroes the restored stats so `ccache -s` counts this job only
             - name: Cache ccache
               uses: actions/cache@v5
               with:
@@ -402,6 +400,9 @@ jobs:
                   key: ccache-image-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
                   restore-keys: |
                       ccache-image-${{ github.job }}-
+
+            - name: Check the toolchain, configure ccache
+              uses: ./.github/actions/haybarn-wasm-toolchain
 
             - name: Git submodule status
               run: |
@@ -447,9 +448,7 @@ jobs:
                   make apply_patches
                   cd submodules/duckdb && git tag ${{ inputs.override_git_describe }}
 
-            - name: Check the toolchain, configure ccache
-              uses: ./.github/actions/haybarn-wasm-toolchain
-
+            # Before the toolchain action, which zeroes the restored stats so `ccache -s` counts this job only
             - name: Cache ccache
               uses: actions/cache@v5
               with:
@@ -457,6 +456,9 @@ jobs:
                   key: ccache-image-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
                   restore-keys: |
                       ccache-image-${{ github.job }}-
+
+            - name: Check the toolchain, configure ccache
+              uses: ./.github/actions/haybarn-wasm-toolchain
 
             - name: Git submodule status
               run: |
@@ -503,9 +505,7 @@ jobs:
                   make apply_patches
                   cd submodules/duckdb && git tag ${{ inputs.override_git_describe }}
 
-            - name: Check the toolchain, configure ccache
-              uses: ./.github/actions/haybarn-wasm-toolchain
-
+            # Before the toolchain action, which zeroes the restored stats so `ccache -s` counts this job only
             - name: Cache ccache
               uses: actions/cache@v5
               with:
@@ -513,6 +513,9 @@ jobs:
                   key: ccache-image-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
                   restore-keys: |
                       ccache-image-${{ github.job }}-
+
+            - name: Check the toolchain, configure ccache
+              uses: ./.github/actions/haybarn-wasm-toolchain
 
             - name: Git submodule status
               run: |
@@ -578,9 +581,7 @@ jobs:
                   make apply_patches
                   cd submodules/duckdb && git tag ${{ inputs.override_git_describe }}
 
-            - name: Check the toolchain, configure ccache
-              uses: ./.github/actions/haybarn-wasm-toolchain
-
+            # Before the toolchain action, which zeroes the restored stats so `ccache -s` counts this job only
             - name: Cache ccache
               uses: actions/cache@v5
               with:
@@ -588,6 +589,9 @@ jobs:
                   key: ccache-image-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
                   restore-keys: |
                       ccache-image-${{ github.job }}-
+
+            - name: Check the toolchain, configure ccache
+              uses: ./.github/actions/haybarn-wasm-toolchain
 
             - name: Git submodule status
               run: |
