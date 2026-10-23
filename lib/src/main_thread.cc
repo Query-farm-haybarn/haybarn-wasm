@@ -30,9 +30,10 @@ EM_JS(void, duckdb_web_pthread_pool_top_up, (int spare, int max_workers), {
         PThread.unusedWorkers.splice(PThread.unusedWorkers.indexOf(worker), 1);
         PThread.haybarnLoadingWorkers++;
         total++;
-        PThread.loadWasmModuleToWorker(worker).then(() => {
+        // Resolves to the worker that loaded (a replacement if this one failed), or null when none did
+        PThread.loadWasmModuleToWorker(worker).then(loaded => {
             PThread.haybarnLoadingWorkers--;
-            PThread.unusedWorkers.push(worker);
+            if (loaded) PThread.unusedWorkers.push(loaded);
         });
     }
 });

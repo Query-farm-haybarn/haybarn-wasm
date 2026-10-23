@@ -118,6 +118,69 @@ open(path, "w").write(src)
 EOF_PATCH
 fi
 
+# The threads bundle loads its pthread pool during instantiate, and every pthread worker fetches the engine worker's
+# script again. Emscripten waits for each pool worker to report that it loaded and has no failure path: one fetch that
+# failed (a reset connection, a proxy hiccup) left instantiate waiting for good. A worker whose script or module did
+# not load is replaced instead, up to three attempts per pool slot, after which the slot is given up (pthread_create
+# then fails with EAGAIN on an empty pool rather than hanging). The error is caught from the moment the worker is
+# created, since it can fire before the load handler is attached.
+if [ "$FEATURES" = "threads" ]; then
+python3 - "${BUILD_DIR}/duckdb_wasm.js" <<'EOF_PATCH'
+import re, sys
+path = sys.argv[1]
+src = open(path).read()
+if "haybarnLoadWorker" not in src:
+    def sub_once(pattern, repl):
+        global src
+        src, n = re.subn(pattern, repl, src, count=2)
+        assert n == 1, "pthread pool glue: expected one match of " + pattern
+    # Record a failure to load, from the moment the worker exists
+    sub_once(r"(allocateUnusedWorker\(\) \{[^}]*?\}\);\n)(\s*)(PThread\.unusedWorkers\.push\(worker\);\n\s*return worker;)",
+             r"""\1\2worker.addEventListener?.("error", e => {
+\2    if (worker.haybarnLoaded || worker.pthread_ptr) return;
+\2    e.preventDefault();
+\2    worker.haybarnLoadFailed = true;
+\2    worker.haybarnOnLoadFailure?.();
+\2});
+\2\3""")
+    # Emscripten's own handler reports errors of a loaded worker only
+    sub_once(r"(worker\.onerror = e => \{\n)(\s*)(var message = \"worker sent an error!\";)",
+             r"\1\2if (!worker.haybarnLoaded) return;\n\2\3")
+    # Load with replacement; the original loader stays as haybarnLoadWorkerOnce
+    sub_once(r"(\n(\s*))loadWasmModuleToWorker: worker => new Promise\(onFinishedLoading => \{",
+             r"""\1loadWasmModuleToWorker: worker => PThread.haybarnLoadWorker(worker, 1),
+\2haybarnLoadWorker: (worker, attempt) => new Promise(resolve => {
+\2    var replace = () => {
+\2        worker.haybarnOnLoadFailure = null;
+\2        worker.terminate();
+\2        var pooled = PThread.unusedWorkers.indexOf(worker);
+\2        if (pooled >= 0) PThread.unusedWorkers.splice(pooled, 1);
+\2        if (attempt >= 3) {
+\2            err(`a pthread worker failed to load ${attempt} times, the pool has one worker less`);
+\2            resolve(null);
+\2            return;
+\2        }
+\2        err(`a pthread worker failed to load, starting another (attempt ${attempt + 1})`);
+\2        setTimeout(() => {
+\2            var next = PThread.allocateUnusedWorker();
+\2            if (pooled < 0) PThread.unusedWorkers.splice(PThread.unusedWorkers.indexOf(next), 1);
+\2            PThread.haybarnLoadWorker(next, attempt + 1).then(resolve);
+\2        }, 100 * attempt);
+\2    };
+\2    // Not from inside the caller's loop over the pool
+\2    if (worker.haybarnLoadFailed) return void queueMicrotask(replace);
+\2    worker.haybarnOnLoadFailure = replace;
+\2    PThread.haybarnLoadWorkerOnce(worker).then(loaded => {
+\2        worker.haybarnLoaded = true;
+\2        worker.haybarnOnLoadFailure = null;
+\2        resolve(loaded);
+\2    });
+\2}),
+\2haybarnLoadWorkerOnce: worker => new Promise(onFinishedLoading => {""")
+    open(path, "w").write(src)
+EOF_PATCH
+fi
+
 # Loadable builds export every symbol for extensions to link against. Make the dynamic-linking glue resolve those
 # exports on first use instead of walking all of them at startup, free side-module bytes after compiling them, read
 # exported-global mutability from the bytes, and let dlopen take a module the worker already compiled. The patcher
