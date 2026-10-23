@@ -1188,6 +1188,13 @@ jobs:
               run: |
                       CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:platform
 
+            # Haybarn: prefetch, hash and compile extensions ahead of LOAD, signatures on: the local extensions
+            # signed with a throwaway key the test server makes, and the published Haybarn repository
+            - name: Test extension prefetch on Chrome
+              shell: bash
+              run: |
+                      CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:prefetch
+
             # Haybarn: install and load signed core extensions from haybarn-extensions.query.farm with
             # both loadable bundles, the way a user's page does (no local repository, signatures checked)
             - name: Test the Haybarn extension repository on Chrome
@@ -1220,6 +1227,11 @@ jobs:
                           node -e 'const { isPatched } = require("./scripts/patch_dylink_glue.cjs"); const f = process.argv[1]; if (!isPatched(require("fs").readFileSync(f, "utf8"))) { console.error(f + ": dylink glue not patched"); process.exit(1); }' packages/duckdb-wasm/src/bindings/duckdb-$f.js
                       done
                       node scripts/test_dylink_glue.cjs packages/duckdb-wasm/dist
+
+            - name: Test extension loads keep no copy on the heap on Node.js
+              shell: bash
+              run: |
+                      node scripts/test_extension_load_memory.cjs packages/duckdb-wasm/dist build/extension_repository
 
             - name: Deploy GitHub Page
               if: false
