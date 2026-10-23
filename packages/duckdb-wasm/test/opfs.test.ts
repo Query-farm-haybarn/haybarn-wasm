@@ -171,8 +171,9 @@ export function testOPFS(baseDir: string, bundle: () => DuckDBBundle): void {
             for (const name of ['temp.db.wal', 'temp.db.wal.checkpoint', 'temp.db.wal.recovery']) {
                 await fsDir.removeEntry(name).catch(_ignore);
             }
-            conn2.close();
-            db2.terminate();
+            // Terminating rejects requests that are still pending, so let the close finish first
+            await conn2.close();
+            await db2.terminate();
         });
 
         it('Load Parquet file that are already with empty handler', async () => {

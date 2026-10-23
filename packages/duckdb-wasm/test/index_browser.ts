@@ -127,6 +127,7 @@ import { testSpill } from './spill.test';
 import { testJsBufferFile } from './js_buffer_file.test';
 import { testTimeZone, testTimeZoneAsync } from './timezone.test';
 import { testInstantiateWasm } from './instantiate_wasm.test';
+import { testWorkerErrors } from './worker_errors.test';
 
 const baseURL = window.location.origin;
 const dataURL = `${baseURL}/data`;
@@ -162,3 +163,4 @@ testTokenizationAsync(() => adb!);
 //testEXCEL(() => db!);
 //testJSON(() => db!);
 testPivot(() => db!);
+testWorkerErrors();
