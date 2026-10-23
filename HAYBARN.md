@@ -55,22 +55,17 @@ equivalent of the engine's "keep the `duckdb::` namespace" rule.
 * The wasm platform strings (`wasm_eh` for `base`, `wasm_threads` for `threads`)
 * Internal C++ symbols, `.duckdb_extension.wasm`, `DUCKDB_*` macros
 
-## Not yet on the 2.0 line
+## Known limitations (2.0)
 
-The 1.5 line carries Haybarn runtime features that upstream 2.0 rewrote
-the ground under (HTTP client, threading model, extension loading). They
-are not ported yet:
-
-* the EM_JS HTTP client rewrite with in-flight abort and the query interrupt flag
-* SAB query cancellation, query progress binding (the single-threaded
-  extension LOAD from the same series is ported)
-* code caching of the engine wasm
-* the 1.5 COI pthread worker rewrite (obsolete: emscripten 6 runs the pthreads
-  from the main worker script)
-
-Upstream 2.0 covers some of the same ground differently (extension loading
-on the main thread, pending-query cancellation, the HTTP client registered
-as httplib capability), so each needs re-deciding rather than a straight port.
+* **No remote reads from Node.** `http(s)://` paths fail in Node with "No files found", with or
+  without httpfs: Node has no `XMLHttpRequest` and the Node runtime maps only local files.
+  Upstream duckdb-wasm behaves the same (1.5 and 2.0). Remote reads work in the browser.
+* **Base bundle HTTP requests have no timeout.** A synchronous XHR can't be aborted mid-flight,
+  and a total-time limit would fail large downloads. The threads bundle has the `http_timeout`
+  inactivity timeout and aborts on interrupt.
+* The 1.5 COI pthread worker rewrite is obsolete: emscripten 6 runs the pthreads from the main
+  worker script. Every other 1.5 runtime feature is ported (see the table above and
+  `devops/wasm-2.0-feature-gap.md`).
 
 ## Rebasing onto a new upstream
 
