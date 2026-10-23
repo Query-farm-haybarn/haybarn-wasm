@@ -9,6 +9,8 @@
  * - Pool exhaustion: a statement that needs more threads than the pool holds does not hang (pthread_create fails
  *   with EAGAIN beyond the pool and the scheduler keeps the threads it got), and the database keeps working.
  * - A parallel query that fails on a scheduler thread while the others call into the main thread settles.
+ * - A pthread worker whose script fails to load (the connection is reset) is replaced: instantiate does not wait
+ *   for it forever.
  *
  * Every step has a deadline, so a hang fails with the iteration and the statement it hung in.
  */
@@ -48,8 +50,8 @@ async function deadline<T>(what: string, run: Promise<T>, ms = STEP_TIMEOUT): Pr
     }
 }
 
-async function openInstance(config: duckdb.DuckDBConfig) {
-    const worker = new Worker(BUNDLE.mainWorker!);
+async function openInstance(config: duckdb.DuckDBConfig, mainWorker = BUNDLE.mainWorker!) {
+    const worker = new Worker(mainWorker);
     const db = new duckdb.AsyncDuckDB(new duckdb.VoidLogger(), worker);
     try {
         await deadline('instantiate', db.instantiate(BUNDLE.mainModule, BUNDLE.pthreadWorker));
@@ -200,4 +202,31 @@ describe('Haybarn threads bundle: extension loads and the pthread pool', () => {
         },
         30 * STEP_TIMEOUT,
     );
+    it('instantiates when pthread worker scripts fail to load', async () => {
+        // The pool is loaded during instantiate and every pthread worker fetches the engine worker's script again.
+        // A worker whose fetch failed never reported back, and instantiate waited for it for good. Request 1 is the
+        // engine worker, 2-9 the pool's eight pthread workers, 10 and on their replacements: a slot whose third
+        // attempt fails too is given up, and the pool has one worker less
+        const faults = ['2', '2,4', '5,9', '2,10', '2,10,11', '3,4,5,6'];
+        for (const [i, failing] of faults.entries()) {
+            const t0 = performance.now();
+            const { worker, db, conn } = await openInstance(
+                { allowUnsignedExtensions: false },
+                `/fault/pool-${Date.now()}-${i}/${failing}/duckdb-browser-threads.worker.js`,
+            );
+            try {
+                const r = await deadline(
+                    `parallel query, requests ${failing} failed`,
+                    conn.query('SELECT count(DISTINCT i % 1000) FROM range(3000000) t(i)'),
+                );
+                expect(Number(r.getChildAt(0)?.get(0))).toEqual(1000);
+                await deadline(`LOAD inet, requests ${failing} failed`, conn.query('LOAD inet'));
+                await conn.close();
+            } finally {
+                await db.terminate();
+                worker.terminate();
+            }
+            log(`requests ${failing} failed: instance ok in ${Math.round(performance.now() - t0)}ms`);
+        }
+    }, 30 * STEP_TIMEOUT);
 });
