@@ -59,12 +59,20 @@ The engine names its repositories with `http://` (for the native httpfs
 bootstrap); `lib/src/extension_provider.cc` upgrades them to https, which a
 page needs.
 
-Main module and side modules must come from the same emscripten: 6.0.13,
-matching haybarn-extension-ci-tools `haybarn-2.0`. Bump both together.
+Main module and side modules must come from the same emscripten (6.0.13).
+The version is set in one place, the Haybarn wasm build image
+(haybarn-extension-ci-tools `haybarn-2.0` `docker/wasm`). `main.yml` pins the
+image by digest in `HAYBARN_WASM_CI_IMAGE`, and ci-tools' `build.yml` /
+`_extension_distribution.yml` pin the same image for the extension builds. To
+bump emscripten: change the image, publish it under a new tag
+(`publish-build-images.yml`, never re-push a tag), and re-pin both repos.
 
 ## Building
 
-Build on the EC2 box or in CI, not on a laptop. Native build (emcc on PATH):
+Build on the EC2 box or in CI, not on a laptop. CI builds in the wasm build
+image (multi-arch, so it runs natively on the arm64 box too):
+`docker run --rm -v "$PWD:/__w/haybarn-wasm/haybarn-wasm" -w /__w/haybarn-wasm/haybarn-wasm <HAYBARN_WASM_CI_IMAGE> …`.
+Native build (emcc on PATH):
 
 ```bash
 git submodule update --init --depth=1 submodules/duckdb submodules/duckdb-nanoarrow submodules/rapidjson

@@ -1,20 +1,15 @@
 # Haybarn replacement for `duckdb/duckdb-wasm-ci-env@<sha>`.
 #
 # Runs the caller's `script:` inside the shared Haybarn wasm build
-# environment image at:
+# environment image. main.yml pins it by digest in $HAYBARN_WASM_CI_IMAGE
+# (the same image its wasm compile jobs run in as `container:`, and the one
+# haybarn-extension-ci-tools 2.0 builds extension .wasm files in), built by
+# haybarn-extension-ci-tools haybarn-2.0's publish-build-images.yml.
 #
-#   ghcr.io/query-farm-haybarn/haybarn-wasm-base:v<engine-version>
-#
-# For the 2.0 line that is haybarn-wasm-base:v2.0.0 (emscripten 6.0.13), built
-# by haybarn-extension-ci-tools haybarn-2.0's publish-build-images.yml.
-#
-# The tag is *derived*, not pinned — see the "Resolve base image" step.
-# The image is rebuilt once per engine release train (v1.5.4, v1.5.5, …)
-# and its tag carries the same `<major>.<minor>.<patch>` as the workspace
-# version, so the workspace version is the single source of truth. This
-# keeps the build toolchain in lockstep with haybarn-extension-ci-tools,
-# which builds extension .wasm against the same image family — toolchain
-# drift between the two is what produces exception-ABI mismatches (#9).
+# Without that variable the tag is derived from the workspace version
+# (`haybarn-wasm-base:v<M.N.P>`, see "Resolve base image"), as the 1.5 line
+# does; toolchain drift between the bundle and the extensions is what
+# produces exception-ABI mismatches (#9), so 2.0 pins.
 #
 # Same image haybarn-extension-ci-tools / haybarn-community-extensions
 # use to compile community .duckdb_extension.wasm artifacts — Ubuntu
