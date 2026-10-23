@@ -268,6 +268,8 @@ if (DUCKDB_WASM_LOADABLE_EXTENSIONS)
   set(DUCKDB_WEB_JSON "")
 
   target_sources(duckdb_web PRIVATE ${CMAKE_SOURCE_DIR}/src/extension_provider.cc)
+  # Haybarn: the provider hashes extensions with the engine's mbedtls for their signature checks
+  target_include_directories(duckdb_web PRIVATE ${DUCKDB_SOURCE_DIR}/third_party/mbedtls/include)
   target_link_libraries(duckdb_web duckdb duckdb_nanoarrow rapidjson ${THREAD_LIBS})
 else()
   add_library(
