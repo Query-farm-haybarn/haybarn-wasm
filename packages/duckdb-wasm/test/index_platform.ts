@@ -180,11 +180,23 @@ for (const variant of ['base', 'threads']) {
             );
         });
 
-        it('exchanges from DuckDB worker threads at once', async () => {
-            await conn.query('CREATE TABLE numbers AS SELECT range AS i FROM range(500000)');
-            const matched = await scalar(`SELECT count(*) FROM numbers
-                WHERE i % 1000 = 0 AND haybarn_platform_vgi_exchange('${ECHO_WORKER}', i::VARCHAR) = 'echo:' || i`);
-            expect(Number(matched)).toEqual(500);
+        it('exchanges from DuckDB worker threads at once, every answer intact', async () => {
+            // Requests of 1 to ~300 bytes (longer than the 256-byte ring), from 4 threads at once, in several rounds:
+            // a reader that takes the writer's close for the end of the data before draining the ring truncates one
+            const exchanges = Number(new URLSearchParams(location.search).get('exchanges') || 0) || 4000;
+            const rounds = 5;
+            await conn.query('CREATE TABLE numbers AS SELECT range AS i FROM range(800000)');
+            const step = Math.floor(800000 / (exchanges / rounds));
+            for (let round = 0; round < rounds; round++) {
+                const request = `repeat(i::VARCHAR || '-', 1 + ((i // ${step} + ${round}) % 50))`;
+                const wrong = await conn.query(`SELECT * FROM (
+                        SELECT i, haybarn_platform_vgi_exchange('${ECHO_WORKER}', ${request}) AS answer,
+                            'echo:' || ${request} AS expected
+                        FROM numbers WHERE i % ${step} = 0
+                    ) WHERE answer IS DISTINCT FROM expected`);
+                expect(wrong.numRows).withContext(`round ${round}`).toEqual(0);
+                expect(wrong.toArray().slice(0, 3).map(r => `${r.i}: ${r.answer} != ${r.expected}`)).toEqual([]);
+            }
             await conn.query('DROP TABLE numbers');
         });
 
