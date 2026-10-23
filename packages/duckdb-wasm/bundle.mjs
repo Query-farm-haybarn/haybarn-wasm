@@ -394,6 +394,18 @@ fs.copyFile(path.resolve(src, 'bindings', 'duckdb-threads.wasm'), path.resolve(d
         external: EXTERNALS_TEST_BROWSER,
     });
 
+    console.log('[ ESBUILD ] tests-prefetch.js');
+    await esbuild.build({
+        entryPoints: ['./test/index_prefetch.ts'],
+        outfile: 'dist/tests-prefetch.js',
+        platform: 'browser',
+        format: 'iife',
+        target: TARGET_BROWSER_TEST,
+        bundle: true,
+        sourcemap: is_debug ? 'inline' : true,
+        external: EXTERNALS_TEST_BROWSER,
+    });
+
     console.log('[ ESBUILD ] tests-platform.js');
     await esbuild.build({
         entryPoints: ['./test/index_platform.ts'],
