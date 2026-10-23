@@ -15,6 +15,7 @@ export interface DuckDBBindings {
     getVersion(): string;
     getFeatureFlags(): number;
     tokenize(text: string): ScriptTokens;
+    getExtensionUrl(name: string): string;
 
     connect(): DuckDBConnection;
     disconnect(conn: number): void;

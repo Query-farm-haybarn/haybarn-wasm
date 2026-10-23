@@ -2,6 +2,7 @@ import { DuckDBBindings, DuckDBDataProtocol } from '../bindings';
 import { WorkerResponseVariant, WorkerRequestVariant, WorkerRequestType, WorkerResponseType } from './worker_request';
 import { Logger, LogEntryVariant } from '../log';
 import { InstantiationProgress } from '../bindings/progress';
+import { clearPrefetchedExtensions, prefetchExtensions } from './extension_prefetch';
 
 export abstract class AsyncDuckDBDispatcher implements Logger {
     /** The bindings */
@@ -153,6 +154,7 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                     );
                     break;
                 case WorkerRequestType.RESET:
+                    clearPrefetchedExtensions();
                     this._bindings.reset();
                     // Files written by this request are in place when it is acknowledged
                     await this.checkpointFiles();
@@ -169,6 +171,8 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                     this.log({ timestamp: new Date(), level: 1, origin: 3, topic: 3, event: 3, value: 'mount' } as any);
                     await this._bindings.mountOPFS();
                     this.log({ timestamp: new Date(), level: 1, origin: 3, topic: 3, event: 3, value: 'open' } as any);
+                    // The new database may resolve extensions to other URLs
+                    clearPrefetchedExtensions();
                     this._bindings.open(request.data);
                     this.log({ timestamp: new Date(), level: 1, origin: 3, topic: 3, event: 3, value: 'opened' } as any);
                     this.sendOK(request);
@@ -192,6 +196,41 @@ export abstract class AsyncDuckDBDispatcher implements Logger {
                     await this.checkpointFiles();
                     this.sendOK(request);
                     break;
+                case WorkerRequestType.PREFETCH_EXTENSIONS: {
+                    // Haybarn: only browsers gain. Node's LOAD reads files or downloads in a child process.
+                    const [names, timeoutMs] = request.data;
+                    const held: string[] = [];
+                    if (typeof XMLHttpRequest !== 'undefined') {
+                        const urls = new Map<string, string>();
+                        for (const name of names) {
+                            try {
+                                // Empty when the extension is already loaded
+                                const url = this._bindings.getExtensionUrl(name);
+                                if (url) {
+                                    urls.set(name, url);
+                                }
+                            } catch (e) {
+                                // Not resolvable (e.g. no loadable extensions in this build): LOAD reports it
+                            }
+                        }
+                        const ready = new Set(await prefetchExtensions([...new Set(urls.values())], timeoutMs));
+                        for (const [name, url] of urls) {
+                            if (ready.has(url)) {
+                                held.push(name);
+                            }
+                        }
+                    }
+                    this.postMessage(
+                        {
+                            messageId: this._nextMessageId++,
+                            requestId: request.messageId,
+                            type: WorkerResponseType.EXTENSIONS_PREFETCHED,
+                            data: held,
+                        },
+                        [],
+                    );
+                    break;
+                }
                 case WorkerRequestType.CONNECT: {
                     const conn = this._bindings.connect();
                     this.postMessage(
