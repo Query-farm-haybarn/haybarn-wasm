@@ -1,0 +1,227 @@
+#!/usr/bin/env node
+// Make emscripten's MAIN_MODULE dynamic-linking glue (libdylink.js) resolve the main module's
+// exports on first use, instead of walking all ~48k of them at startup.
+//
+//   node scripts/patch_dylink_glue.cjs <in.js> <out.js> [--check]
+//
+// Runs on the readable emcc output in wasm_build_lib.sh (loadable builds link with -g2, so the glue keeps
+// its names and shape), before esbuild bundles and minifies it.
+// The glue functions the patch relies on are compared exactly (ignoring comments and whitespace)
+// against the emscripten version this was validated with. If any of them changed, the script
+// fails, so an emsdk upgrade breaks the build instead of silently mis-patching.
+//
+// What changes at startup:
+//   - The main module's exports are no longer copied into `wasmImports`. `wasmImports` becomes a
+//     Proxy that falls back to them, with the same lookup precedence. The first enumeration
+//     (dlsym on the main handle) copies them in once, so symbol indices stay deterministic.
+//   - `updateGOT(mainExports)` only fills GOT entries that already exist (the main module's own GOT
+//     imports). Every other main-module GOT entry is created on first use, with exactly the value
+//     the eager pass would have given it, so the main module's definitions still win over
+//     duplicate definitions in side modules.
+//   - applySignatureConversions() overlays its ~350 pointer-return wrappers on the exports instead
+//     of copying all of them with Object.assign.
+// Undefined-symbol reporting is unchanged.
+//
+// What changes on dlopen:
+//   - loadWebAssemblyModule drops its reference to the side module's bytes once they are compiled.
+//     When a side module imports a symbol that isn't defined yet, the import gets a lazy stub whose
+//     closure shares loadWebAssemblyModule's context, which holds `binary`, so the whole file stays
+//     in memory for as long as the module is loaded (~26 MB for spatial). The async path already
+//     replaces `binary` with the compiled module, so only the sync path changes. Needed until
+//     https://github.com/emscripten-core/emscripten/pull/28002 (merged, first in emscripten 6.0.14).
+//   - relocateExports reads which exported globals are mutable from the side module's bytes,
+//     instead of calling isImmutableGlobal on each one. That probe writes to the global and catches
+//     the exception, so every data symbol a side module exports threw once (1,286 for spatial,
+//     ~30-60 ms per LOAD in Chrome). It falls back to the probe when it only has a compiled module
+//     or meets something it doesn't parse. Needed until
+//     https://github.com/emscripten-core/emscripten/pull/28006 lands.
+//   - dlopen can use a side module the worker already compiled. When the extension provider has
+//     verified an extension the worker prefetched, it arms the module compiled from
+//     those same bytes in globalThis.__haybarnArmedModule just before dlopen, and loadLibData returns
+//     it instead of the file, so dlopen skips compiling. The mutable-globals scan reads the bytes that
+//     came with it, since a compiled module has none.
+'use strict';
+const fs = require('fs');
+
+// Compare code without comments or whitespace
+const normalize = code => code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '').replace(/\s+/g, '');
+const occurrences = (haystack, needle) => haystack.split(needle).length - 1;
+
+// The glue code the injected runtime depends on, as emitted by emscripten 6.0.13
+const REQUIRED = {
+    receiveInstance: `wasmExports = instance.exports; var origExports = wasmExports; mergeLibSymbols(wasmExports, "main");`,
+    receiveInstanceGOT: `assignWasmExports(wasmExports); updateGOT(origExports);`,
+    GOTHandler: `var GOTHandler = { get(weakImports, symName) { var rtn = GOT[symName]; if (!rtn) { rtn = GOT[symName] = new WebAssembly.Global({ "value": "i32", "mutable": true }, -1); } if (!weakImports.has(symName)) { rtn.required = true; } return rtn; } };`,
+    updateGOT: `var updateGOT = (exports, replace) => { for (var symName in exports) { if (isInternalSym(symName)) { continue; } var value = exports[symName]; var existingEntry = GOT[symName] && GOT[symName].value != -1; if (replace || !existingEntry) { var newValue; if (typeof value === "function") { newValue = addFunction(value); } else if (typeof value.value === "number") { newValue = value; } else { continue; } GOT[symName] ??= new WebAssembly.Global({ "value": "i32", "mutable": true }); GOT[symName].value = newValue; } } };`,
+    isSymbolDefined: `var isSymbolDefined = symName => { var existing = wasmImports[symName]; if (!existing || existing.stub) { return false; }`,
+    mergeLibSymbols: `var mergeLibSymbols = (exports, libName) => { for (var [sym, exp] of Object.entries(exports)) { const setImport = target => { if (!isSymbolDefined(target)) { wasmImports[target] = exp; } }; setImport(sym); } };`,
+    ldsoInit: `var LDSO = { loadedLibsByName: {}, loadedLibsByHandle: {}, init() { newDSO("__main__", 0, wasmImports); } };`,
+    isInternalSym: `var isInternalSym = symName => [`,
+    // base creates wasmImports directly; threads (pthreads) creates it in assignWasmImports()
+    wasmImports: [`var wasmImports = {`, `var wasmImports; function assignWasmImports() { wasmImports = {`],
+    dlsymImport: `_dlsym_js: __dlsym_js,`,
+    dlsymCatchupImport: `_dlsym_catchup_js: __dlsym_catchup_js,`,
+    applySignatureConversions: `function applySignatureConversions(wasmExports) { wasmExports = Object.assign({}, wasmExports);`,
+};
+// The end of loadWebAssemblyModule's loadModule(), as emitted by emscripten 6.0.13. Matching through
+// the closing brace shows nothing after the sync compile reads `binary` again.
+const LOAD_MODULE_TAIL = `if (flags.loadAsync) { return ((async () => { var instance; if (binary instanceof WebAssembly.Module) { instance = new WebAssembly.Instance(binary, info); } else { ({ module: binary, instance } = await WebAssembly.instantiate(binary, info)); } return postInstantiation(binary, instance); }))(); } var module = binary instanceof WebAssembly.Module ? binary : new WebAssembly.Module(binary); var instance = new WebAssembly.Instance(module, info); return postInstantiation(module, instance); } flags = {`;
+const FREE_BINARY_MARKER = '/* haybarn: free side-module bytes (scripts/patch_dylink_glue.cjs) */';
+// The relocateExports and loadWebAssemblyModule code the mutable-globals rewrite changes, as
+// emitted by emscripten 6.0.13
+const MUTABLE_GLOBALS_REQUIRED = {
+    relocateExports: `var relocateExports = (exports, memoryBase = 0) => { function relocateExport(name, value) { if (isImmutableGlobal(value)) { return new WebAssembly.Global({ "value": "i32" }, value.value + memoryBase); } return value; } var relocated = {}; for (var e in exports) { relocated[e] = relocateExport(e, exports[e]); } return relocated; };`,
+    getDylinkMetadata: `var metadata = getDylinkMetadata(binary);`,
+    relocateCall: `moduleExports = relocateExports(instance.exports, memoryBase);`,
+};
+const MUTABLE_GLOBALS_MARKER = '/* haybarn: mutable globals from the binary (scripts/patch_dylink_glue.cjs) */';
+// Returns the names of a side module's exported globals that are mutable, read from its import,
+// global and export sections, or undefined if it only has a compiled module or meets something it
+// doesn't parse. A port of getMutableGlobals() from emscripten#28006. Pthreads get the bytes as an
+// Int8Array (HEAP8.slice), so read them through an unsigned view.
+const MUTABLE_GLOBALS_RUNTIME = `${MUTABLE_GLOBALS_MARKER}
+function __hbMutableGlobals(b){if(!ArrayBuffer.isView(b))return;b=new Uint8Array(b.buffer,b.byteOffset,b.byteLength);var o=8,m=[],r=new Set,L=()=>{for(var v=0,s=1,x;;s*=128)if(x=b[o++],v+=(x&127)*s,!(x&128))return v},S=()=>{var n=L();o+=n},T=()=>{var t=b[o++];(t==99||t==100)&&L()},M=()=>{var f=b[o++];L();f&1&&L();f&8&&L()};while(o<b.length){var id=b[o++],n=L(),e=o+n;if(id==2){for(var c=L();c--;){S();S();var k=b[o++];if(k==0)L();else if(k==1){T();M()}else if(k==2)M();else if(k==3){T();m.push(b[o++]&1)}else if(k==4){o++;L()}else return}}else if(id==6){for(var c=L();c--;){T();m.push(b[o++]&1);for(var p;(p=b[o++])!=11;)if(p==67)o+=4;else if(p==68)o+=8;else if(p==65||p==66||p==35||p==208||p==210)L();else if(!(p>=106&&p<=108||p>=124&&p<=126))return}}else if(id==7){for(var c=L();c--;){var a=o;S();var k=b[o++],i=L();if(k==3&&m[i]){var q=o;o=a;var l=L();r.add(UTF8ArrayToString(b,o,l));o=q}}return o==e?r:void 0}else o=e;if(o!=e)return}return r}
+`;
+const PRECOMPILED_MARKER = '/* haybarn: precompiled side modules (scripts/patch_dylink_glue.cjs) */';
+// Takes the module the engine armed for this library, if any. The armed entry carries the bytes the
+// module was compiled from, for the mutable-globals scan. Every load first drops a scan left by a
+// precompiled load that failed before using it.
+const PRECOMPILED_RUNTIME = `${PRECOMPILED_MARKER}
+var __hbNextMut;
+function __hbTakeArmedModule(n){__hbNextMut=void 0;var a=globalThis.__haybarnArmedModule;if(!a||typeof n!="string"||!(n==a.name||n.endsWith("/"+a.name)))return;globalThis.__haybarnArmedModule=null;__hbNextMut=__hbMutableGlobals(a.bytes);return a.module}
+`;
+// Glue features the injected runtime doesn't handle
+const UNSUPPORTED = {
+    asyncify: 'asyncifyStubs', // isSymbolDefined has extra ASYNCIFY logic
+    legalizedI64: 'orig$', // without WASM_BIGINT, updateGOT renames orig$ symbols
+    dynCalls: 'registerDynCallSymbols', // with DYNCALLS, mergeLibSymbols does more work
+    memory64: '"value":"i64"', // MEMORY64 GOT entries
+};
+
+// Injected immediately before applySignatureConversions: after wasmImports, GOTHandler, updateGOT and
+// mergeLibSymbols are defined, and before createWasm() runs.
+const RUNTIME = `
+/* haybarn: lazy MAIN_MODULE dylink glue (scripts/patch_dylink_glue.cjs) */
+var __hbMainExports=null,__hbLazy=null,__hbGOTGet=GOTHandler.get,__hbUpdateGOT=updateGOT,__hbMerge=mergeLibSymbols;
+function __hbGOTFromMain(s){if(__hbMainExports&&!GOT[s]&&typeof s=="string"&&s in __hbMainExports&&!isInternalSym(s)){var o={};o[s]=__hbMainExports[s];__hbUpdateGOT(o)}}
+GOTHandler.get=function(w,s){__hbGOTFromMain(s);return __hbGOTGet.call(this,w,s)};
+updateGOT=(e,r)=>{if(__hbMainExports){if(e===__hbMainExports&&!r){for(var s in GOT)if(s in e&&!isInternalSym(s)&&GOT[s].value==-1){var o={};o[s]=e[s];__hbUpdateGOT(o)}return}if(!r)for(var s in e)__hbGOTFromMain(s)}return __hbUpdateGOT(e,r)};
+mergeLibSymbols=(e,r)=>{if(r!=="main"||__hbMainExports)return __hbMerge(e,r);__hbMainExports=e;var t=wasmImports,h=k=>{if(typeof k!="string"||!(k in e))return!1;var v=t[k];return!v||!!v.stub},H={get:(o,k)=>h(k)?e[k]:o[k],has:(o,k)=>k in o||h(k),getOwnPropertyDescriptor:(o,k)=>h(k)?{value:e[k],writable:!0,enumerable:!0,configurable:!0}:Reflect.getOwnPropertyDescriptor(o,k),ownKeys:o=>(__hbMaterialize(),Reflect.ownKeys(o))};__hbLazy={t,h,H};wasmImports=new Proxy(t,H)};
+function __hbMaterialize(){var L=__hbLazy;if(!L)return;__hbLazy=null;var p=wasmImports,o=L.t,e=__hbMainExports;for(var k in e)L.h(k)&&(o[k]=e[k]);delete L.H.get;delete L.H.has;delete L.H.getOwnPropertyDescriptor;delete L.H.ownKeys;wasmImports=o;for(var n in LDSO.loadedLibsByName){var d=LDSO.loadedLibsByName[n];d.exports===p&&(d.exports=o)}}
+function __hbWrapDlsym(){["_dlsym_js","_dlsym_catchup_js"].forEach(n=>{var f=wasmImports[n];var w=function(h){if(__hbLazy){var d=LDSO.loadedLibsByHandle[h>>>0];d&&d.exports===wasmImports&&__hbMaterialize()}return f.apply(this,arguments)};w.sig=f.sig;wasmImports[n]=w})}
+if(wasmImports)__hbWrapDlsym();else{var __hbAssignWasmImports=assignWasmImports;assignWasmImports=function(){__hbAssignWasmImports();__hbWrapDlsym()}}
+function __hbOverlay(s){var v={};return new Proxy(v,{get:(o,k)=>k in v?v[k]:s[k],set:(o,k,x)=>(v[k]=x,!0),has:(o,k)=>k in v||k in s,ownKeys:()=>Reflect.ownKeys(s),getOwnPropertyDescriptor:(o,k)=>k in v||k in s?{value:k in v?v[k]:s[k],writable:!0,enumerable:!0,configurable:!0}:void 0})}
+`;
+
+const isLazyPatched = src => src.includes('__hbMainExports');
+const isFreeBinaryPatched = src => src.includes(FREE_BINARY_MARKER);
+const isMutableGlobalsPatched = src => src.includes(MUTABLE_GLOBALS_MARKER);
+const isPrecompiledPatched = src => src.includes(PRECOMPILED_MARKER);
+const isPatched = src =>
+    isLazyPatched(src) && isFreeBinaryPatched(src) && isMutableGlobalsPatched(src) && isPrecompiledPatched(src);
+
+function checkGlue(code) {
+    for (const [name, snippets] of Object.entries(REQUIRED)) {
+        // A check passes when exactly one of its alternative forms occurs, exactly once
+        const counts = [].concat(snippets).map(snippet => occurrences(code, normalize(snippet)));
+        if (counts.reduce((a, b) => a + b, 0) !== 1) {
+            throw new Error(`glue check '${name}' found ${counts.join('+')} matches, expected 1 (did emscripten change libdylink.js? re-validate the patch)`);
+        }
+    }
+    for (const [name, marker] of Object.entries(UNSUPPORTED)) {
+        if (code.includes(marker)) throw new Error(`unsupported glue feature present: ${name}`);
+    }
+}
+
+// Load extensions without startup walking all main-module exports
+function patchLazy(src) {
+    checkGlue(normalize(src));
+    const anchor = /function\s+applySignatureConversions\s*\(\s*wasmExports\s*\)\s*\{(\s*(?:\/\/[^\n]*\s*)*)wasmExports\s*=\s*Object\.assign\(\s*\{\s*\}\s*,\s*wasmExports\s*\)\s*;/;
+    if (!anchor.test(src)) throw new Error('applySignatureConversions is not in the expected form');
+    return src.replace(anchor, (_, between) => `${RUNTIME}function applySignatureConversions(wasmExports) {${between}wasmExports = __hbOverlay(wasmExports);`);
+}
+
+// Don't keep a side module's bytes alive after compiling it
+function patchFreeBinary(src) {
+    const found = occurrences(normalize(src), normalize(LOAD_MODULE_TAIL));
+    if (found !== 1) {
+        throw new Error(`glue check 'loadModuleTail' found ${found} matches, expected 1 (did emscripten change libdylink.js? re-validate the patch)`);
+    }
+    const anchor = /(var\s+module\s*=\s*binary\s+instanceof\s+WebAssembly\.Module\s*\?\s*binary\s*:\s*new\s+WebAssembly\.Module\(\s*binary\s*\)\s*;)/g;
+    const matches = src.match(anchor);
+    if (!matches || matches.length !== 1) throw new Error('loadModule sync compile is not in the expected form');
+    return src.replace(anchor, `$1 binary = null; ${FREE_BINARY_MARKER}`);
+}
+
+// Read exported global mutability from the side module's bytes instead of probing each global
+function patchMutableGlobals(src) {
+    const code = normalize(src);
+    for (const [name, snippet] of Object.entries(MUTABLE_GLOBALS_REQUIRED)) {
+        const found = occurrences(code, normalize(snippet));
+        if (found !== 1) {
+            throw new Error(`glue check '${name}' found ${found} matches, expected 1 (did emscripten change libdylink.js? re-validate the patch)`);
+        }
+    }
+    const rewrites = [
+        [/var\s+relocateExports\s*=\s*\(\s*exports\s*,\s*memoryBase\s*=\s*0\s*\)\s*=>\s*\{(\s*function\s+relocateExport\s*\(\s*name\s*,\s*value\s*\)\s*\{(?:\s*\/\/[^\n]*)*\s*)if\s*\(\s*isImmutableGlobal\(\s*value\s*\)\s*\)/,
+            (_, between) => `${MUTABLE_GLOBALS_RUNTIME}var relocateExports = (exports, memoryBase = 0, __hbMut) => {${between}if (__hbMut ? value instanceof WebAssembly.Global && !__hbMut.has(name) : isImmutableGlobal(value))`],
+        [/var\s+metadata\s*=\s*getDylinkMetadata\(\s*binary\s*\)\s*;/, '$& var __hbMut = __hbMutableGlobals(binary);'],
+        [/moduleExports\s*=\s*relocateExports\(\s*instance\.exports\s*,\s*memoryBase\s*\)/, 'moduleExports = relocateExports(instance.exports, memoryBase, __hbMut)'],
+    ];
+    for (const [anchor, replacement] of rewrites) {
+        const matches = src.match(new RegExp(anchor.source, 'g'));
+        if (!matches || matches.length !== 1) throw new Error(`mutable globals: ${anchor.source.slice(0, 40)}... is not in the expected form`);
+        src = src.replace(anchor, replacement);
+    }
+    return src;
+}
+
+// Let dlopen use a module the worker compiled from the bytes the engine verified
+function patchPrecompiled(src) {
+    const rewrites = [
+        [/function\s+loadLibData\s*\(\s*\)\s*\{/,
+            'function loadLibData() { var __hbPre = __hbTakeArmedModule(libName); if (__hbPre) { return flags.loadAsync ? Promise.resolve(__hbPre) : __hbPre; }'],
+        [/var\s+__hbMut\s*=\s*__hbMutableGlobals\(\s*binary\s*\)\s*;/,
+            'var __hbMut = __hbNextMut !== undefined ? __hbNextMut : __hbMutableGlobals(binary); __hbNextMut = undefined;'],
+        [/\/\* haybarn: mutable globals from the binary \(scripts\/patch_dylink_glue\.cjs\) \*\//, `${PRECOMPILED_RUNTIME}$&`],
+    ];
+    for (const [anchor, replacement] of rewrites) {
+        const matches = src.match(new RegExp(anchor.source, 'g'));
+        if (!matches || matches.length !== 1) throw new Error(`precompiled: ${anchor.source.slice(0, 40)}... is not in the expected form`);
+        src = src.replace(anchor, replacement);
+    }
+    return src;
+}
+
+// Apply each rewrite that isn't applied yet, so output from an older version of this script is
+// brought up to date
+function patch(src) {
+    if (isPatched(src)) throw new Error('already patched');
+    if (!isLazyPatched(src)) src = patchLazy(src);
+    if (!isFreeBinaryPatched(src)) src = patchFreeBinary(src);
+    if (!isMutableGlobalsPatched(src)) src = patchMutableGlobals(src);
+    if (!isPrecompiledPatched(src)) src = patchPrecompiled(src);
+    return src;
+}
+
+if (require.main === module) {
+    const args = process.argv.slice(2);
+    const check = args.includes('--check');
+    const [input, output] = args.filter(a => !a.startsWith('--'));
+    try {
+        const src = fs.readFileSync(input, 'utf8');
+        // wasm_build_lib.sh reprocesses its previous output when the link step had nothing to do
+        if (isPatched(src)) {
+            if (!check && input !== output) fs.writeFileSync(output, src);
+            console.error(`patch_dylink_glue: ${input}: already patched`);
+            return;
+        }
+        const patched = patch(src);
+        if (!check) fs.writeFileSync(output, patched);
+        console.error(`patch_dylink_glue: ${input}: ${check ? 'checks passed' : 'patched'}`);
+    } catch (e) {
+        console.error(`patch_dylink_glue: ${input}: ${e.message}`);
+        process.exit(1);
+    }
+}
+module.exports = { patch, isPatched, FREE_BINARY_MARKER, MUTABLE_GLOBALS_RUNTIME, PRECOMPILED_RUNTIME };
