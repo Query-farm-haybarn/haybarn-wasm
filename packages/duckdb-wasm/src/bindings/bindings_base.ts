@@ -168,6 +168,16 @@ export abstract class DuckDBBindingsBase implements DuckDBBindings {
         dropResponseBuffers(this.mod);
         return version;
     }
+    /** Haybarn: the URL `LOAD <name>` would fetch, empty when the extension is already loaded */
+    public getExtensionUrl(name: string): string {
+        const [s, d, n] = callSRet(this.mod, 'duckdb_web_extension_url', ['string'], [name]);
+        if (s !== StatusCode.SUCCESS) {
+            throw new Error(readString(this.mod, d, n));
+        }
+        const url = readString(this.mod, d, n);
+        dropResponseBuffers(this.mod);
+        return url;
+    }
     /** Get the feature flags */
     public getFeatureFlags(): number {
         return this.mod.ccall('duckdb_web_get_feature_flags', 'number', [], []);

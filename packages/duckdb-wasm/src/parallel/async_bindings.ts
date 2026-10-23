@@ -345,6 +345,12 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
                     return;
                 }
                 break;
+            case WorkerRequestType.PREFETCH_EXTENSIONS:
+                if (response.type == WorkerResponseType.EXTENSIONS_PREFETCHED) {
+                    task.promiseResolver(response.data);
+                    return;
+                }
+                break;
             case WorkerRequestType.TOKENIZE:
                 if (response.type == WorkerResponseType.SCRIPT_TOKENS) {
                     task.promiseResolver(response.data);
@@ -533,6 +539,32 @@ export class AsyncDuckDB implements AsyncDuckDBBindings {
         this.forgetConnections();
         const task = new WorkerTask<WorkerRequestType.OPEN, DuckDBConfig, null>(WorkerRequestType.OPEN, config);
         await this.postTask(task);
+    }
+
+    /**
+     * Haybarn: download, hash and compile extensions ahead of LOAD.
+     *
+     * In browsers, LOAD downloads each extension synchronously and hashes it with SHA-256 compiled to wasm before
+     * checking its signature, then compiles it. This does that work in the worker ahead of time: the downloads run in
+     * parallel, the hash is computed with WebCrypto and the module is compiled with `WebAssembly.compileStreaming`. A
+     * later `LOAD <name>` that resolves to the same URL then only checks the signature, against that hash, and
+     * dlopen uses the compiled module once the check has passed. Settings that change the URL (such as
+     * `custom_extension_repository`, or `INSTALL <name> FROM <repository>` / `VERSION`) must come first.
+     *
+     * Call it while setting up the session, before running queries. Requests sent while a prefetch runs wait for it.
+     *
+     * Resolves to the names that are held for LOAD, once every download has finished, failed or timed out (after
+     * `timeoutMs`, 30 seconds by default). A name that can't be resolved or downloaded is skipped, leaving the
+     * download to LOAD, which reports any error; so are extensions that are already loaded. Each prefetched extension
+     * serves one LOAD, at most 256 MiB is held for LOADs that haven't run yet, and `reset()` or `open()` drops what no
+     * LOAD took. Does nothing in Node.js.
+     */
+    public async prefetchExtensions(names: string[], timeoutMs?: number): Promise<string[]> {
+        const task = new WorkerTask<WorkerRequestType.PREFETCH_EXTENSIONS, [string[], number | undefined], string[]>(
+            WorkerRequestType.PREFETCH_EXTENSIONS,
+            [names, timeoutMs],
+        );
+        return await this.postTask(task);
     }
 
     /** Tokenize a script text */
