@@ -21,6 +21,7 @@
 #include "duckdb/common/arrow/arrow_converter.hpp"
 #include "duckdb/common/file_system.hpp"
 #include "duckdb/common/http_util.hpp"
+#include "duckdb/common/string_util.hpp"
 #include "duckdb/common/types.hpp"
 #include "duckdb/common/types/data_chunk.hpp"
 #include "duckdb/common/types/vector.hpp"
@@ -29,6 +30,8 @@
 #include "duckdb/function/table/arrow.hpp"
 #include "duckdb/function/table/arrow/arrow_duck_schema.hpp"
 #include "duckdb/main/buffered_data/buffered_data.hpp"
+#include "duckdb/main/config.hpp"
+#include "duckdb/main/extension_helper.hpp"
 #include "duckdb/main/query_result.hpp"
 #include "duckdb/main/settings.hpp"
 #include "duckdb/parser/expression/constant_expression.hpp"
@@ -1006,6 +1009,26 @@ bool WebDB::QueriesInFlight() const {
 
 /// Get the version
 std::string_view WebDB::GetVersion() { return database_->LibraryVersion(); }
+
+/// Haybarn: the URL `LOAD <name>` would fetch. It is the provider's own resolution (repository, version pin), so a
+/// prefetch and the LOAD agree.
+web::Result<std::string> WebDB::GetExtensionUrl(std::string_view name) {
+#ifdef WASM_LOADABLE_EXTENSIONS
+    try {
+        auto& db = *database_->instance;
+        std::string extension{name};
+        if (db.ExtensionIsLoaded(ExtensionHelper::ApplyExtensionAlias(StringUtil::Lower(extension)))) {
+            return std::string{};
+        }
+        auto& provider = dynamic_cast<WasmExtensionProvider&>(DBConfig::GetConfig(db).GetExternalExtensionProvider());
+        return provider.ExtensionUrl(db, extension);
+    } catch (std::exception& e) {
+        return web::Status{web::StatusCode::Invalid, e.what()};
+    }
+#else
+    return web::Status{web::StatusCode::NotImplemented, "extensions are not loadable in this build"};
+#endif
+}
 
 void QueryProgressSlot::Write(bool running_now, double percentage_now, double rows_now, double total_now) {
     auto seq = sequence.load(std::memory_order_relaxed);

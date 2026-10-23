@@ -28,7 +28,23 @@ class WasmExtensionProvider : public ExternalExtensionProvider {
     void *TryLoadFunction(void *library, const string &function_name) override;
     string GetLibraryError() override;
 
+    /// The URL `LOAD <extension>` fetches, with the repository and version it would use
+    string ExtensionUrl(DatabaseInstance &db, const string &extension);
+
    private:
+    /// Where an extension is loaded from
+    struct ResolvedExtension {
+        bool direct_load = false;
+        string name;
+        string url;
+        ExtensionRepository repository;
+        string version;
+    };
+    /// Resolve the URL of `LOAD <extension> [FROM <repository_name>]`. Returns false with an error if the
+    /// repository is unknown.
+    bool ResolveExtension(DatabaseInstance &db, FileSystem &fs, const string &extension, const string &repository_name,
+                          ResolvedExtension &out, string &error);
+
     /// Guards the installed repositories
     std::mutex mutex_;
     /// The repository each installed extension is to be loaded from

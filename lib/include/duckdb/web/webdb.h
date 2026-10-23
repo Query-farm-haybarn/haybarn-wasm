@@ -224,6 +224,8 @@ class WebDB {
 
     /// Tokenize a script and return tokens as json
     std::string Tokenize(std::string_view text);
+    /// Haybarn: the URL `LOAD <name>` would fetch, for the worker to prefetch it. Empty when the extension is loaded.
+    web::Result<std::string> GetExtensionUrl(std::string_view name);
 
     /// Create a connection
     Connection* Connect();

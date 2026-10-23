@@ -172,6 +172,11 @@ void duckdb_web_get_version(WASMResponse* packed) {
 }
 /// Get the duckdb feature flags
 uint32_t duckdb_web_get_feature_flags() { return ResolveFeatureFlags(); }
+/// Haybarn: the URL `LOAD <name>` would fetch, empty when the extension is already loaded
+void duckdb_web_extension_url(WASMResponse* packed, const char* name) {
+    GET_WEBDB(*packed);
+    WASMResponseBuffer::Get().Store(*packed, webdb.GetExtensionUrl(name));
+}
 /// Tokenize a query
 void duckdb_web_tokenize(WASMResponse* packed, const char* query) {
     GET_WEBDB(*packed);
