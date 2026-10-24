@@ -51,7 +51,7 @@ the patch stack, and how to rebase onto a newer upstream.
 ## Haybarn engine version
 
 This branch (`haybarn-2.0`) is built on the Haybarn engine tag
-`haybarn-v2.0.0-rc5`: DuckDB v2.0.0 plus the Haybarn patch stack (extension
+`haybarn-v2.0.0-rc6`: DuckDB v2.0.0 plus the Haybarn patch stack (extension
 repository, trust root, branding). The 1.5 line lives on the `haybarn` branch.
 
 ## Wasm bundles
