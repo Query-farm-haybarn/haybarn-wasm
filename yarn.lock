@@ -452,7 +452,7 @@
   integrity sha512-dBVuXR082gk3jsFp7Rd/JI4kytwGHecnCoTtXFb7DB6CNHp4rg5k1bhg0nWdLGLnOV71lmDzGQaLMy8iPLY0pw==
 
 "@haybarn/haybarn-wasm-shell@file:packages/duckdb-wasm-shell":
-  version "2.0.0-rc6"
+  version "2.0.0-rc7"
   dependencies:
     "@haybarn/haybarn-wasm" "file:packages/duckdb-wasm"
     qs "^6.14.1"
@@ -462,7 +462,7 @@
     xterm-addon-webgl "^0.16.0"
 
 "@haybarn/haybarn-wasm@file:packages/duckdb-wasm":
-  version "2.0.0-rc6"
+  version "2.0.0-rc7"
   dependencies:
     apache-arrow "^17.0.0"
     qs "^6.14.1"

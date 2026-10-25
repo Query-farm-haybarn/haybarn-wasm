@@ -39,7 +39,7 @@ are satisfied by the package name and branding strings.
 
 ## Versioning and releases
 
-Workspace versions are `<duckdb-version>-rc<N>` (currently `2.0.0-rc6`),
+Workspace versions are `<duckdb-version>-rc<N>` (currently `2.0.0-rc7`),
 dropping `-rc<N>` for a stable release. Cutting an rc bumps the nine
 `package.json` version fields, the two workspace entries in `yarn.lock`,
 `app.tsx`'s `HAYBARN_WASM_VERSION` and `_worker.js`'s engine path, then a
