@@ -73,6 +73,9 @@ jobs:
               with:
                   submodules: true
 
+            - name: Test Wasm artifact cache
+              run: python3 scripts/test_ci_wasm_artifacts.py
+
             # Haybarn: the VGI worker: ring stubs of lib/js-stubs.js and their reference model, in Node
             - name: Test the VGI shared-memory host ABI
               run: |
@@ -383,16 +386,38 @@ jobs:
         steps:
             - uses: actions/checkout@v6
               with:
-                  submodules: true
                   fetch-depth: 0
 
+            - name: Compute Wasm artifact key
+              id: wasm-key
+              run: |
+                  KEY=$(python3 scripts/ci_wasm_artifacts.py key base)
+                  echo "key=$KEY" >> "$GITHUB_OUTPUT"
+
+            - name: Restore compiled Wasm artifacts
+              id: wasm-cache
+              uses: actions/cache/restore@v5
+              with:
+                  path: build/ci-wasm-artifacts
+                  key: ${{ steps.wasm-key.outputs.key }}
+
+            - name: Verify and restore compiled Wasm artifacts
+              if: steps.wasm-cache.outputs.cache-hit == 'true'
+              run: python3 scripts/ci_wasm_artifacts.py restore base --cache build/ci-wasm-artifacts --key "${{ steps.wasm-key.outputs.key }}"
+
+            - name: Check out native build inputs
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
+              run: git submodule update --init
+
             - name: Prepare repository
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
               run: |
                   make apply_patches
                   cd submodules/duckdb && git tag ${{ inputs.override_git_describe }}
 
             # Before the toolchain action, which zeroes the restored stats so `ccache -s` counts this job only
             - name: Cache ccache
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
               uses: actions/cache@v5
               with:
                   path: .ccache
@@ -401,23 +426,37 @@ jobs:
                       ccache-image-${{ github.job }}-
 
             - name: Check the toolchain, configure ccache
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
               uses: ./.github/actions/haybarn-wasm-toolchain
 
             - name: Git submodule status
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
               run: |
                   git submodule status > git_submodule_status.txt
 
             - name: Build Wasm module
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
               run: |
                   DUCKDB_PLATFORM="wasm_eh" ./scripts/wasm_build_lib.sh relperf base
 
             - name: ccache stats
-              if: always()
+              if: always() && steps.wasm-cache.outputs.cache-hit != 'true'
               run: ccache -s -v
 
             - name: Check the wasm name section
               run: |
                   node ./scripts/test_wasm_name_section.cjs ./packages/duckdb-wasm/src/bindings/duckdb-base.wasm
+
+            - name: Stage compiled Wasm artifacts
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
+              run: python3 scripts/ci_wasm_artifacts.py stage base --cache build/ci-wasm-artifacts --key "${{ steps.wasm-key.outputs.key }}"
+
+            - name: Save compiled Wasm artifacts
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
+              uses: actions/cache/save@v5
+              with:
+                  path: build/ci-wasm-artifacts
+                  key: ${{ steps.wasm-key.outputs.key }}
 
             - name: Upload artifact
               uses: actions/upload-artifact@v7
@@ -436,16 +475,38 @@ jobs:
         steps:
             - uses: actions/checkout@v6
               with:
-                  submodules: true
                   fetch-depth: 0
 
+            - name: Compute Wasm artifact key
+              id: wasm-key
+              run: |
+                  KEY=$(python3 scripts/ci_wasm_artifacts.py key threads)
+                  echo "key=$KEY" >> "$GITHUB_OUTPUT"
+
+            - name: Restore compiled Wasm artifacts
+              id: wasm-cache
+              uses: actions/cache/restore@v5
+              with:
+                  path: build/ci-wasm-artifacts
+                  key: ${{ steps.wasm-key.outputs.key }}
+
+            - name: Verify and restore compiled Wasm artifacts
+              if: steps.wasm-cache.outputs.cache-hit == 'true'
+              run: python3 scripts/ci_wasm_artifacts.py restore threads --cache build/ci-wasm-artifacts --key "${{ steps.wasm-key.outputs.key }}"
+
+            - name: Check out native build inputs
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
+              run: git submodule update --init
+
             - name: Prepare repository
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
               run: |
                   make apply_patches
                   cd submodules/duckdb && git tag ${{ inputs.override_git_describe }}
 
             # Before the toolchain action, which zeroes the restored stats so `ccache -s` counts this job only
             - name: Cache ccache
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
               uses: actions/cache@v5
               with:
                   path: .ccache
@@ -454,23 +515,37 @@ jobs:
                       ccache-image-${{ github.job }}-
 
             - name: Check the toolchain, configure ccache
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
               uses: ./.github/actions/haybarn-wasm-toolchain
 
             - name: Git submodule status
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
               run: |
                   git submodule status > git_submodule_status.txt
 
             - name: Build Wasm module
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
               run: |
                   DUCKDB_PLATFORM="wasm_threads" ./scripts/wasm_build_lib.sh relperf threads
 
             - name: ccache stats
-              if: always()
+              if: always() && steps.wasm-cache.outputs.cache-hit != 'true'
               run: ccache -s -v
 
             - name: Check the wasm name section
               run: |
                   node ./scripts/test_wasm_name_section.cjs ./packages/duckdb-wasm/src/bindings/duckdb-threads.wasm
+
+            - name: Stage compiled Wasm artifacts
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
+              run: python3 scripts/ci_wasm_artifacts.py stage threads --cache build/ci-wasm-artifacts --key "${{ steps.wasm-key.outputs.key }}"
+
+            - name: Save compiled Wasm artifacts
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
+              uses: actions/cache/save@v5
+              with:
+                  path: build/ci-wasm-artifacts
+                  key: ${{ steps.wasm-key.outputs.key }}
 
             - name: Upload artifact
               uses: actions/upload-artifact@v7
@@ -490,16 +565,38 @@ jobs:
         steps:
             - uses: actions/checkout@v6
               with:
-                  submodules: true
                   fetch-depth: 0
 
+            - name: Compute Wasm artifact key
+              id: wasm-key
+              run: |
+                  KEY=$(python3 scripts/ci_wasm_artifacts.py key base-loadable)
+                  echo "key=$KEY" >> "$GITHUB_OUTPUT"
+
+            - name: Restore compiled Wasm artifacts
+              id: wasm-cache
+              uses: actions/cache/restore@v5
+              with:
+                  path: build/ci-wasm-artifacts
+                  key: ${{ steps.wasm-key.outputs.key }}
+
+            - name: Verify and restore compiled Wasm artifacts
+              if: steps.wasm-cache.outputs.cache-hit == 'true'
+              run: python3 scripts/ci_wasm_artifacts.py restore base-loadable --cache build/ci-wasm-artifacts --key "${{ steps.wasm-key.outputs.key }}"
+
+            - name: Check out native build inputs
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
+              run: git submodule update --init
+
             - name: Prepare repository
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
               run: |
                   make apply_patches
                   cd submodules/duckdb && git tag ${{ inputs.override_git_describe }}
 
             # Before the toolchain action, which zeroes the restored stats so `ccache -s` counts this job only
             - name: Cache ccache
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
               uses: actions/cache@v5
               with:
                   path: .ccache
@@ -508,9 +605,11 @@ jobs:
                       ccache-image-${{ github.job }}-
 
             - name: Check the toolchain, configure ccache
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
               uses: ./.github/actions/haybarn-wasm-toolchain
 
             - name: Git submodule status
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
               run: |
                   git submodule status > git_submodule_status.txt
 
@@ -518,6 +617,7 @@ jobs:
             # so the loadable suites test the browser HTTP client against an httpfs of the same engine (the published
             # one may have been built against another engine commit)
             - name: Check out httpfs
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
               run: |
                   ref=$(sed -n 's/^ *GIT_TAG *\([0-9a-f]*\).*/\1/p' submodules/duckdb/.github/config/haybarn/extensions/httpfs.cmake)
                   git clone --filter=blob:none https://github.com/Query-farm-haybarn/haybarn-httpfs "$RUNNER_TEMP/haybarn-httpfs"
@@ -527,16 +627,28 @@ jobs:
             # Haybarn: HAYBARN_WASM_TEST_EXTENSIONS adds the test extension of the platform functions to the local
             # repository (extension_config_wasm.cmake), for test:chrome:platform
             - name: Build Wasm module
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
               run: |
                   HAYBARN_WASM_TEST_EXTENSIONS=1 USE_GENERATED_EXPORTED_LIST="$DEFAULT_USE_GENERATED_EXPORTED_LIST" DUCKDB_PLATFORM="wasm_eh" DUCKDB_WASM_LOADABLE_EXTENSIONS=1 GEN=ninja ./scripts/wasm_build_lib.sh relsize base
 
             - name: ccache stats
-              if: always()
+              if: always() && steps.wasm-cache.outputs.cache-hit != 'true'
               run: ccache -s -v
 
             - name: Check the wasm name section
               run: |
                   node ./scripts/test_wasm_name_section.cjs ./packages/duckdb-wasm/src/bindings/duckdb-base.wasm
+
+            - name: Stage compiled Wasm artifacts
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
+              run: python3 scripts/ci_wasm_artifacts.py stage base-loadable --cache build/ci-wasm-artifacts --key "${{ steps.wasm-key.outputs.key }}"
+
+            - name: Save compiled Wasm artifacts
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
+              uses: actions/cache/save@v5
+              with:
+                  path: build/ci-wasm-artifacts
+                  key: ${{ steps.wasm-key.outputs.key }}
 
             - name: Upload artifact
               uses: actions/upload-artifact@v7
@@ -563,16 +675,38 @@ jobs:
         steps:
             - uses: actions/checkout@v6
               with:
-                  submodules: true
                   fetch-depth: 0
 
+            - name: Compute Wasm artifact key
+              id: wasm-key
+              run: |
+                  KEY=$(python3 scripts/ci_wasm_artifacts.py key threads-loadable)
+                  echo "key=$KEY" >> "$GITHUB_OUTPUT"
+
+            - name: Restore compiled Wasm artifacts
+              id: wasm-cache
+              uses: actions/cache/restore@v5
+              with:
+                  path: build/ci-wasm-artifacts
+                  key: ${{ steps.wasm-key.outputs.key }}
+
+            - name: Verify and restore compiled Wasm artifacts
+              if: steps.wasm-cache.outputs.cache-hit == 'true'
+              run: python3 scripts/ci_wasm_artifacts.py restore threads-loadable --cache build/ci-wasm-artifacts --key "${{ steps.wasm-key.outputs.key }}"
+
+            - name: Check out native build inputs
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
+              run: git submodule update --init
+
             - name: Prepare repository
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
               run: |
                   make apply_patches
                   cd submodules/duckdb && git tag ${{ inputs.override_git_describe }}
 
             # Before the toolchain action, which zeroes the restored stats so `ccache -s` counts this job only
             - name: Cache ccache
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
               uses: actions/cache@v5
               with:
                   path: .ccache
@@ -581,9 +715,11 @@ jobs:
                       ccache-image-${{ github.job }}-
 
             - name: Check the toolchain, configure ccache
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
               uses: ./.github/actions/haybarn-wasm-toolchain
 
             - name: Git submodule status
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
               run: |
                   git submodule status > git_submodule_status.txt
 
@@ -591,6 +727,7 @@ jobs:
             # so the loadable suites test the browser HTTP client against an httpfs of the same engine (the published
             # one may have been built against another engine commit)
             - name: Check out httpfs
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
               run: |
                   ref=$(sed -n 's/^ *GIT_TAG *\([0-9a-f]*\).*/\1/p' submodules/duckdb/.github/config/haybarn/extensions/httpfs.cmake)
                   git clone --filter=blob:none https://github.com/Query-farm-haybarn/haybarn-httpfs "$RUNNER_TEMP/haybarn-httpfs"
@@ -598,11 +735,12 @@ jobs:
                   echo "DUCKDB_HTTPFS_DIRECTORY=$RUNNER_TEMP/haybarn-httpfs" >> "$GITHUB_ENV"
 
             - name: Build Wasm module
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
               run: |
                   HAYBARN_WASM_TEST_EXTENSIONS=1 USE_GENERATED_EXPORTED_LIST="$DEFAULT_USE_GENERATED_EXPORTED_LIST" DUCKDB_PLATFORM="wasm_threads" DUCKDB_WASM_LOADABLE_EXTENSIONS="signed" GEN=ninja ./scripts/wasm_build_lib.sh relsize threads
 
             - name: ccache stats
-              if: always()
+              if: always() && steps.wasm-cache.outputs.cache-hit != 'true'
               run: ccache -s -v
 
             - name: Check the wasm name section
@@ -612,6 +750,17 @@ jobs:
             - name: Test pthread completion handler
               run: |
                   node ./scripts/test_wasm_pthread_glue.cjs ./packages/duckdb-wasm/src/bindings/duckdb-threads.js
+
+            - name: Stage compiled Wasm artifacts
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
+              run: python3 scripts/ci_wasm_artifacts.py stage threads-loadable --cache build/ci-wasm-artifacts --key "${{ steps.wasm-key.outputs.key }}"
+
+            - name: Save compiled Wasm artifacts
+              if: steps.wasm-cache.outputs.cache-hit != 'true'
+              uses: actions/cache/save@v5
+              with:
+                  path: build/ci-wasm-artifacts
+                  key: ${{ steps.wasm-key.outputs.key }}
 
             - name: Upload artifact
               uses: actions/upload-artifact@v7
@@ -733,10 +882,10 @@ jobs:
                       rm -rf ./packages/duckdb-wasm-app/build/
                       yarn workspace @haybarn/haybarn-wasm-app build:release
 
-            - name: Test @haybarn/haybarn-wasm on Chrome
+            - name: Test @haybarn/haybarn-wasm on Chrome with coverage
               shell: bash
               run: |
-                      CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome
+                      CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:coverage
 
             #            - name: Test @haybarn/haybarn-wasm on Firefox
             #              uses: ./.github/actions/haybarn-wasm-ci-env
@@ -748,11 +897,6 @@ jobs:
               shell: bash
               run: |
                       yarn workspace @haybarn/haybarn-wasm test:node
-
-            - name: Coverage @haybarn/haybarn-wasm
-              shell: bash
-              run: |
-                       CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:coverage
 
             # The examples take @haybarn/haybarn-wasm as a file: dependency, which yarn copies at install
             # time, before dist/ is built. Upstream's plain `yarn install` refreshes the copy only because
@@ -941,7 +1085,7 @@ jobs:
                   retention-days: 1
 
     js_libs_loadable:
-        name: Js / Libraries (loadable version)
+        name: Js / Build libraries (loadable version)
         runs-on: ubuntu-latest
         needs:
             - dataprep
@@ -1083,82 +1227,23 @@ jobs:
               run: |
                   ./scripts/npm_measure_lib.sh
 
-            - name: Test @haybarn/haybarn-wasm on Chrome
+            - name: Package loadable test inputs
               shell: bash
               run: |
-                      CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome
+                  tar -czf "$RUNNER_TEMP/loadable-test-inputs.tar.gz" \
+                      packages/duckdb-wasm/dist packages/duckdb-wasm/src/bindings \
+                      packages/duckdb-wasm/package.json data build/extension_repository
 
-            - name: Test loadable threaded bundle on Chrome
-              shell: bash
-              run: |
-                      CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:threads:smoke
+            - name: Upload loadable test inputs
+              uses: actions/upload-artifact@v7
+              with:
+                  name: loadable-test-inputs
+                  path: ${{ runner.temp }}/loadable-test-inputs.tar.gz
+                  compression-level: 0
+                  if-no-files-found: error
+                  retention-days: 1
 
-            # Haybarn: httpfs from the local repository on both bundles: remote reads, secrets, S3 through the
-            # browser HTTP client
-            - name: Test HTTPFS on Chrome
-              shell: bash
-              run: |
-                      CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:httpfs
-
-            # Haybarn: interrupting a running query, its HTTP requests and reading its progress, on both bundles
-            - name: Test query interrupt and progress on Chrome
-              shell: bash
-              run: |
-                      CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:interrupt
-
-            # Haybarn: the platform functions for extensions (OAuth popup, page origin, Web Crypto, SHA-256, the VGI
-            # worker: transport) through the test extension, called from the engine's threads, on both bundles
-            - name: Test platform functions for extensions on Chrome
-              shell: bash
-              run: |
-                      CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:platform
-
-            # Haybarn: prefetch, hash and compile extensions ahead of LOAD, signatures on: the local extensions
-            # signed with a throwaway key the test server makes, and the published Haybarn repository
-            - name: Test extension prefetch on Chrome
-              shell: bash
-              run: |
-                      CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:prefetch
-
-            # Haybarn: install and load signed core extensions from haybarn-extensions.query.farm with
-            # both loadable bundles, the way a user's page does (no local repository, signatures checked)
-            - name: Test the Haybarn extension repository on Chrome
-              shell: bash
-              run: |
-                      CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:haybarn-repository
-
-            # Haybarn: remote extension loads with the scheduler's threads live (20 fresh instances, no SET threads=1
-            # bracket, autoloads inside queries), pthread pool exhaustion and failing parallel queries on the threads bundle
-            - name: Test extension loads and the pthread pool on the threads bundle
-              shell: bash
-              run: |
-                      CHROME_BIN=`which google-chrome` POOL_ITERATIONS=20 yarn workspace @haybarn/haybarn-wasm test:chrome:threads-pool
-
-            #            - name: Test @haybarn/haybarn-wasm on Firefox
-            #              uses: ./.github/actions/haybarn-wasm-ci-env
-            #              with:
-            #                  script: |-
-            #                      yarn workspace @haybarn/haybarn-wasm test:firefox
-
-            - name: Test @haybarn/haybarn-wasm on Node.js
-              shell: bash
-              run: |
-                      yarn workspace @haybarn/haybarn-wasm test:node
-
-            - name: Test dynamic linking on Node.js
-              shell: bash
-              run: |
-                      for f in base threads; do
-                          node -e 'const { isPatched } = require("./scripts/patch_dylink_glue.cjs"); const f = process.argv[1]; if (!isPatched(require("fs").readFileSync(f, "utf8"))) { console.error(f + ": dylink glue not patched"); process.exit(1); }' packages/duckdb-wasm/src/bindings/duckdb-$f.js
-                      done
-                      node scripts/test_dylink_glue.cjs packages/duckdb-wasm/dist
-
-            - name: Test extension loads keep no copy on the heap on Node.js
-              shell: bash
-              run: |
-                      node scripts/test_extension_load_memory.cjs packages/duckdb-wasm/dist build/extension_repository
-
-            # Package only after every loadable-bundle test passes. Deployment consumes these exact files.
+            # Package once. Deployment waits for every test group before publishing these exact files.
             - name: Package release artifacts
               if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/haybarn-v2.')
               shell: bash
@@ -1185,6 +1270,117 @@ jobs:
                   git fetch origin gh-pages
                   ./scripts/deploy_pages.sh
 
+    js_libs_loadable_tests:
+        name: Js / Loadable tests (${{ matrix.suite }})
+        runs-on: ubuntu-latest
+        needs:
+            - js_libs_loadable
+        strategy:
+            fail-fast: false
+            matrix:
+                suite: [chrome, extensions, threads-pool, node]
+        steps:
+            - uses: actions/checkout@v6
+
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: '24'
+                  registry-url: 'https://registry.npmjs.org'
+
+            - name: Restore node_modules
+              uses: actions/cache/restore@v5
+              with:
+                  path: |
+                      ./node_modules
+                      ./packages/benchmarks/node_modules
+                      ./packages/duckdb-wasm/node_modules
+                      ./packages/duckdb-wasm-shell/node_modules
+                  key: ${{ runner.os }}-yarn-${{ hashFiles('./yarn.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-yarn-
+
+            # Install against the committed manifests, then restore the versioned
+            # package and exact bundles/data produced by the build job.
+            - name: Prepare test dependencies
+              run: yarn install --frozen-lockfile --ignore-scripts --prefer-offline
+
+            - uses: actions/download-artifact@v8
+              with:
+                  name: loadable-test-inputs
+                  path: ${{ runner.temp }}
+
+            - name: Restore loadable test inputs
+              run: tar -xzf "$RUNNER_TEMP/loadable-test-inputs.tar.gz"
+
+            - name: Test @haybarn/haybarn-wasm on Chrome
+              if: matrix.suite == 'chrome'
+              shell: bash
+              run: |
+                  CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome
+
+            - name: Test loadable threaded bundle on Chrome
+              if: matrix.suite == 'extensions'
+              shell: bash
+              run: |
+                  CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:threads:smoke
+
+            - name: Test HTTPFS on Chrome
+              if: matrix.suite == 'extensions'
+              shell: bash
+              run: |
+                  CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:httpfs
+
+            - name: Test query interrupt and progress on Chrome
+              if: matrix.suite == 'extensions'
+              shell: bash
+              run: |
+                  CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:interrupt
+
+            - name: Test platform functions for extensions on Chrome
+              if: matrix.suite == 'extensions'
+              shell: bash
+              run: |
+                  CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:platform
+
+            - name: Test extension prefetch on Chrome
+              if: matrix.suite == 'extensions'
+              shell: bash
+              run: |
+                  CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:prefetch
+
+            - name: Test the Haybarn extension repository on Chrome
+              if: matrix.suite == 'extensions'
+              shell: bash
+              run: |
+                  CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:haybarn-repository
+
+            - name: Test extension loads and the pthread pool on the threads bundle
+              if: matrix.suite == 'threads-pool'
+              shell: bash
+              run: |
+                  CHROME_BIN=`which google-chrome` POOL_ITERATIONS=20 yarn workspace @haybarn/haybarn-wasm test:chrome:threads-pool
+
+            - name: Test @haybarn/haybarn-wasm on Node.js
+              if: matrix.suite == 'node'
+              shell: bash
+              run: |
+                  yarn workspace @haybarn/haybarn-wasm test:node
+
+            - name: Test dynamic linking on Node.js
+              if: matrix.suite == 'node'
+              shell: bash
+              run: |
+                  for f in base threads; do
+                      node -e 'const { isPatched } = require("./scripts/patch_dylink_glue.cjs"); const f = process.argv[1]; if (!isPatched(require("fs").readFileSync(f, "utf8"))) { console.error(f + ": dylink glue not patched"); process.exit(1); }' packages/duckdb-wasm/src/bindings/duckdb-$f.js
+                  done
+                  node scripts/test_dylink_glue.cjs packages/duckdb-wasm/dist
+
+            - name: Test extension loads keep no copy on the heap on Node.js
+              if: matrix.suite == 'node'
+              shell: bash
+              run: |
+                  node scripts/test_extension_load_memory.cjs packages/duckdb-wasm/dist build/extension_repository
+
     # Haybarn: the release job. It runs only for a push of a haybarn-v2.* tag, so no push to
     # a branch (haybarn-2.0 included), pull request or manual dispatch can publish. 1.5 releases
     # come from haybarn-v1.* tags, whose own (1.5) workflow file runs.
@@ -1197,6 +1393,7 @@ jobs:
             contents: read
         needs:
             - js_libs_loadable
+            - js_libs_loadable_tests
         steps:
             - uses: actions/setup-node@v6
               with:

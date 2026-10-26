@@ -1,0 +1,104 @@
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -95,47 +95,51 @@
+ # ${CMAKE_CURRENT_BINARY_DIR}/libduckdb_static.a)
+ #
+ 
+-if(NATIVE_LTO_STATIC_LIBRARIES)
+-  add_library(duckdb SHARED)
+-  target_link_libraries(duckdb PRIVATE -Wl,--whole-archive duckdb_static
+-                                       -Wl,--no-whole-archive)
+-else()
+-  add_library(duckdb SHARED ${ALL_OBJECT_FILES} ${LINK_OBJECTS})
+-endif()
+-target_link_libraries(duckdb PUBLIC ${DUCKDB_SYSTEM_LIBS})
+-link_extension_libraries(duckdb PRIVATE)
+-# Haybarn: ship the shared library as libhaybarn.{so,dylib,dll}. The CMake
+-# target name (`duckdb`) and the `duckdb::` namespace/symbols are intentionally
+-# kept.
+-set_target_properties(duckdb PROPERTIES OUTPUT_NAME haybarn)
++# The Wasm wrapper links duckdb_static and does not use the shared engine.
++if(NOT DUCKDB_WASM_STATIC_ONLY)
++  if(NATIVE_LTO_STATIC_LIBRARIES)
++    add_library(duckdb SHARED)
++    target_link_libraries(duckdb PRIVATE -Wl,--whole-archive duckdb_static
++                                         -Wl,--no-whole-archive)
++  else()
++    add_library(duckdb SHARED ${ALL_OBJECT_FILES} ${LINK_OBJECTS})
++  endif()
++  target_link_libraries(duckdb PUBLIC ${DUCKDB_SYSTEM_LIBS})
++  link_extension_libraries(duckdb PRIVATE)
++  # Haybarn: ship the shared library as libhaybarn.{so,dylib,dll}. The CMake
++  # target name (`duckdb`) and the `duckdb::` namespace/symbols are intentionally
++  # kept.
++  set_target_properties(duckdb PROPERTIES OUTPUT_NAME haybarn)
+ 
+-link_threads(duckdb PUBLIC)
++  link_threads(duckdb PUBLIC)
+ 
+-if(SET_DUCKDB_LIBRARY_VERSION)
+-  set_target_properties(
+-    duckdb PROPERTIES VERSION ${DUCKDB_VERSION_NUMBER}
+-                      SOVERSION ${DUCKDB_MAJOR_VERSION}.${DUCKDB_MINOR_VERSION})
++  if(SET_DUCKDB_LIBRARY_VERSION)
++    set_target_properties(
++      duckdb PROPERTIES VERSION ${DUCKDB_VERSION_NUMBER}
++                        SOVERSION ${DUCKDB_MAJOR_VERSION}.${DUCKDB_MINOR_VERSION})
+ 
+-endif()
++  endif()
+ 
+-if(WIN32 AND NOT MINGW)
+-  ensure_variable_is_number(DUCKDB_MAJOR_VERSION RC_MAJOR_VERSION)
+-  ensure_variable_is_number(DUCKDB_MINOR_VERSION RC_MINOR_VERSION)
+-  ensure_variable_is_number(DUCKDB_PATCH_VERSION RC_PATCH_VERSION)
+-  ensure_variable_is_number(DUCKDB_DEV_ITERATION RC_DEV_ITERATION)
++  if(WIN32 AND NOT MINGW)
++    ensure_variable_is_number(DUCKDB_MAJOR_VERSION RC_MAJOR_VERSION)
++    ensure_variable_is_number(DUCKDB_MINOR_VERSION RC_MINOR_VERSION)
++    ensure_variable_is_number(DUCKDB_PATCH_VERSION RC_PATCH_VERSION)
++    ensure_variable_is_number(DUCKDB_DEV_ITERATION RC_DEV_ITERATION)
+ 
+-  set(CMAKE_RC_FLAGS
+-      "${CMAKE_RC_FLAGS} -D DUCKDB_VERSION=\"${DUCKDB_VERSION}\"")
+-  set(CMAKE_RC_FLAGS
+-      "${CMAKE_RC_FLAGS} -D DUCKDB_MAJOR_VERSION=\"${RC_MAJOR_VERSION}\"")
+-  set(CMAKE_RC_FLAGS
+-      "${CMAKE_RC_FLAGS} -D DUCKDB_MINOR_VERSION=\"${RC_MINOR_VERSION}\"")
+-  set(CMAKE_RC_FLAGS
+-      "${CMAKE_RC_FLAGS} -D DUCKDB_PATCH_VERSION=\"${RC_PATCH_VERSION}\"")
+-  set(CMAKE_RC_FLAGS
+-      "${CMAKE_RC_FLAGS} -D DUCKDB_DEV_ITERATION=\"${RC_DEV_ITERATION}\"")
++    set(CMAKE_RC_FLAGS
++        "${CMAKE_RC_FLAGS} -D DUCKDB_VERSION=\"${DUCKDB_VERSION}\"")
++    set(CMAKE_RC_FLAGS
++        "${CMAKE_RC_FLAGS} -D DUCKDB_MAJOR_VERSION=\"${RC_MAJOR_VERSION}\"")
++    set(CMAKE_RC_FLAGS
++        "${CMAKE_RC_FLAGS} -D DUCKDB_MINOR_VERSION=\"${RC_MINOR_VERSION}\"")
++    set(CMAKE_RC_FLAGS
++        "${CMAKE_RC_FLAGS} -D DUCKDB_PATCH_VERSION=\"${RC_PATCH_VERSION}\"")
++    set(CMAKE_RC_FLAGS
++        "${CMAKE_RC_FLAGS} -D DUCKDB_DEV_ITERATION=\"${RC_DEV_ITERATION}\"")
+ 
+-  target_sources(duckdb PRIVATE version.rc)
++    target_sources(duckdb PRIVATE version.rc)
++  endif()
++
+ endif()
+ 
+ install(
+@@ -155,8 +159,13 @@
+         "${PROJECT_SOURCE_DIR}/src/include/duckdb_static_extension.h"
+   DESTINATION "${INSTALL_INCLUDE_DIR}")
+ 
++set(DUCKDB_INSTALL_TARGETS duckdb_static)
++if(NOT DUCKDB_WASM_STATIC_ONLY)
++  list(APPEND DUCKDB_INSTALL_TARGETS duckdb)
++endif()
++
+ install(
+-  TARGETS duckdb duckdb_static
++  TARGETS ${DUCKDB_INSTALL_TARGETS}
+   EXPORT "${DUCKDB_EXPORT_SET}"
+   LIBRARY DESTINATION "${INSTALL_LIB_DIR}"
+   ARCHIVE DESTINATION "${INSTALL_LIB_DIR}"

@@ -12,6 +12,15 @@ if(DUCKDB_LOCATION)
   set(DUCKDB_CORE_DIR ${DUCKDB_LOCATION})
 endif()
 
+# Do not silently fall back to the redundant shared link if an engine update
+# stops the patch from applying (the legacy apply_patches target tolerates failures).
+if(EMSCRIPTEN)
+  file(READ "${DUCKDB_CORE_DIR}/src/CMakeLists.txt" DUCKDB_TARGET_DEFINITIONS)
+  if(NOT DUCKDB_TARGET_DEFINITIONS MATCHES "DUCKDB_WASM_STATIC_ONLY")
+    message(FATAL_ERROR "Apply patches/duckdb/wasm_static_only.patch before building Wasm")
+  endif()
+endif()
+
 set(DUCKDB_CXX_FLAGS "${DUCKDB_CXX_FLAGS} -Wno-unqualified-std-cast-call -DDUCKDB_DEBUG_NO_SAFETY -DDUCKDB_FROM_DUCKDB_WASM")
 message("DUCKDB_CXX_FLAGS=${DUCKDB_CXX_FLAGS}")
 
@@ -64,6 +73,7 @@ ExternalProject_Add(
              -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
              -DBUILD_EXTENSIONS=${DUCKDB_EXTENSIONS_PACKED}
              -DENABLE_JEMALLOC=OFF
+             -DDUCKDB_WASM_STATIC_ONLY:BOOL=${EMSCRIPTEN}
              -DBUILD_SHELL=FALSE
              -DBUILD_UNITTESTS=FALSE
              -DSTATICALLY_LINK_EXTENSIONS=core_functions
