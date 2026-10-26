@@ -1,10 +1,11 @@
 name: 'Main'
 on:
     push:
-    pull_request:
-    create:
+        branches:
+            - '**'
         tags:
             - haybarn-v*
+    pull_request:
     workflow_call:
       inputs:
         override_git_describe:
@@ -33,8 +34,9 @@ on:
           default: false
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.head_ref || '' }}-${{ github.base_ref || '' }}-${{ github.ref != 'refs/heads/haybarn-2.0' || github.sha }}-${{ github.event_name}}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  # New commits supersede branch/PR builds; never interrupt a tag publication.
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
 
 env:
   # Haybarn: the wasm build image, pinned by digest. The wasm compile jobs run in it (`container:`),
@@ -378,9 +380,6 @@ jobs:
         runs-on: ubuntu-latest
         container:
             image: *wasm-image
-        needs:
-            - dataprep
-            - tpchgen
         steps:
             - uses: actions/checkout@v6
               with:
@@ -434,9 +433,6 @@ jobs:
         runs-on: ubuntu-latest
         container:
             image: *wasm-image
-        needs:
-            - dataprep
-            - tpchgen
         steps:
             - uses: actions/checkout@v6
               with:
@@ -491,9 +487,6 @@ jobs:
         runs-on: ubuntu-latest
         container:
             image: *wasm-image
-        needs:
-            - dataprep
-            - tpchgen
         steps:
             - uses: actions/checkout@v6
               with:
@@ -567,9 +560,6 @@ jobs:
         runs-on: ubuntu-latest
         container:
             image: *wasm-image
-        needs:
-            - dataprep
-            - tpchgen
         steps:
             - uses: actions/checkout@v6
               with:
@@ -645,23 +635,24 @@ jobs:
         name: Js / Libraries
         runs-on: ubuntu-latest
         needs:
+            - dataprep
+            - tpchgen
             - wasm_base
             - wasm_threads
             - eslint
         steps:
             - uses: actions/checkout@v6
               with:
-                  submodules: true
+                  # npm_version.sh needs this repository's tags, not the engine source tree.
                   fetch-depth: 0
+
+            - name: Check out TPC-H generator data
+              run: git submodule update --init --depth 1 -- submodules/tpch-dbgen
 
             - uses: actions/setup-node@v6
               with:
                   node-version: '24'
                   registry-url: 'https://registry.npmjs.org'
-
-            - name: Git submodule status
-              run: |
-                  git submodule status > git_submodule_status.txt
 
             - name: Cache rust build
               uses: actions/cache@v5
@@ -707,11 +698,6 @@ jobs:
               with:
                   name: wasm-threads
                   path: ./packages/duckdb-wasm/src/bindings/
-
-            - name: Prepare repository
-              run: |
-                  git fetch --tags --no-recurse-submodules -f
-                  (cd ./submodules/duckdb && git fetch --all --tags)
 
             - name: Prepare environment
               uses: ./.github/actions/haybarn-wasm-ci-env
@@ -958,23 +944,24 @@ jobs:
         name: Js / Libraries (loadable version)
         runs-on: ubuntu-latest
         needs:
+            - dataprep
+            - tpchgen
             - wasm_base_loadable
             - wasm_threads_loadable
             - eslint
         steps:
             - uses: actions/checkout@v6
               with:
-                  submodules: true
+                  # npm_version.sh needs this repository's tags, not the engine source tree.
                   fetch-depth: 0
+
+            - name: Check out TPC-H generator data
+              run: git submodule update --init --depth 1 -- submodules/tpch-dbgen
 
             - uses: actions/setup-node@v6
               with:
                   node-version: '24'
                   registry-url: 'https://registry.npmjs.org'
-
-            - name: Git submodule status
-              run: |
-                  git submodule status > git_submodule_status.txt
 
             - name: Cache rust build
               uses: actions/cache@v5
@@ -1031,11 +1018,6 @@ jobs:
                   name: extension-repository-threads-loadable
                   path: ./build/extension_repository/
 
-            - name: Prepare repository
-              run: |
-                  git fetch --tags --no-recurse-submodules -f
-                  (cd ./submodules/duckdb && git fetch --all --tags)
-
             - name: Prepare environment
               uses: ./.github/actions/haybarn-wasm-ci-env
               with:
@@ -1083,6 +1065,19 @@ jobs:
               with:
                   name: duckdb-wasm-packages-loadable
                   path: duckdb-wasm-packages.zip
+
+            - name: Read engine version for the package badge
+              shell: bash
+              run: |
+                  ENGINE_SHA=$(git rev-parse HEAD:submodules/duckdb)
+                  ENGINE_URL=$(git config -f .gitmodules submodule.submodules/duckdb.url)
+                  ENGINE_GIT_DIR="$RUNNER_TEMP/haybarn-engine.git"
+                  git init --bare "$ENGINE_GIT_DIR"
+                  git --git-dir="$ENGINE_GIT_DIR" remote add origin "$ENGINE_URL"
+                  git --git-dir="$ENGINE_GIT_DIR" fetch --filter=blob:none --no-recurse-submodules origin \
+                      "$ENGINE_SHA" '+refs/tags/*:refs/tags/*'
+                  ENGINE_TAG=$(git --git-dir="$ENGINE_GIT_DIR" describe --tags --abbrev=0 "$ENGINE_SHA" || echo haybarn-vunknown)
+                  echo "HAYBARN_ENGINE_TAG=$ENGINE_TAG" >> "$GITHUB_ENV"
 
             - name: Measure NPM stats
               run: |
@@ -1163,6 +1158,26 @@ jobs:
               run: |
                       node scripts/test_extension_load_memory.cjs packages/duckdb-wasm/dist build/extension_repository
 
+            # Package only after every loadable-bundle test passes. Deployment consumes these exact files.
+            - name: Package release artifacts
+              if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/haybarn-v2.')
+              shell: bash
+              run: |
+                  mkdir -p "$RUNNER_TEMP/haybarn-wasm-release"
+                  npm pack --ignore-scripts --workspace @haybarn/haybarn-wasm \
+                      --pack-destination "$RUNNER_TEMP/haybarn-wasm-release"
+                  cp packages/duckdb-wasm/dist/duckdb-threads.wasm "$RUNNER_TEMP/haybarn-wasm-release/"
+                  cp -R packages/duckdb-wasm-app/build/release "$RUNNER_TEMP/haybarn-wasm-release/shell"
+
+            - name: Upload release artifacts
+              if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/haybarn-v2.')
+              uses: actions/upload-artifact@v7
+              with:
+                  name: haybarn-wasm-release
+                  path: ${{ runner.temp }}/haybarn-wasm-release/
+                  if-no-files-found: error
+                  retention-days: 7
+
             - name: Deploy GitHub Page
               if: false
               run: |
@@ -1170,162 +1185,56 @@ jobs:
                   git fetch origin gh-pages
                   ./scripts/deploy_pages.sh
 
-    # Haybarn: the release job. It runs only for the creation of a haybarn-v2.* tag, so no push to
+    # Haybarn: the release job. It runs only for a push of a haybarn-v2.* tag, so no push to
     # a branch (haybarn-2.0 included), pull request or manual dispatch can publish. 1.5 releases
     # come from haybarn-v1.* tags, whose own (1.5) workflow file runs.
     js_libs_loadable_deploy:
         name: Js / Libraries (loadable version) - Deploy
         runs-on: ubuntu-latest
-        if: github.event_name == 'create' && startsWith(github.ref, 'refs/tags/haybarn-v2.')
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/haybarn-v2.')
         permissions: # provenance for the npm publish
             id-token: write  # Required for OIDC
             contents: read
         needs:
             - js_libs_loadable
         steps:
-            - uses: actions/checkout@v6
-              with:
-                  submodules: true
-                  fetch-depth: 0
-
             - uses: actions/setup-node@v6
               with:
                   node-version: '24'
                   registry-url: 'https://registry.npmjs.org'
 
-            - name: Git submodule status
-              run: |
-                  git submodule status > git_submodule_status.txt
-
-            - name: Cache rust build
-              uses: actions/cache@v5
-              with:
-                  path: |
-                      ./.cargo/bin/
-                      ./.cargo/registry/index/
-                      ./.cargo/registry/cache/
-                      ./.cargo/git/db/
-                      ./target
-                  key: ${{ runner.os }}-shell-${{ hashFiles('./Cargo.lock') }}-${{ hashFiles('./packages/duckdb-wasm-shell/crate/src/**') }}
-                  restore-keys: |
-                      ${{ runner.os }}-shell-
-
-            - name: Cache node_modules
-              uses: actions/cache@v5
-              with:
-                  path: |
-                      ./node_modules
-                      ./packages/benchmarks/node_modules
-                      ./packages/duckdb-wasm/node_modules
-                      ./packages/duckdb-wasm-shell/node_modules
-                  key: ${{ runner.os }}-yarn-${{ hashFiles('./yarn.lock') }}
-                  restore-keys: |
-                      ${{ runner.os }}-yarn-
-
             - uses: actions/download-artifact@v8
               with:
-                  name: dataprep
-                  path: ./target/release/
+                  name: haybarn-wasm-release
+                  path: ./release/
 
-            - uses: actions/download-artifact@v8
-              with:
-                  name: tpch-dbgen
-                  path: ./submodules/tpch-dbgen/dbgen/
-
-            - uses: actions/download-artifact@v8
-              with:
-                  name: wasm-base-loadable
-                  path: ./packages/duckdb-wasm/src/bindings/
-
-            - uses: actions/download-artifact@v8
-              with:
-                  name: wasm-threads-loadable
-                  path: ./packages/duckdb-wasm/src/bindings/
-
-            - uses: actions/download-artifact@v8
-              with:
-                  name: extension-repository-base-loadable
-                  path: ./build/extension_repository/
-
-            - uses: actions/download-artifact@v8
-              with:
-                  name: extension-repository-threads-loadable
-                  path: ./build/extension_repository/
-
-            - name: Prepare repository
-              run: |
-                  git fetch --tags --no-recurse-submodules -f
-                  (cd ./submodules/duckdb && git fetch --all --tags)
-
-            - name: Prepare environment
-              uses: ./.github/actions/haybarn-wasm-ci-env
-              with:
-                  script: |-
-                      git config --global --add safe.directory '*'
-                      mkdir -p ./lib/build/wasm/release ./reports
-                      yarn install --frozen-lockfile
-                      ./scripts/generate_tpch_tbl.sh 0.01
-                      ./scripts/generate_tpch_arrow.sh 0.01
-                      ./scripts/generate_tpch_duckdb.sh 0.01
-                      ./scripts/generate_tpch_sqlite.sh 0.01
-                      ./scripts/generate_uni.sh
-                      ./scripts/npm_version.sh
-
-            - name: Build @haybarn/haybarn-wasm
+            - name: Verify release artifacts
+              id: release
               shell: bash
               run: |
-                      rm -rf ./packages/duckdb-wasm/dist/
-                      yarn workspace @haybarn/haybarn-wasm build:release
-                      yarn workspace @haybarn/haybarn-wasm docs
-
-            - name: Build @haybarn/haybarn-wasm-shell
-              shell: bash
-              run: |
-                      rm -rf ./packages/duckdb-wasm-shell/dist/
-                      yarn workspace @haybarn/haybarn-wasm-shell install:wasmpack
-                      yarn workspace @haybarn/haybarn-wasm-shell build:release
-
-            - name: Build @haybarn/haybarn-wasm-app
-              shell: bash
-              run: |
-                      rm -rf ./packages/duckdb-wasm-app/build/
-                      yarn workspace @haybarn/haybarn-wasm-app build:release
-
-            #- name: Coverage @haybarn/haybarn-wasm
-            #  shell: bash
-            #  run: |
-            #           CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome:coverage
-
-            - name: Package
-              shell: bash
-              run: zip -r duckdb-wasm-packages.zip ./packages
-
-            - name: Measure NPM stats
-              run: |
-                  ./scripts/npm_measure_lib.sh
-
-            - name: Test @haybarn/haybarn-wasm on Chrome
-              shell: bash
-              run: |
-                      CHROME_BIN=`which google-chrome` yarn workspace @haybarn/haybarn-wasm test:chrome
-            
-            #            - name: Test @haybarn/haybarn-wasm on Firefox
-            #              uses: ./.github/actions/haybarn-wasm-ci-env
-            #              with:
-            #                  script: |-
-            #                      yarn workspace @haybarn/haybarn-wasm test:firefox
-
-            - name: Test @haybarn/haybarn-wasm on Node.js
-              shell: bash
-              run: |
-                      yarn workspace @haybarn/haybarn-wasm test:node
+                  PACKAGES=(release/*.tgz)
+                  test "${#PACKAGES[@]}" -eq 1
+                  test -f "${PACKAGES[0]}"
+                  VERSION=$(tar -xOf "${PACKAGES[0]}" package/package.json | node -pe '
+                      const pkg = JSON.parse(require("fs").readFileSync(0, "utf8"));
+                      if (pkg.name !== "@haybarn/haybarn-wasm") throw new Error("unexpected package name");
+                      pkg.version')
+                  test "$VERSION" = "${GITHUB_REF_NAME#haybarn-v}"
+                  WORKER_VERSION=$(grep -oE 'engine/[^/]+/duckdb-threads\.wasm' release/shell/_worker.js | head -1 | sed -E 's|engine/(.+)/duckdb-threads\.wasm|\1|')
+                  test "$WORKER_VERSION" = "$VERSION"
+                  test -s release/shell/index.html
+                  test -s release/duckdb-threads.wasm
+                  cmp release/duckdb-threads.wasm <(tar -xOf "${PACKAGES[0]}" package/dist/duckdb-threads.wasm)
+                  echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+                  echo "package=${PACKAGES[0]}" >> "$GITHUB_OUTPUT"
 
             # Publish the threads wasm to Haybarn R2 (served at haybarn-extensions.query.farm) under a
             # version-pinned key; the shell's _worker.js streams it same-origin from there. The version
             # comes from the worker's own URL, the single source of truth for the path it requests.
             - name: Publish threads wasm to R2
-              if: github.event_name == 'create' && startsWith(github.ref, 'refs/tags/haybarn-v2.')
+              if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/haybarn-v2.')
               env:
+                  VERSION: ${{ steps.release.outputs.version }}
                   AWS_ENDPOINT_URL: ${{ secrets.R2_ENDPOINT }}
                   AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
                   AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_KEY_ID }}
@@ -1333,9 +1242,7 @@ jobs:
                   AWS_REQUEST_CHECKSUM_CALCULATION: when_required
                   AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
               run: |
-                  VERSION=$(grep -oE 'engine/[^/]+/duckdb-threads\.wasm' packages/duckdb-wasm-app/_worker.js | head -1 | sed -E 's|engine/(.+)/duckdb-threads\.wasm|\1|')
-                  test -n "$VERSION" || { echo "could not parse engine version from _worker.js"; exit 1; }
-                  WASM=./packages/duckdb-wasm/src/bindings/duckdb-threads.wasm
+                  WASM=./release/duckdb-threads.wasm
                   test -f "$WASM" || { echo "missing $WASM"; exit 1; }
                   echo "Uploading $WASM -> s3://${{ secrets.R2_BUCKET }}/engine/${VERSION}/duckdb-threads.wasm"
                   aws s3 cp "$WASM" "s3://${{ secrets.R2_BUCKET }}/engine/${VERSION}/duckdb-threads.wasm" \
@@ -1347,7 +1254,7 @@ jobs:
             # line until a stable 2.0 tag.
             - name: Release channel
               id: channel
-              if: github.event_name == 'create' && startsWith(github.ref, 'refs/tags/haybarn-v2.')
+              if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/haybarn-v2.')
               run: |
                   if [[ "${GITHUB_REF_NAME}" == *-rc* ]]; then
                       echo "npm_tag=rc" >> "$GITHUB_OUTPUT"
@@ -1362,12 +1269,13 @@ jobs:
             - name: Publish @haybarn/haybarn-wasm to npm
               env:
                   TAG: ${{ steps.channel.outputs.npm_tag }}
+                  PACKAGE: ${{ steps.release.outputs.package }}
                   NODE_AUTH_TOKEN: ${{ secrets.HAYBARN_NPM_TOKEN }}
-              if: github.event_name == 'create' && startsWith(github.ref, 'refs/tags/haybarn-v2.')
+              if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/haybarn-v2.')
               run: |
                   echo "TAG=${TAG} ref=${GITHUB_REF}"
                   test -n "${TAG}"
-                  ./scripts/npm_publish_lib.sh
+                  npm publish "$PACKAGE" --ignore-scripts --access public --provenance --tag "$TAG"
 
             # Deploy the Haybarn shell to Cloudflare Pages, after the npm publish: the shell loads the base
             # wasm from the published package. An rc goes to the preview branch alias
@@ -1375,14 +1283,15 @@ jobs:
             # (shell.haybarn.query.farm). Pinned wrangler, and the account id is stripped of stray
             # whitespace (wrangler >= 4.119 rejects it), as on 1.5.
             - name: Deploy Haybarn shell to Cloudflare Pages
-              if: github.event_name == 'create' && startsWith(github.ref, 'refs/tags/haybarn-v2.')
+              if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/haybarn-v2.')
               env:
                   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
                   CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
               run: |
-                  export CLOUDFLARE_ACCOUNT_ID="$(printf '%s' "${CLOUDFLARE_ACCOUNT_ID}" | tr -d '[:space:]')"
+                  CLOUDFLARE_ACCOUNT_ID="$(printf '%s' "${CLOUDFLARE_ACCOUNT_ID}" | tr -d '[:space:]')"
+                  export CLOUDFLARE_ACCOUNT_ID
                   npx --yes wrangler@4.119.0 pages deploy \
-                      packages/duckdb-wasm-app/build/release \
+                      release/shell \
                       --project-name haybarn-shell \
                       --branch "${{ steps.channel.outputs.pages_branch }}"
 

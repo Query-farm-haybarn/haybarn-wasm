@@ -10,8 +10,11 @@ set -euo pipefail
 PROJECT_ROOT="$(cd $(dirname "$BASH_SOURCE[0]") && cd .. && pwd)" &> /dev/null
 BADGEGEN=${PROJECT_ROOT}/node_modules/.bin/badge
 
-cd ${PROJECT_ROOT}/submodules/duckdb
-RAW=$(git describe --tags --abbrev=0 2>/dev/null || echo "haybarn-vunknown")
+# CI supplies the pinned engine's tag from a metadata-only fetch, without checking out its sources.
+RAW=${HAYBARN_ENGINE_TAG:-}
+if [ -z "$RAW" ]; then
+    RAW=$(git -C "${PROJECT_ROOT}/submodules/duckdb" describe --tags --abbrev=0 2>/dev/null || echo "haybarn-vunknown")
+fi
 # Strip the haybarn- prefix and any leading v: haybarn-v1.5.2-rc13 → 1.5.2-rc13
 VERSION=${RAW#haybarn-}
 VERSION=${VERSION#v}
