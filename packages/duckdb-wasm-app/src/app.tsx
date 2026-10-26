@@ -24,7 +24,7 @@ const onWorkerCreated = composeWorkerBridges(installVgiOAuthBridge, installVgiWe
 // and served same-origin: a Worker cannot be constructed from a cross-origin script, and each worker fetches its
 // mainModule with CORS (jsDelivr sends access-control-allow-origin: * and a cross-origin CORP header, so it also
 // loads under COEP: require-corp).
-const HAYBARN_WASM_VERSION = '2.0.0-rc7';
+const HAYBARN_WASM_VERSION = '2.0.0-rc8';
 const CDN = `https://cdn.jsdelivr.net/npm/@haybarn/haybarn-wasm@${HAYBARN_WASM_VERSION}/dist`;
 
 const DUCKDB_BUNDLES: duckdb.DuckDBBundles = {
