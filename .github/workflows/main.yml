@@ -1423,7 +1423,7 @@ jobs:
                   test -s release/duckdb-threads.wasm
                   cmp release/duckdb-threads.wasm <(tar -xOf "${PACKAGES[0]}" package/dist/duckdb-threads.wasm)
                   echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-                  echo "package=${PACKAGES[0]}" >> "$GITHUB_OUTPUT"
+                  echo "package=./${PACKAGES[0]}" >> "$GITHUB_OUTPUT"
 
             # Publish the threads wasm to Haybarn R2 (served at haybarn-extensions.query.farm) under a
             # version-pinned key; the shell's _worker.js streams it same-origin from there. The version
