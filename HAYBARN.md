@@ -20,7 +20,7 @@ upstream  https://github.com/duckdb/duckdb-wasm.git
 | Branch        | Line | Based on | Engine |
 |---------------|------|----------|--------|
 | `haybarn`     | 1.5  | upstream duckdb-wasm 1.5 | `haybarn-v1.5.*` |
-| `haybarn-2.0` | 2.0  | upstream `main` at `1f85a503` (duckdb-wasm has no 2.0 tag; `main` pins DuckDB v2.0.0, `d54cbbe3df`) | `haybarn-v2.0.0-rc8` |
+| `haybarn-2.0` | 2.0  | upstream `main` at `1f85a503` (duckdb-wasm has no 2.0 tag; `main` pins DuckDB v2.0.0, `d54cbbe3df`) | `haybarn-v2.0.0-rc9` |
 
 Each branch is a curated, linear stack of Haybarn commits on top of its
 upstream base, one concern per commit.
