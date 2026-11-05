@@ -41,6 +41,11 @@ extern "C" {
     async fn get_version(this: &JsAsyncDuckDB) -> Result<JsValue, JsValue>;
     #[wasm_bindgen(catch, method, js_name = "getFeatureFlags")]
     async fn get_feature_flags(this: &JsAsyncDuckDB) -> Result<JsValue, JsValue>;
+    #[wasm_bindgen(catch, method, js_name = "prefetchExtensions")]
+    async fn prefetch_extensions(
+        this: &JsAsyncDuckDB,
+        names: js_sys::Array,
+    ) -> Result<JsValue, JsValue>;
     #[wasm_bindgen(catch, method, js_name = "dropFile")]
     async fn drop_file(this: &JsAsyncDuckDB, name: &str) -> Result<JsValue, JsValue>;
     #[wasm_bindgen(catch, method, js_name = "dropFiles")]
@@ -106,6 +111,14 @@ impl AsyncDuckDB {
             .await?
             .as_string()
             .unwrap_or_else(|| "?".to_string()))
+    }
+
+    /// Download, hash and compile extensions ahead of their LOADs. An extension that can't be prefetched is left to
+    /// its LOAD, which reports any error.
+    pub async fn prefetch_extensions(&self, names: &[String]) -> Result<(), js_sys::Error> {
+        let names: js_sys::Array = names.iter().map(|n| JsValue::from_str(n)).collect();
+        self.bindings.prefetch_extensions(names).await?;
+        Ok(())
     }
 
     /// Drop a file

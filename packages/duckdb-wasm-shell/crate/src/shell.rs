@@ -49,6 +49,20 @@ fn resolve_default_extensions(js: JsValue) -> Vec<String> {
         .collect()
 }
 
+/// The extensions to prefetch for the given `LOAD`s. `LOAD iceberg` also loads avro and parquet, and a dependency that
+/// isn't prefetched is downloaded synchronously inside that LOAD.
+fn extensions_to_prefetch(exts: &[String]) -> Vec<String> {
+    let mut names = exts.to_vec();
+    if exts.iter().any(|e| e == "iceberg") {
+        for dep in ["avro", "parquet"] {
+            if !exts.iter().any(|e| e == dep) {
+                names.push(dep.to_string());
+            }
+        }
+    }
+    names
+}
+
 /// Silently issue `LOAD <ext>;` for each given extension via the supplied
 /// connection. Successes are invisible. Failures print a single dim
 /// `(skipped: <ext>)` line in the shell and log the full engine error via
@@ -240,6 +254,13 @@ impl Shell {
         // prints a single dim `(skipped: <ext>)` line per failed extension.
         let exts = Shell::with_mut(|s| s.default_extensions.clone());
         if !exts.is_empty() {
+            // Downloads them in parallel, without blocking the database's worker. A failure here only means that each
+            // LOAD downloads its extension itself.
+            let db_guard = db.read().unwrap();
+            if let Err(e) = db_guard.prefetch_extensions(&extensions_to_prefetch(&exts)).await {
+                warn!("prefetching default extensions failed: {}", String::from(e.message()));
+            }
+            drop(db_guard);
             load_default_extensions(&conn, &exts).await;
         }
 
