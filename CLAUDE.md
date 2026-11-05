@@ -46,9 +46,12 @@ dropping `-rc<N>` for a stable release. Cutting an rc bumps the nine
 `haybarn-v<version>` tag. Only the creation of a `haybarn-v2.*` tag runs the
 release job in `main.yml` (npm publish of `@haybarn/haybarn-wasm`, the threads
 wasm to R2, the shell to Cloudflare Pages); branch pushes, PRs and manual
-dispatches never publish. An `-rcN` tag publishes under the npm dist-tag `rc`
-and deploys the shell as the Pages preview `haybarn-2-0-rc.haybarn-shell.pages.dev`;
-only a stable tag takes `latest` and production `shell.haybarn.query.farm`.
+dispatches of it never publish. An `-rcN` tag publishes under the npm dist-tag
+`rc` and deploys the shell as the Pages preview
+`haybarn-2-0-rc.haybarn-shell.pages.dev`; a stable tag takes `latest` and deploys
+to production `shell.haybarn.query.farm`. To put an rc on production without
+changing npm, dispatch `promote_shell.yml` (on `haybarn`) with its tag within 7
+days of the release. Production currently serves `2.0.0-rc12`, promoted that way.
 
 ## Bundles and extension platforms
 

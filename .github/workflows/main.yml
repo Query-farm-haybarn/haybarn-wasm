@@ -1447,8 +1447,8 @@ jobs:
                       --cache-control "public, max-age=31536000, immutable"
 
             # Release candidates (haybarn-v2.0.0-rcN) are published under the npm dist-tag `rc` and deploy
-            # the shell as a Cloudflare Pages preview; `latest` and the production shell stay with the 1.5
-            # line until a stable 2.0 tag.
+            # the shell as a Cloudflare Pages preview; `latest` stays with the 1.5 line until a stable 2.0
+            # tag. Production only takes an rc through a manual promote_shell.yml run (on `haybarn`).
             - name: Release channel
               id: channel
               if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/haybarn-v2.')
