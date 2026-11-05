@@ -1,0 +1,60 @@
+# Deploy the shell of an already released tag to production (shell.haybarn.query.farm).
+#
+# It publishes the exact files that tag's release run tested and deployed to its preview, without
+# rebuilding them. npm is not touched, so the `latest` dist-tag stays where it is. The release artifact
+# is kept for 7 days, so an older tag has to be re-released first. To undo a promotion, roll back to the
+# previous production deployment in Cloudflare Pages; this workflow logs the recent deployments first.
+name: Promote shell to production
+
+on:
+    workflow_dispatch:
+        inputs:
+            tag:
+                description: 'Release tag to promote, e.g. haybarn-v2.0.0-rc12'
+                required: true
+                type: string
+
+permissions:
+    actions: read
+    contents: read
+
+jobs:
+    promote:
+        name: Promote ${{ inputs.tag }}
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: '24'
+
+            - name: Download the release artifact
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  TAG: ${{ inputs.tag }}
+              run: |
+                  RUN_ID=$(gh run list -R "$GITHUB_REPOSITORY" --branch "$TAG" --event push --status success \
+                      --workflow main.yml --limit 1 --json databaseId --jq '.[0].databaseId')
+                  test -n "$RUN_ID"
+                  echo "Release run: $RUN_ID"
+                  gh run download "$RUN_ID" -R "$GITHUB_REPOSITORY" --name haybarn-wasm-release --dir release
+
+            # The shell streams the threads wasm from R2 at a path set in its worker, so that has to exist.
+            - name: Verify the release artifact
+              env:
+                  TAG: ${{ inputs.tag }}
+              run: |
+                  VERSION="${TAG#haybarn-v}"
+                  test -s release/shell/index.html
+                  grep -qF "engine/${VERSION}/duckdb-threads.wasm" release/shell/_worker.js
+                  curl -fsSI "https://haybarn-extensions.query.farm/engine/${VERSION}/duckdb-threads.wasm" > /dev/null
+
+            - name: Deploy to production
+              env:
+                  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+                  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+              run: |
+                  # wrangler >= 4.119 rejects an account id with stray whitespace.
+                  CLOUDFLARE_ACCOUNT_ID="$(printf '%s' "${CLOUDFLARE_ACCOUNT_ID}" | tr -d '[:space:]')"
+                  export CLOUDFLARE_ACCOUNT_ID
+                  npx --yes wrangler@4.119.0 pages deployment list --project-name haybarn-shell --environment production || true
+                  npx --yes wrangler@4.119.0 pages deploy release/shell --project-name haybarn-shell --branch production

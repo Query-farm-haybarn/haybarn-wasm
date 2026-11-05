@@ -1305,11 +1305,12 @@ jobs:
                   echo "TAG=${TAG} ref=${GITHUB_REF}"
                   ./scripts/npm_publish_lib.sh
 
-            # Deploy the rebranded Haybarn shell to Cloudflare Pages
-            # (shell.haybarn.query.farm). The COI wasm is streamed same-origin by
-            # _worker.js from Haybarn R2 (uploaded earlier). `--branch
-            # production` targets the project's production deployment (the one the
-            # custom domain serves). Runs on manual dispatch or on a haybarn-v* tag.
+            # Deploy the 1.5 shell to the Cloudflare Pages preview
+            # https://haybarn-1-5.haybarn-shell.pages.dev. Production
+            # (shell.haybarn.query.farm) now serves the 2.0 line, so a 1.5 release
+            # must not deploy there. The COI wasm is streamed same-origin by
+            # _worker.js from Haybarn R2 (uploaded earlier). Runs on manual dispatch
+            # or on a haybarn-v* tag.
             #
             # Deliberately ordered AFTER the npm publish. This step used to sit
             # before it, so when wrangler rejected the account ID during
@@ -1336,7 +1337,7 @@ jobs:
                   npx --yes wrangler@4.119.0 pages deploy \
                       packages/duckdb-wasm-app/build/release \
                       --project-name haybarn-shell \
-                      --branch production
+                      --branch haybarn-1-5
 
     merge_reports:
         name: Merge benchmark reports
