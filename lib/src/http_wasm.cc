@@ -21,9 +21,15 @@ namespace duckdb {
 ///   [status:2 LE][headers length:4 LE][headers][body length:4 LE][body]
 /// Takes ownership of `buffer`. A null buffer is a request that got no HTTP response: no XHR in this environment, a
 /// network error or a CORS refusal (status 0), or no memory for the response.
+///
+/// Its status is INVALID ("no status"), not 404. httpfs reads 404 as "the file does not exist" and then skips its
+/// fallback from a failed HEAD to a ranged GET. A browser hides the real status of a CORS-blocked response, and the
+/// common case is a pre-signed S3/R2 URL: signed for GET, it answers HEAD with a 403 that carries no CORS headers.
+/// That GET still works, so the fallback must run. No `request_error` either: that would make the request retried
+/// and then thrown, before the fallback.
 static unique_ptr<HTTPResponse> ParseWasmResponse(char *buffer) {
     if (!buffer) {
-        auto res = make_uniq<HTTPResponse>(HTTPStatusCode::NotFound_404);
+        auto res = make_uniq<HTTPResponse>(HTTPStatusCode::INVALID);
         res->reason = "Please consult the browser console for details, might be potentially a CORS error";
         return res;
     }

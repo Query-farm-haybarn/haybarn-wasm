@@ -57,6 +57,8 @@ for (const variant of ['base', 'threads']) {
                     expect(await scalar(`SELECT count(*) FROM '${csv}'`)).toEqual(3);
                     expect(await scalar(`SELECT count(*) FROM '${parquet}'`)).toEqual(8);
                 }
+                // A HEAD with no HTTP response (CORS-blocked 403 on a pre-signed GET URL) falls back to a ranged GET.
+                expect(await scalar(`SELECT count(*) FROM '${origin}/httpfs-fixture/head-refused.csv'`)).toEqual(3);
                 await query("SET httpfs_client_implementation='wasm'");
                 await query("SET httpfs_client_implementation='default'");
                 await expectAsync(query("SET httpfs_client_implementation='curl'")).toBeRejectedWithError(

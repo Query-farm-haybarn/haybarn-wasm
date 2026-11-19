@@ -33,6 +33,11 @@ function fixture() {
             response.end('Missing S3 signature');
             return;
         }
+        if (path === '/httpfs-fixture/head-refused.csv' && request.method === 'HEAD') {
+            // A HEAD that gets no HTTP response, as a browser sees a pre-signed GET URL's CORS-less 403 to HEAD.
+            request.socket.destroy();
+            return;
+        }
         const data = path.endsWith('.gz') ? compressedCSV : csv;
         const headers = {
             'Content-Type': 'application/octet-stream',
