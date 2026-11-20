@@ -88,7 +88,7 @@ The build requires:
 
 * Node.js and npm. Node.js 24 is required for the current browser test tooling.
 * Yarn Classic. This repository uses a Yarn v1 lockfile.
-* Emscripten 6.0.13 or a compatible 6.0.x release, CMake, and ccache.
+* Emscripten 7.0.0 (side modules must come from the same release), CMake, and ccache.
 * Rust and rustup for building the shell.
 * The DuckDB CLI when generating the complete test dataset.
 

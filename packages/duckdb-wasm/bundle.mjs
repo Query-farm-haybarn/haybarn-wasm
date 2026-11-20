@@ -35,8 +35,9 @@ import { execSync } from 'child_process';
 // The lack of alternatives for Karma won't allow us to bundle workers and tests as ESM.
 // We should upgrade all CommonJS bundles to ESM as soon as the dynamic requires are resolved.
 
-// Emscripten >= 4 emits BigInt literals (WASM_BIGINT), which need chrome 67 / firefox 68 / safari 14
-const TARGET_BROWSER = ['chrome67', 'edge79', 'firefox68', 'safari14'];
+// The browsers emscripten 7 targets by default (MIN_CHROME_VERSION 93, MIN_FIREFOX_VERSION 92,
+// MIN_SAFARI_VERSION 15.4); the glue is not tested on anything older
+const TARGET_BROWSER = ['chrome93', 'edge93', 'firefox92', 'safari15.4'];
 const TARGET_BROWSER_TEST = ['es2020'];
 const TARGET_NODE = ['node14.6'];
 const EXTERNALS_NODE = ['apache-arrow'];

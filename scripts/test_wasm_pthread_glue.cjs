@@ -10,16 +10,24 @@ const source = fs.readFileSync(process.argv[2], 'utf8');
 const handlers = [...source.matchAll(/^([ \t]*)worker\.onmessage = e => \{\r?\n[\s\S]*?^\1\};/gm)];
 assert.equal(handlers.length, 1, 'Expected one generated worker message handler');
 const handler = handlers[0][0];
-const cases = [...handler.matchAll(/case (\d+):([\s\S]*?)\bbreak;/g)];
+// emscripten 6 writes the command numbers inline (`case 7:`), 7 names them (`case CMD_MARK_AS_FINISHED:`,
+// defined as `const CMD_MARK_AS_FINISHED = 7;` at the top level of the glue).
+const cases = [...handler.matchAll(/case (\d+|CMD_[A-Z_]+):([\s\S]*?)\bbreak;/g)];
 const finishedCases = cases.filter(match => match[2].includes('markAsFinished(d.thread)'));
 assert.equal(finishedCases.length, 1, 'Expected one thread completion message case');
-const command = Number(finishedCases[0][1]);
+const commandName = finishedCases[0][1];
+const commandConstants = Object.fromEntries(
+    [...source.matchAll(/^\s*const (CMD_[A-Z_]+) = (\d+);/gm)].map(match => [match[1], Number(match[2])]),
+);
+const command = /^\d+$/.test(commandName) ? Number(commandName) : commandConstants[commandName];
+assert.equal(typeof command, 'number', `Expected a value for ${commandName}`);
 
 const PThread = { pthreads: {} };
 const finished = new Set();
 function createWorker() {
     const worker = {};
     vm.runInNewContext(handler, {
+        ...commandConstants,
         worker,
         PThread,
         markAsFinished: thread => finished.add(thread),

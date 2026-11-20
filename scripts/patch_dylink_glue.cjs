@@ -18,28 +18,26 @@
 //     imports). Every other main-module GOT entry is created on first use, with exactly the value
 //     the eager pass would have given it, so the main module's definitions still win over
 //     duplicate definitions in side modules.
-//   - applySignatureConversions() overlays its ~350 pointer-return wrappers on the exports instead
-//     of copying all of them with Object.assign.
 // Undefined-symbol reporting is unchanged.
 //
 // What changes on dlopen:
-//   - loadWebAssemblyModule drops its reference to the side module's bytes once they are compiled.
-//     When a side module imports a symbol that isn't defined yet, the import gets a lazy stub whose
-//     closure shares loadWebAssemblyModule's context, which holds `binary`, so the whole file stays
-//     in memory for as long as the module is loaded (~26 MB for spatial). The async path already
-//     replaces `binary` with the compiled module, so only the sync path changes. Needed until
-//     https://github.com/emscripten-core/emscripten/pull/28002 (merged, first in emscripten 6.0.14).
 //   - relocateExports reads which exported globals are mutable from the side module's bytes,
 //     instead of calling isImmutableGlobal on each one. That probe writes to the global and catches
 //     the exception, so every data symbol a side module exports threw once (1,286 for spatial,
 //     ~30-60 ms per LOAD in Chrome). It falls back to the probe when it only has a compiled module
-//     or meets something it doesn't parse. Needed until
-//     https://github.com/emscripten-core/emscripten/pull/28006 lands.
+//     or meets something it doesn't parse. The scan runs in loadWebAssemblyModule, before the needed
+//     libraries load, and travels to instantiateModule on the metadata object. Needed until
+//     https://github.com/emscripten-core/emscripten/pull/28006 lands (not in 7.0.0).
 //   - dlopen can use a side module the worker already compiled. When the extension provider has
 //     verified an extension the worker prefetched, it arms the module compiled from
 //     those same bytes in globalThis.__haybarnArmedModule just before dlopen, and loadLibData returns
 //     it instead of the file, so dlopen skips compiling. The mutable-globals scan reads the bytes that
 //     came with it, since a compiled module has none.
+//
+// No longer patched as of emscripten 7.0.0: side-module bytes are no longer kept alive by the lazy
+// import stubs (emscripten#28002: instantiateModule's closures don't reference `binary`), and
+// applySignatureConversions layers its wrappers on the exports through the prototype instead of
+// copying them, which is what the overlay this script used to inject did.
 'use strict';
 const fs = require('fs');
 
@@ -47,12 +45,13 @@ const fs = require('fs');
 const normalize = code => code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '').replace(/\s+/g, '');
 const occurrences = (haystack, needle) => haystack.split(needle).length - 1;
 
-// The glue code the injected runtime depends on, as emitted by emscripten 6.0.13
+// The glue code the injected runtime depends on, as emitted by emscripten 7.0.0
 const REQUIRED = {
     receiveInstance: `wasmExports = instance.exports; var origExports = wasmExports; mergeLibSymbols(wasmExports, "main");`,
     receiveInstanceGOT: `assignWasmExports(wasmExports); updateGOT(origExports);`,
-    GOTHandler: `var GOTHandler = { get(weakImports, symName) { var rtn = GOT[symName]; if (!rtn) { rtn = GOT[symName] = new WebAssembly.Global({ "value": "i32", "mutable": true }, -1); } if (!weakImports.has(symName)) { rtn.required = true; } return rtn; } };`,
-    updateGOT: `var updateGOT = (exports, replace) => { for (var symName in exports) { if (isInternalSym(symName)) { continue; } var value = exports[symName]; var existingEntry = GOT[symName] && GOT[symName].value != -1; if (replace || !existingEntry) { var newValue; if (typeof value === "function") { newValue = addFunction(value); } else if (typeof value.value === "number") { newValue = value; } else { continue; } GOT[symName] ??= new WebAssembly.Global({ "value": "i32", "mutable": true }); GOT[symName].value = newValue; } } };`,
+    GOTHandler: `var GOTHandler = { get(weakImports, symName) { var rtn = GOT[symName]; if (!rtn) { rtn = GOT[symName] = new WebAssembly.Global({ "value": POINTER_WASM_TYPE, "mutable": true }, UNDEFINED_ADDR); } if (!weakImports.has(symName)) { rtn.required = true; } return rtn; } };`,
+    pointerTypes: `const POINTER_WASM_TYPE = "i32"; const UNDEFINED_ADDR = -1;`,
+    updateGOT: `var updateGOT = (exports, replace) => { for (var symName in exports) { if (isInternalSym(symName)) { continue; } var value = exports[symName]; var existingEntry = GOT[symName] && GOT[symName].value != UNDEFINED_ADDR; if (replace || !existingEntry) { var newValue; if (typeof value === "function") { newValue = addFunction(value); } else if (typeof value.value === POINTER_JS_TYPE) { newValue = value; } else { continue; } GOT[symName] ??= new WebAssembly.Global({ "value": POINTER_WASM_TYPE, "mutable": true }); GOT[symName].value = newValue; } } };`,
     isSymbolDefined: `var isSymbolDefined = symName => { var existing = wasmImports[symName]; if (!existing || existing.stub) { return false; }`,
     mergeLibSymbols: `var mergeLibSymbols = (exports, libName) => { for (var [sym, exp] of Object.entries(exports)) { const setImport = target => { if (!isSymbolDefined(target)) { wasmImports[target] = exp; } }; setImport(sym); } };`,
     ldsoInit: `var LDSO = { loadedLibsByName: {}, loadedLibsByHandle: {}, init() { newDSO("__main__", 0, wasmImports); } };`,
@@ -61,16 +60,13 @@ const REQUIRED = {
     wasmImports: [`var wasmImports = {`, `var wasmImports; function assignWasmImports() { wasmImports = {`],
     dlsymImport: `_dlsym_js: __dlsym_js,`,
     dlsymCatchupImport: `_dlsym_catchup_js: __dlsym_catchup_js,`,
-    applySignatureConversions: `function applySignatureConversions(wasmExports) { wasmExports = Object.assign({}, wasmExports);`,
+    applySignatureConversions: `Object.setPrototypeOf(wasmExports, origExports); return wasmExports; }`,
 };
-// The end of loadWebAssemblyModule's loadModule(), as emitted by emscripten 6.0.13. Matching through
-// the closing brace shows nothing after the sync compile reads `binary` again.
-const LOAD_MODULE_TAIL = `if (flags.loadAsync) { return ((async () => { var instance; if (binary instanceof WebAssembly.Module) { instance = new WebAssembly.Instance(binary, info); } else { ({ module: binary, instance } = await WebAssembly.instantiate(binary, info)); } return postInstantiation(binary, instance); }))(); } var module = binary instanceof WebAssembly.Module ? binary : new WebAssembly.Module(binary); var instance = new WebAssembly.Instance(module, info); return postInstantiation(module, instance); } flags = {`;
-const FREE_BINARY_MARKER = '/* haybarn: free side-module bytes (scripts/patch_dylink_glue.cjs) */';
 // The relocateExports and loadWebAssemblyModule code the mutable-globals rewrite changes, as
-// emitted by emscripten 6.0.13
+// emitted by emscripten 7.0.0
 const MUTABLE_GLOBALS_REQUIRED = {
-    relocateExports: `var relocateExports = (exports, memoryBase = 0) => { function relocateExport(name, value) { if (isImmutableGlobal(value)) { return new WebAssembly.Global({ "value": "i32" }, value.value + memoryBase); } return value; } var relocated = {}; for (var e in exports) { relocated[e] = relocateExport(e, exports[e]); } return relocated; };`,
+    relocateExports: `var relocateExports = (exports, memoryBase = 0) => { function relocateExport(name, value) { if (isImmutableGlobal(value)) { return new WebAssembly.Global({ "value": POINTER_WASM_TYPE }, value.value + memoryBase); } return value; } var relocated = {}; for (var e in exports) { relocated[e] = relocateExport(e, exports[e]); } return relocated; };`,
+    instantiateModule: `var instantiateModule = (binary, metadata, flags, libName, localScope, handle) => {`,
     getDylinkMetadata: `var metadata = getDylinkMetadata(binary);`,
     relocateCall: `moduleExports = relocateExports(instance.exports, memoryBase);`,
 };
@@ -95,7 +91,7 @@ const UNSUPPORTED = {
     asyncify: 'asyncifyStubs', // isSymbolDefined has extra ASYNCIFY logic
     legalizedI64: 'orig$', // without WASM_BIGINT, updateGOT renames orig$ symbols
     dynCalls: 'registerDynCallSymbols', // with DYNCALLS, mergeLibSymbols does more work
-    memory64: '"value":"i64"', // MEMORY64 GOT entries
+    memory64: 'POINTER_WASM_TYPE="i64"', // MEMORY64 GOT entries
 };
 
 // Injected immediately before applySignatureConversions: after wasmImports, GOTHandler, updateGOT and
@@ -105,20 +101,18 @@ const RUNTIME = `
 var __hbMainExports=null,__hbLazy=null,__hbGOTGet=GOTHandler.get,__hbUpdateGOT=updateGOT,__hbMerge=mergeLibSymbols;
 function __hbGOTFromMain(s){if(__hbMainExports&&!GOT[s]&&typeof s=="string"&&s in __hbMainExports&&!isInternalSym(s)){var o={};o[s]=__hbMainExports[s];__hbUpdateGOT(o)}}
 GOTHandler.get=function(w,s){__hbGOTFromMain(s);return __hbGOTGet.call(this,w,s)};
-updateGOT=(e,r)=>{if(__hbMainExports){if(e===__hbMainExports&&!r){for(var s in GOT)if(s in e&&!isInternalSym(s)&&GOT[s].value==-1){var o={};o[s]=e[s];__hbUpdateGOT(o)}return}if(!r)for(var s in e)__hbGOTFromMain(s)}return __hbUpdateGOT(e,r)};
+updateGOT=(e,r)=>{if(__hbMainExports){if(e===__hbMainExports&&!r){for(var s in GOT)if(s in e&&!isInternalSym(s)&&GOT[s].value==UNDEFINED_ADDR){var o={};o[s]=e[s];__hbUpdateGOT(o)}return}if(!r)for(var s in e)__hbGOTFromMain(s)}return __hbUpdateGOT(e,r)};
 mergeLibSymbols=(e,r)=>{if(r!=="main"||__hbMainExports)return __hbMerge(e,r);__hbMainExports=e;var t=wasmImports,h=k=>{if(typeof k!="string"||!(k in e))return!1;var v=t[k];return!v||!!v.stub},H={get:(o,k)=>h(k)?e[k]:o[k],has:(o,k)=>k in o||h(k),getOwnPropertyDescriptor:(o,k)=>h(k)?{value:e[k],writable:!0,enumerable:!0,configurable:!0}:Reflect.getOwnPropertyDescriptor(o,k),ownKeys:o=>(__hbMaterialize(),Reflect.ownKeys(o))};__hbLazy={t,h,H};wasmImports=new Proxy(t,H)};
 function __hbMaterialize(){var L=__hbLazy;if(!L)return;__hbLazy=null;var p=wasmImports,o=L.t,e=__hbMainExports;for(var k in e)L.h(k)&&(o[k]=e[k]);delete L.H.get;delete L.H.has;delete L.H.getOwnPropertyDescriptor;delete L.H.ownKeys;wasmImports=o;for(var n in LDSO.loadedLibsByName){var d=LDSO.loadedLibsByName[n];d.exports===p&&(d.exports=o)}}
 function __hbWrapDlsym(){["_dlsym_js","_dlsym_catchup_js"].forEach(n=>{var f=wasmImports[n];var w=function(h){if(__hbLazy){var d=LDSO.loadedLibsByHandle[h>>>0];d&&d.exports===wasmImports&&__hbMaterialize()}return f.apply(this,arguments)};w.sig=f.sig;wasmImports[n]=w})}
 if(wasmImports)__hbWrapDlsym();else{var __hbAssignWasmImports=assignWasmImports;assignWasmImports=function(){__hbAssignWasmImports();__hbWrapDlsym()}}
-function __hbOverlay(s){var v={};return new Proxy(v,{get:(o,k)=>k in v?v[k]:s[k],set:(o,k,x)=>(v[k]=x,!0),has:(o,k)=>k in v||k in s,ownKeys:()=>Reflect.ownKeys(s),getOwnPropertyDescriptor:(o,k)=>k in v||k in s?{value:k in v?v[k]:s[k],writable:!0,enumerable:!0,configurable:!0}:void 0})}
 `;
 
 const isLazyPatched = src => src.includes('__hbMainExports');
-const isFreeBinaryPatched = src => src.includes(FREE_BINARY_MARKER);
 const isMutableGlobalsPatched = src => src.includes(MUTABLE_GLOBALS_MARKER);
 const isPrecompiledPatched = src => src.includes(PRECOMPILED_MARKER);
 const isPatched = src =>
-    isLazyPatched(src) && isFreeBinaryPatched(src) && isMutableGlobalsPatched(src) && isPrecompiledPatched(src);
+    isLazyPatched(src) && isMutableGlobalsPatched(src) && isPrecompiledPatched(src);
 
 function checkGlue(code) {
     for (const [name, snippets] of Object.entries(REQUIRED)) {
@@ -136,21 +130,10 @@ function checkGlue(code) {
 // Load extensions without startup walking all main-module exports
 function patchLazy(src) {
     checkGlue(normalize(src));
-    const anchor = /function\s+applySignatureConversions\s*\(\s*wasmExports\s*\)\s*\{(\s*(?:\/\/[^\n]*\s*)*)wasmExports\s*=\s*Object\.assign\(\s*\{\s*\}\s*,\s*wasmExports\s*\)\s*;/;
-    if (!anchor.test(src)) throw new Error('applySignatureConversions is not in the expected form');
-    return src.replace(anchor, (_, between) => `${RUNTIME}function applySignatureConversions(wasmExports) {${between}wasmExports = __hbOverlay(wasmExports);`);
-}
-
-// Don't keep a side module's bytes alive after compiling it
-function patchFreeBinary(src) {
-    const found = occurrences(normalize(src), normalize(LOAD_MODULE_TAIL));
-    if (found !== 1) {
-        throw new Error(`glue check 'loadModuleTail' found ${found} matches, expected 1 (did emscripten change libdylink.js? re-validate the patch)`);
-    }
-    const anchor = /(var\s+module\s*=\s*binary\s+instanceof\s+WebAssembly\.Module\s*\?\s*binary\s*:\s*new\s+WebAssembly\.Module\(\s*binary\s*\)\s*;)/g;
+    const anchor = /function\s+applySignatureConversions\s*\(\s*wasmExports\s*\)\s*\{/g;
     const matches = src.match(anchor);
-    if (!matches || matches.length !== 1) throw new Error('loadModule sync compile is not in the expected form');
-    return src.replace(anchor, `$1 binary = null; ${FREE_BINARY_MARKER}`);
+    if (!matches || matches.length !== 1) throw new Error('applySignatureConversions is not in the expected form');
+    return src.replace(anchor, `${RUNTIME}$&`);
 }
 
 // Read exported global mutability from the side module's bytes instead of probing each global
@@ -165,8 +148,8 @@ function patchMutableGlobals(src) {
     const rewrites = [
         [/var\s+relocateExports\s*=\s*\(\s*exports\s*,\s*memoryBase\s*=\s*0\s*\)\s*=>\s*\{(\s*function\s+relocateExport\s*\(\s*name\s*,\s*value\s*\)\s*\{(?:\s*\/\/[^\n]*)*\s*)if\s*\(\s*isImmutableGlobal\(\s*value\s*\)\s*\)/,
             (_, between) => `${MUTABLE_GLOBALS_RUNTIME}var relocateExports = (exports, memoryBase = 0, __hbMut) => {${between}if (__hbMut ? value instanceof WebAssembly.Global && !__hbMut.has(name) : isImmutableGlobal(value))`],
-        [/var\s+metadata\s*=\s*getDylinkMetadata\(\s*binary\s*\)\s*;/, '$& var __hbMut = __hbMutableGlobals(binary);'],
-        [/moduleExports\s*=\s*relocateExports\(\s*instance\.exports\s*,\s*memoryBase\s*\)/, 'moduleExports = relocateExports(instance.exports, memoryBase, __hbMut)'],
+        [/var\s+metadata\s*=\s*getDylinkMetadata\(\s*binary\s*\)\s*;/, '$& var __hbMut = __hbMutableGlobals(binary); metadata.__hbMut = __hbMut;'],
+        [/moduleExports\s*=\s*relocateExports\(\s*instance\.exports\s*,\s*memoryBase\s*\)/, 'moduleExports = relocateExports(instance.exports, memoryBase, metadata.__hbMut)'],
     ];
     for (const [anchor, replacement] of rewrites) {
         const matches = src.match(new RegExp(anchor.source, 'g'));
@@ -198,7 +181,6 @@ function patchPrecompiled(src) {
 function patch(src) {
     if (isPatched(src)) throw new Error('already patched');
     if (!isLazyPatched(src)) src = patchLazy(src);
-    if (!isFreeBinaryPatched(src)) src = patchFreeBinary(src);
     if (!isMutableGlobalsPatched(src)) src = patchMutableGlobals(src);
     if (!isPrecompiledPatched(src)) src = patchPrecompiled(src);
     return src;
@@ -224,4 +206,4 @@ if (require.main === module) {
         process.exit(1);
     }
 }
-module.exports = { patch, isPatched, FREE_BINARY_MARKER, MUTABLE_GLOBALS_RUNTIME, PRECOMPILED_RUNTIME };
+module.exports = { patch, isPatched, MUTABLE_GLOBALS_RUNTIME, PRECOMPILED_RUNTIME };

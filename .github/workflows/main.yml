@@ -45,8 +45,8 @@ env:
   # is the single source of the emscripten version (HAYBARN_EMSCRIPTEN_VERSION, which
   # .github/actions/haybarn-wasm-toolchain checks emcc against). Published by ci-tools haybarn-2.0
   # publish-build-images.yml; a new image gets a new tag, never a re-pushed one.
-  # haybarn-wasm-base:v2.0.0-2 (emscripten 6.0.13; linux/amd64 + linux/arm64)
-  HAYBARN_WASM_CI_IMAGE: &wasm-image ghcr.io/query-farm-haybarn/haybarn-wasm-base@sha256:3c841479b14f1337b4711952896066a98a41fed78615ebac9678d41bc98c7f5b
+  # haybarn-wasm-base:v2.0.1-2 (emscripten 7.0.0; linux/amd64 + linux/arm64)
+  HAYBARN_WASM_CI_IMAGE: &wasm-image ghcr.io/query-farm-haybarn/haybarn-wasm-base@sha256:17721ea93ae66c01d7415faafdffd8e44f57b63584362c4edf607c6205f6448a
   DEFAULT_USE_GENERATED_EXPORTED_LIST: 'no'
   # DuckDB >= v2.0 no longer derives its version from git tags, the wasm builds pick this up instead.
   # Haybarn: always the engine release, so extensions resolve under core/v2.0.1/ on every build.

@@ -63,7 +63,7 @@ The engine names its repositories with `http://` (for the native httpfs
 bootstrap); `lib/src/extension_provider.cc` upgrades them to https, which a
 page needs.
 
-Main module and side modules must come from the same emscripten (6.0.13).
+Main module and side modules must come from the same emscripten (7.0.0).
 The version is set in one place, the Haybarn wasm build image
 (haybarn-extension-ci-tools `haybarn-2.0` `docker/wasm`). `main.yml` pins the
 image by digest in `HAYBARN_WASM_CI_IMAGE`, and ci-tools' `build.yml` /

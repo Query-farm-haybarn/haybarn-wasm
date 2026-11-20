@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <duckdb/common/types.hpp>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <optional>
