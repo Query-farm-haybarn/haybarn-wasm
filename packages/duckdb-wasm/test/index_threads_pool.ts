@@ -1,6 +1,6 @@
 /**
  * Haybarn: extension loading and the pthread pool on the threads bundle, against the published Haybarn extension
- * repository (haybarn-extensions.query.farm/core/v2.0.0/wasm_threads/) with signature checks on. Run with
+ * repository (haybarn-extensions.query.farm/core/v2.0.1/wasm_threads/) with signature checks on. Run with
  * karma/threads-pool-chrome.cjs (cross-origin isolated, needs network access).
  *
  * - Repeated fresh instances, each loading remote extensions with the scheduler's workers live: explicit

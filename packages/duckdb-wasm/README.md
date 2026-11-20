@@ -11,7 +11,7 @@
 
 **Haybarn-Wasm**
 
-Haybarn-Wasm is Query Farm LLC's WebAssembly distribution of [Haybarn](https://query.farm/products/haybarn/) — a derived distribution of [DuckDB](https://duckdb.org) ("Haybarn, powered by DuckDB"). This is the 2.0 line, built on DuckDB v2.0.0. The wasm binary is built against the Haybarn engine fork, so `INSTALL <extension>` resolves to the Haybarn extension repository at [`haybarn-extensions.query.farm`](https://haybarn-status.query.farm) and validates against the Haybarn signing trust root.
+Haybarn-Wasm is Query Farm LLC's WebAssembly distribution of [Haybarn](https://query.farm/products/haybarn/) — a derived distribution of [DuckDB](https://duckdb.org) ("Haybarn, powered by DuckDB"). This is the 2.0 line, built on DuckDB v2.0.1. The wasm binary is built against the Haybarn engine fork, so `INSTALL <extension>` resolves to the Haybarn extension repository at [`haybarn-extensions.query.farm`](https://haybarn-status.query.farm) and validates against the Haybarn signing trust root.
 
 The public API mirrors `@duckdb/duckdb-wasm` 2.0. Existing duckdb-wasm code ports by rewriting the import:
 
@@ -105,15 +105,15 @@ await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
 
 ## Loading extensions
 
-Extensions are fetched from `https://haybarn-extensions.query.farm/{core,community}/v2.0.0/<platform>/`, where the
+Extensions are fetched from `https://haybarn-extensions.query.farm/{core,community}/v2.0.1/<platform>/`, where the
 platform is `wasm_eh` for the `base` bundle and `wasm_threads` for the `threads` bundle. Every extension is checked
 against the Haybarn signing key before it is loaded.
 
 ```sql
-INSTALL httpfs;             -- core/v2.0.0/wasm_eh/httpfs.duckdb_extension.wasm
+INSTALL httpfs;             -- core/v2.0.1/wasm_eh/httpfs.duckdb_extension.wasm
 LOAD httpfs;
 
-INSTALL h3 FROM community;  -- community/v2.0.0/wasm_eh/h3.duckdb_extension.wasm
+INSTALL h3 FROM community;  -- community/v2.0.1/wasm_eh/h3.duckdb_extension.wasm
 LOAD h3;
 ```
 

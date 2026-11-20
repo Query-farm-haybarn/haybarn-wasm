@@ -34,7 +34,7 @@ const log = async (): Promise<Record<string, number>> => (await fetch('/haybarn-
 
 for (const variant of ['base', 'threads']) {
     const platform = variant === 'threads' ? 'wasm_threads' : 'wasm_eh';
-    const file = (mode: string, name: string) => `/haybarn-ext/${mode}/v2.0.0/${platform}/${name}.duckdb_extension.wasm`;
+    const file = (mode: string, name: string) => `/haybarn-ext/${mode}/v2.0.1/${platform}/${name}.duckdb_extension.wasm`;
 
     describe(`Extension prefetch (${variant})`, () => {
         let worker: Worker;

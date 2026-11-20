@@ -5,7 +5,7 @@ structure; the notes below are the things to remember when making changes.
 
 ## Branches
 
-`haybarn-2.0` is the 2.0 line (DuckDB v2.0.0). `haybarn` is the 1.5 line;
+`haybarn-2.0` is the 2.0 line (DuckDB v2.0.1). `haybarn` is the 1.5 line;
 don't touch it from 2.0 work. Neither is `main`.
 
 ## Remotes
@@ -29,7 +29,7 @@ fork, then bump the pointer in its own commit. Wasm-only engine tweaks live in
 - Use "Haybarn", never "DuckDB Haybarn" or "Haybarn DuckDB"
 - The canonical tagline is "Haybarn, powered by DuckDB"
 - No DuckDB logo or duck-derived imagery
-- Factual references to DuckDB ("based on DuckDB v2.0.0") are fine
+- Factual references to DuckDB ("based on DuckDB v2.0.1") are fine
 
 ## Public API compatibility
 
@@ -57,8 +57,8 @@ days of the release. Production currently serves `2.0.0-rc13`, promoted that way
 ## Bundles and extension platforms
 
 `base` loads `wasm_eh` extensions, `threads` loads `wasm_threads` ones, from
-`https://haybarn-extensions.query.farm/{core,community}/v2.0.0/<platform>/`.
-The version directory is the engine version (`v2.0.0`), not the workspace rc.
+`https://haybarn-extensions.query.farm/{core,community}/v2.0.1/<platform>/`.
+The version directory is the engine version (`v2.0.1`), not the workspace rc.
 The engine names its repositories with `http://` (for the native httpfs
 bootstrap); `lib/src/extension_provider.cc` upgrades them to https, which a
 page needs.
@@ -106,6 +106,6 @@ module with `scripts/test_wasm_name_section.cjs`. Extensions carry the same flag
 | What                          | Where                                                |
 |-------------------------------|------------------------------------------------------|
 | Build status                  | https://haybarn-status.query.farm                    |
-| Extension repository          | https://haybarn-extensions.query.farm/{core,community}/v2.0.0/ |
+| Extension repository          | https://haybarn-extensions.query.farm/{core,community}/v2.0.1/ |
 | Haybarn engine                | https://github.com/Query-farm-haybarn/haybarn (`next-2.0`) |
 | Extension CI workflows        | https://github.com/Query-farm-haybarn/haybarn-extension-ci-tools (`haybarn-2.0`) |

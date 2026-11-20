@@ -1,7 +1,7 @@
 import * as duckdb from '../src/';
 
 // Haybarn: the loadable bundles against the published Haybarn extension repository
-// (haybarn-extensions.query.farm/core/v2.0.0/<platform>/), with signature checks on. Unlike the other suites
+// (haybarn-extensions.query.farm/core/v2.0.1/<platform>/), with signature checks on. Unlike the other suites
 // this one uses no local repository and does not allow unsigned extensions, so it proves the bundle's default
 // repository, the https upgrade of its http:// URL, and the engine's Haybarn trust root against what CI publishes.
 for (const variant of ['base', 'threads']) {
@@ -31,7 +31,7 @@ for (const variant of ['base', 'threads']) {
                 };
                 const scalar = async (sql: string) => (await query(sql)).getChildAt(0)!.get(0);
 
-                expect(await scalar('SELECT version()')).toEqual('v2.0.0');
+                expect(await scalar('SELECT version()')).toEqual('v2.0.1');
                 expect(await scalar("SELECT current_setting('allow_unsigned_extensions')")).toEqual(false);
 
                 // parquet is not linked into the loadable bundles, reading a file autoloads it

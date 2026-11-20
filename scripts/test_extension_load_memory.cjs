@@ -62,7 +62,7 @@ WebAssembly.instantiate = async function (...args) {
 
     let failures = 0;
     for (const name of EXTENSIONS) {
-        const file = path.join(repository, 'v2.0.0', 'wasm_eh', `${name}.duckdb_extension.wasm`);
+        const file = path.join(repository, 'v2.0.1', 'wasm_eh', `${name}.duckdb_extension.wasm`);
         const probe = codeProbe(fs.readFileSync(file));
         conn.query(`LOAD '${file}'`);
         const heap = Buffer.from(X.memory.buffer);

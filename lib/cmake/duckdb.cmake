@@ -34,10 +34,10 @@ if(NOT DUCKDB_EXPLICIT_VERSION AND DEFINED ENV{OVERRIDE_GIT_DESCRIBE})
 endif()
 # Haybarn: default to the release the engine submodule is cut from. Left to DuckDB, a build without
 # OVERRIDE_GIT_DESCRIBE reports v2.0.0-devN and resolves extensions under a commit hash, which the Haybarn
-# extension repository does not serve (it publishes per release: core/v2.0.0/wasm_eh/...). Bump with the
+# extension repository does not serve (it publishes per release: core/v2.0.1/wasm_eh/...). Bump with the
 # submodule.
 if(NOT DUCKDB_EXPLICIT_VERSION)
-  set(DUCKDB_EXPLICIT_VERSION "v2.0.0")
+  set(DUCKDB_EXPLICIT_VERSION "v2.0.1")
 endif()
 
 # The duckdb-nanoarrow checkout that is built and linked statically, the submodule unless given otherwise
