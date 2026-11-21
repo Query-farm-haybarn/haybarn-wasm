@@ -56,7 +56,7 @@ for (const variant of ['base', 'threads']) {
                 // The repository URL the bundle resolves, from the error for an extension that does not exist
                 await expectAsync(query('LOAD haybarn_no_such_extension')).toBeRejectedWithError(
                     new RegExp(
-                        `https://haybarn-extensions\\.query\\.farm/core/v2\\.0\\.0/${platform}/haybarn_no_such_extension\\.duckdb_extension\\.wasm`,
+                        `https://haybarn-extensions\\.query\\.farm/core/v2\\.0\\.1/${platform}/haybarn_no_such_extension\\.duckdb_extension\\.wasm`,
                     ),
                 );
 
